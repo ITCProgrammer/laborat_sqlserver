@@ -1,0 +1,10 @@
+bower_components
+jquery
+dist
+login_assets
+plugins
+uploads
+koneksi.php
+pages/cetak/qrcode.png
+pages/cetak/qrcode_A.png
+pages/cetak/qrcode_B.png
