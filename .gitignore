@@ -1,5 +1,5 @@
 bower_components
-jquery
+# jquery
 dist
 login_assets
 plugins
