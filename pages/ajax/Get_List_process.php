@@ -1,23 +1,39 @@
 <?php
 ini_set("error_reporting", 1);
+header('Content-Type: application/json');
 include "../../koneksi.php";
 
-$search = $_GET['search'];
-if ($search == "") {
-    $sql = mysqli_query($con,"SELECT nama_proses FROM master_proses where is_active = 'TRUE' order by id desc");
-} else {
-    $sql = mysqli_query($con,"SELECT nama_proses FROM master_proses  where is_active = 'TRUE' and nama_proses like '%$search%' order by id desc");
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+if (! $con) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Koneksi SQL Server db_laborat gagal']);
+    exit;
 }
-$result = mysqli_num_rows($sql);
-if ($result > 0) {
-    $list = array();
-    $key = 0;
-    while ($row = mysqli_fetch_array($sql)) {
-        $list[$key]['id'] = $row['nama_proses'];
-        $list[$key]['text'] = $row['nama_proses'];
-        $key++;
-    }
-    echo json_encode($list);
-} else {
-    echo "Keyword tidak cocok!";
+
+$sql = "
+    SELECT id, nama_proses
+    FROM db_laborat.master_proses
+    WHERE is_active = 'TRUE'
+      AND (? = '' OR nama_proses LIKE ?)
+    ORDER BY TRY_CONVERT(INT, id) DESC, id DESC
+";
+$params = [$search, '%' . $search . '%'];
+
+$stmt = sqlsrv_query($con, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+if (! $stmt) {
+    http_response_code(500);
+    echo json_encode(['error' => sqlsrv_errors()]);
+    exit;
 }
+
+$rows = [];
+while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+    $rows[] = [
+        'id'   => $row['nama_proses'],
+        'text' => $row['nama_proses'],
+    ];
+}
+sqlsrv_free_stmt($stmt);
+
+echo json_encode($rows);

@@ -1,17 +1,33 @@
 <?php
 ini_set("error_reporting", 1);
+header('Content-Type: application/json');
 include "../../koneksi.php";
 
-$buyer = $_POST['buyer'];
-$sql = mysqli_query($con,"SELECT lampu from vpot_lampbuy where buyer = '$buyer' order by flag");
+$buyer = isset($_POST['buyer']) ? $_POST['buyer'] : '';
 
-while ($row = mysqli_fetch_array($sql)) {
-    $nestedData = array();
-    $nestedData[] = $row['lampu'];
-
-    $data[] = $nestedData;
+if (! $con) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Koneksi SQL Server db_laborat gagal']);
+    exit;
 }
 
-$json_data = $data;
-//----------------------------------------------------------------------------------
-echo json_encode($json_data);
+$stmt = sqlsrv_query(
+    $con,
+    "SELECT lampu FROM db_laborat.vpot_lampbuy WHERE buyer = ? ORDER BY flag",
+    [$buyer],
+    ['Scrollable' => SQLSRV_CURSOR_KEYSET]
+);
+
+if (! $stmt) {
+    http_response_code(500);
+    echo json_encode(['error' => sqlsrv_errors()]);
+    exit;
+}
+
+$data = [];
+while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+    $data[] = [$row['lampu']];
+}
+sqlsrv_free_stmt($stmt);
+
+echo json_encode($data);

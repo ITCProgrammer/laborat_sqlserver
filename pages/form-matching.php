@@ -45,8 +45,6 @@
 		ini_set("error_reporting", 1);
 		session_start();
 		include "koneksi.php";
-		$conLab = $con;
-
 		// helper sqlsrv
 		function sqlsrv_first_assoc($conn, $sql, array $params = []) {
 			$stmt = sqlsrv_query($conn, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
@@ -65,11 +63,11 @@
 			return is_numeric($first) ? (int)$first : $first;
 		}
 
-		if (! $conLab) {
+		if (! $con) {
 			die('Koneksi SQL Server db_laborat gagal.');
 		}
 
-		$rowNoUrut = sqlsrv_first_assoc($conLab, "SELECT TOP 1 nourut FROM no_urut_matching");
+		$rowNoUrut = sqlsrv_first_assoc($con, "SELECT TOP 1 nourut FROM db_laborat.no_urut_matching");
 		$nourut = isset($rowNoUrut['nourut']) ? ((int)$rowNoUrut['nourut'] + 1) : 1;
 
 		if ($_GET['idk'] != "") {
@@ -123,10 +121,10 @@
 			// ============================
 			$sqlCekLast = "
 				SELECT TOP 1 creationdatetime
-				FROM tbl_matching
+				FROM db_laborat.tbl_matching
 				ORDER BY creationdatetime DESC
 			";
-			$resLast = sqlsrv_first_assoc($conLab, $sqlCekLast);
+			$resLast = sqlsrv_first_assoc($con, $sqlCekLast);
 
 			if (!empty($resLast['creationdatetime'])) {
 				$lastDt = $resLast['creationdatetime'];
@@ -149,7 +147,7 @@
 			// ====== END CEK ======
 
 			// get data no urut terakhir
-			$queryGetNoUrut = sqlsrv_first_assoc($conLab, "SELECT TOP 1 nourut FROM no_urut_matching");
+			$queryGetNoUrut = sqlsrv_first_assoc($con, "SELECT TOP 1 nourut FROM db_laborat.no_urut_matching");
 			$dataNoUrut 	= isset($queryGetNoUrut['nourut']) ? $queryGetNoUrut['nourut'] + 1 : 1;
 			$no_resep 		= $_POST['Dyestuff'] . $dataNoUrut;
 
@@ -166,7 +164,7 @@
 			// Checkbox "For Forecast?" -> kirim 1 jika diceklis, else 0
 			$for_forecast	= (isset($_POST['for_forecast']) && $_POST['for_forecast'] == '1') ? 1 : 0;
 
-			$sqlInsert = "INSERT INTO tbl_matching (
+			$sqlInsert = "INSERT INTO db_laborat.tbl_matching (
 					no_resep, no_order, no_po, langganan, no_item, jenis_kain, benang, tgl_in,
 					cocok_warna, warna, no_warna, lebar, qty_order, gramasi, proses, buyer,
 					tgl_delivery, jenis_matching, temp_code, temp_code2, recipe_code, color_code,
@@ -205,14 +203,14 @@
 				$warnafluorescent,
 				$for_forecast
 			];
-			$qry = sqlsrv_query($conLab, $sqlInsert, $paramsInsert);
- 
+			$qry = sqlsrv_query($con, $sqlInsert, $paramsInsert);
+
 			// update nomor urut terakhir
-			sqlsrv_query($conLab, "UPDATE no_urut_matching SET nourut = ?", [$nourut]);
+			sqlsrv_query($con, "UPDATE db_laborat.no_urut_matching SET nourut = ?", [$nourut]);
 
 			if ($qry) {
 				$time = date('Y-m-d H:i:s');
-				sqlsrv_query($conLab, "INSERT INTO log_status_matching (ids, status, info, do_by, do_at, ip_address)
+				sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
 						VALUES (?, 'Create No.resep', 'generate no resep', ?, ?, ?)", [$no_resep, $_SESSION['userLAB'], $time, $ip_num]);
 				echo "
 				<script>
@@ -253,12 +251,18 @@
 										<select value="<?php echo $_GET['Dystf'] ?>" type="text" class="form-control" id="Dyestuff" name="Dyestuff" required>
 											<option value="" selected disabled>Pilih...</option>
 											<?php
-											$sqlmstrcd = sqlsrv_query($conLab, "SELECT kode, value FROM tbl_mstrheadercd");
-											while ($li = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC)) { ?>
-												<option value="<?php echo $li['value'] ?>" <?php if ($li['value'] == $_GET['Dystf']) {
-																								echo 'selected';
-																							} ?>><?php echo $li['kode'] ?></option>
-											<?php } ?>
+												$sqlmstrcd = sqlsrv_query($con, "SELECT kode, value FROM db_laborat.tbl_mstrheadercd");
+												if ($sqlmstrcd === false) {
+													$err = sqlsrv_errors();
+													echo '<option value="">[ERR] load Dyestuff: ' . htmlspecialchars(print_r($err, true)) . '</option>';
+												} else {
+													while ($li = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC)) { ?>
+														<option value="<?php echo $li['value'] ?>" <?php if ($li['value'] == $_GET['Dystf']) {
+																										echo 'selected';
+																									} ?>><?php echo $li['kode'] ?></option>
+													<?php }
+												}
+											?>
 										</select>
 									</div>
 								</div>
@@ -348,7 +352,7 @@
 						<tbody>
 							<?php
 							$i = 1;
-							$sqlmstrcd = sqlsrv_query($conLab, "SELECT kode, keterangan FROM tbl_mstrheadercd");
+							$sqlmstrcd = sqlsrv_query($con, "SELECT kode, keterangan FROM db_laborat.tbl_mstrheadercd");
 							while ($title = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC)) {
 								echo '<tr><td>' . $i++ . '.</td>
 									<td>' . $title['kode'] . '</td>

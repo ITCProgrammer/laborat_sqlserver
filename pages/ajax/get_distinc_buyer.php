@@ -1,23 +1,43 @@
 <?php
 ini_set("error_reporting", 1);
+header('Content-Type: application/json');
 include "../../koneksi.php";
 
-$search = $_GET['search'];
-if ($search == "") {
-    $sql = mysqli_query($con,"SELECT id, buyer FROM vpot_lampbuy group by buyer order by id desc");
-} else {
-    $sql = mysqli_query($con,"SELECT id, buyer FROM vpot_lampbuy where buyer like '%$search%' group by buyer order by id desc");
+$search = isset($_GET['search']) ? trim($_GET['search']) : '';
+
+if (! $con) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Koneksi SQL Server db_laborat gagal']);
+    exit;
 }
-$result = mysqli_num_rows($sql);
-if ($result > 0) {
-    $list = array();
-    $key = 0;
-    while ($row = mysqli_fetch_array($sql)) {
-        $list[$key]['id'] = $row['buyer'];
-        $list[$key]['text'] = $row['buyer'];
-        $key++;
-    }
-    echo json_encode($list);
-} else {
-    echo "Keyword tidak cocok!";
+
+$sql = "
+    SELECT buyer
+    FROM (
+        SELECT buyer, MAX(id) AS max_id
+        FROM db_laborat.vpot_lampbuy
+        WHERE (? = '' OR buyer LIKE ?)
+        GROUP BY buyer
+    ) AS b
+    ORDER BY b.max_id DESC
+";
+
+$params = [$search, '%' . $search . '%'];
+
+$stmt = sqlsrv_query($con, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+if (! $stmt) {
+    http_response_code(500);
+    echo json_encode(['error' => sqlsrv_errors()]);
+    exit;
 }
+
+$rows = [];
+while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+    $rows[] = [
+        'id'   => $row['buyer'],
+        'text' => $row['buyer'],
+    ];
+}
+sqlsrv_free_stmt($stmt);
+
+echo json_encode($rows);
