@@ -23,13 +23,18 @@ include '../../koneksi.php';
                 $tody           = date('Y-m-d');
                 //     $ystrdy         = date('Y-m-d', strtotime("-2 days"));
                 //    $tody           = date('Y-m-d', strtotime("-1 days"));
-                $sql_23         = mysqli_query($con, "SELECT * FROM sisa_schedule where DATE_FORMAT(`time`, '%Y-%m-%d %H:%i') BETWEEN '$ystrdy 23:00' AND '$tody 23:00'");
+                $stmt_23 = sqlsrv_query(
+                    $con_lab_sqlsrv,
+                    "SELECT * FROM sisa_schedule WHERE [time] BETWEEN ? AND ?",
+                    ["$ystrdy 23:00:00", "$tody 23:00:00"],
+                    ["Scrollable" => SQLSRV_CURSOR_KEYSET]
+                );
                 $lab_dip        = 0;
                 $matching_ulang = 0;
                 $perbaikan      = 0;
                 $development    = 0;
                 ?>
-                <?php while ($li = mysqli_fetch_array($sql_23)) { ?>
+                <?php while ($li = $stmt_23 ? sqlsrv_fetch_array($stmt_23, SQLSRV_FETCH_ASSOC) : null) { ?>
                     <tr>
                         <td><?php echo $li['data'] ?></td>
                         <td><?php echo $li['lab_dip'] ?></td>
@@ -78,37 +83,46 @@ include '../../koneksi.php';
             function get_val($jenismatching, $group)
             {
                 include '../../koneksi.php';
-
+                if (! $con_lab_sqlsrv) {
+                    return 0;
+                }
                 $start_date = date('Y-m-d', strtotime("-2 days"));
                 $end_date = date('Y-m-d', strtotime("-1 day"));
 
                 $start_datetime = $start_date . " 23:00:00";
                 $end_datetime = $end_date . " 23:00:00";
 
-                $sql = mysqli_query($con, "SELECT
-                                    a.grp,
-                                    SUM( IF(a.koreksi_resep <> '' AND a.koreksi_resep IS NOT NULL, 0.5, 0) +
-                                        IF(a.koreksi_resep2 <> '' AND a.koreksi_resep2 IS NOT NULL, 0.5, 0) +
-                                        IF(a.koreksi_resep3 <> '' AND a.koreksi_resep3 IS NOT NULL, 0.5, 0) +
-                                        IF(a.koreksi_resep4 <> '' AND a.koreksi_resep4 IS NOT NULL, 0.5, 0) +
-                                        IF(a.koreksi_resep5 <> '' AND a.koreksi_resep5 IS NOT NULL, 0.5, 0) +
-                                        IF(a.koreksi_resep6 <> '' AND a.koreksi_resep6 IS NOT NULL, 0.5, 0) +
-                                        IF(a.koreksi_resep7 <> '' AND a.koreksi_resep7 IS NOT NULL, 0.5, 0) +
-                                        IF(a.koreksi_resep8 <> '' AND a.koreksi_resep8 IS NOT NULL, 0.5, 0) ) AS total_value 
-                                FROM
-                                    `tbl_status_matching` a
-                                LEFT JOIN tbl_matching b ON b.no_resep = a.idm
-                                WHERE 
-                                    a.grp = '$group'
-                                    AND b.jenis_matching = '$jenismatching'
-                                    AND a.approve_at >= '$start_datetime'
-                                    AND a.approve_at < '$end_datetime'
-                                    AND a.`status` = 'selesai'
-                                GROUP BY 
-                                    a.grp");
-                $data = mysqli_fetch_array($sql);
-
-                return $data['total_value'];
+                $sql = "
+                    SELECT
+                        a.grp,
+                        SUM(
+                            CASE WHEN a.koreksi_resep  <> '' AND a.koreksi_resep  IS NOT NULL THEN 0.5 ELSE 0 END +
+                            CASE WHEN a.koreksi_resep2 <> '' AND a.koreksi_resep2 IS NOT NULL THEN 0.5 ELSE 0 END +
+                            CASE WHEN a.koreksi_resep3 <> '' AND a.koreksi_resep3 IS NOT NULL THEN 0.5 ELSE 0 END +
+                            CASE WHEN a.koreksi_resep4 <> '' AND a.koreksi_resep4 IS NOT NULL THEN 0.5 ELSE 0 END +
+                            CASE WHEN a.koreksi_resep5 <> '' AND a.koreksi_resep5 IS NOT NULL THEN 0.5 ELSE 0 END +
+                            CASE WHEN a.koreksi_resep6 <> '' AND a.koreksi_resep6 IS NOT NULL THEN 0.5 ELSE 0 END +
+                            CASE WHEN a.koreksi_resep7 <> '' AND a.koreksi_resep7 IS NOT NULL THEN 0.5 ELSE 0 END +
+                            CASE WHEN a.koreksi_resep8 <> '' AND a.koreksi_resep8 IS NOT NULL THEN 0.5 ELSE 0 END
+                        ) AS total_value
+                    FROM tbl_status_matching a
+                    LEFT JOIN tbl_matching b ON b.no_resep = a.idm
+                    WHERE a.grp = ?
+                      AND b.jenis_matching = ?
+                      AND a.approve_at >= ?
+                      AND a.approve_at < ?
+                      AND a.status = 'selesai'
+                    GROUP BY a.grp
+                ";
+                $stmt = sqlsrv_query(
+                    $con_lab_sqlsrv,
+                    $sql,
+                    [$group, $jenismatching, $start_datetime, $end_datetime],
+                    ["Scrollable" => SQLSRV_CURSOR_KEYSET]
+                );
+                $data = $stmt ? sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC) : [];
+                if ($stmt) sqlsrv_free_stmt($stmt);
+                return isset($data['total_value']) ? $data['total_value'] : 0;
             }
 
 

@@ -20,6 +20,30 @@ $id    = isset($_GET['id']) ? $_GET['id'] : '';
 $page  = strtolower($page);
 
 ?>
+<?php
+// Helper untuk koneksi SQL Server (db_laborat)
+// Gunakan $con_lab_sqlsrv dari koneksi.php
+function sqlsrv_first_row($conn, $sql, array $params = [])
+{
+  $stmt = sqlsrv_query($conn, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+  if (! $stmt) {
+    return [];
+  }
+  $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+  sqlsrv_free_stmt($stmt);
+  return $row ?: [];
+}
+
+function sqlsrv_scalar_int($conn, $sql, array $params = [])
+{
+  $row = sqlsrv_first_row($conn, $sql, $params);
+  if (empty($row)) {
+    return 0;
+  }
+  $first = reset($row);
+  return (int) $first;
+}
+?>
 <!DOCTYPE html>
 <html dir="ltr" lang="en-US">
 
@@ -223,8 +247,12 @@ $page  = strtolower($page);
     <h1>Welcome back <php echo strtoupper($_SESSION['userLAB']); ?> at system laborat ITTI</h1>
   </blockquote> -->
   <div class="row">
-    <?php $sql_ann = mysqli_query($con, "SELECT * from announcement where id = 1");
-    $ann = mysqli_fetch_array($sql_ann); ?>
+    <?php
+      $ann = sqlsrv_first_row(
+        $con_lab_sqlsrv,
+        "SELECT TOP 1 * FROM announcement WHERE id = 1"
+      );
+    ?>
     <?php if ($ann['is_active'] == 1) : ?>
       <div class="alert" role="alert" style="background-color: #214d66;">
         <marquee style="color: white; font-style: italic; font-weight: bold;">
@@ -235,8 +263,11 @@ $page  = strtolower($page);
     <div class="col-lg-3 col-xs-6" style="margin-top:10px;">
       <!-- small box -->
       <div class="small-box bg-aqua">
-        <?php $sql = mysqli_query($con, "SELECT idm from tbl_status_matching where `status` = 'selesai' and approve = 'TRUE'");
-        $Total_resep = mysqli_num_rows($sql);
+        <?php
+          $Total_resep = sqlsrv_scalar_int(
+            $con_lab_sqlsrv,
+            "SELECT COUNT(*) FROM tbl_status_matching WHERE status = 'selesai' AND approve = 'TRUE'"
+          );
         ?>
         <div class="inner">
           <h3><?php echo $Total_resep; ?> <i class="fa fa-check"></i></h3>
@@ -254,8 +285,11 @@ $page  = strtolower($page);
     <div class="col-lg-3 col-xs-6" style="margin-top:10px;">
       <!-- small box -->
       <div class="small-box bg-green">
-        <?php $sql_Dyes = mysqli_query($con, "SELECT code from tbl_dyestuff WHERE is_active = 'TRUE'");
-        $Total_Dyes = mysqli_num_rows($sql_Dyes);
+        <?php
+          $Total_Dyes = sqlsrv_scalar_int(
+            $con_lab_sqlsrv,
+            "SELECT COUNT(*) FROM tbl_dyestuff WHERE is_active = 'TRUE'"
+          );
         ?>
         <div class="inner">
           <h3><?php echo intval($Total_Dyes) - 1; ?></h3>
@@ -271,10 +305,16 @@ $page  = strtolower($page);
     </div>
     <!-- ./col -->
     <div class="col-lg-3 col-xs-6" style="margin-top:10px;">
-      <?php $sql_totalmatcher = mysqli_query($con, "SELECT * FROM tbl_matcher where `status` = 'Aktif'"); ?>
-      <?php $totalmatcher = mysqli_num_rows($sql_totalmatcher); ?>
-      <?php $sql_totalcolorist = mysqli_query($con, "SELECT * FROM tbl_colorist where is_active = 'TRUE'"); ?>
-      <?php $totalcolorist = mysqli_num_rows($sql_totalcolorist); ?>
+      <?php
+        $totalmatcher = sqlsrv_scalar_int(
+          $con_lab_sqlsrv,
+          "SELECT COUNT(*) FROM tbl_matcher WHERE status = 'Aktif'"
+        );
+        $totalcolorist = sqlsrv_scalar_int(
+          $con_lab_sqlsrv,
+          "SELECT COUNT(*) FROM tbl_colorist WHERE is_active = 'TRUE'"
+        );
+      ?>
       <div class="small-box bg-yellow">
         <div class="inner">
           <h3><?php echo $totalmatcher . ' & ' . $totalcolorist ?></h3>
@@ -290,8 +330,12 @@ $page  = strtolower($page);
     </div>
     <!-- ./col -->
     <div class="col-lg-3 col-xs-6" style="margin-top:10px;">
-      <?php $sql_proses = mysqli_query($con, "SELECT * from master_proses where is_active = 'TRUE'"); ?>
-      <?php $proses = mysqli_num_rows($sql_proses); ?>
+      <?php
+        $proses = sqlsrv_scalar_int(
+          $con_lab_sqlsrv,
+          "SELECT COUNT(*) FROM master_proses WHERE is_active = 'TRUE'"
+        );
+      ?>
       <div class="small-box bg-red">
         <div class="inner">
           <h3><?php echo $proses; ?></h3>

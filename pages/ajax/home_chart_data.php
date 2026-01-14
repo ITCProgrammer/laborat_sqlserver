@@ -4,6 +4,12 @@ header('Content-Type: application/json; charset=utf-8');
 
 include "../../koneksi.php";
 
+if (! $con_lab_sqlsrv) {
+  http_response_code(500);
+  echo json_encode(['error' => 'Koneksi SQL Server db_laborat gagal.']);
+  exit;
+}
+
 // Param: berapa hari ke belakang (default 12, dibatasi max 120 utk safety)
 $days = isset($_GET['days']) ? (int)$_GET['days'] : 12;
 $days = max(0, min(120, $days));
@@ -23,59 +29,53 @@ for ($i = 0; $i <= $days; $i++) {
 }
 
 // Helper ambil hasil group-by jadi map: 'YYYY-MM-DD' => count
-function grouped_map(mysqli $con, string $sql, array $params): array {
-  $stmt = $con->prepare($sql);
-  if (!$stmt) {
+function grouped_map($conn, string $sql, array $params): array {
+  $stmt = sqlsrv_query($conn, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+  if (! $stmt) {
     return [];
   }
-  if (!empty($params)) {
-    $types = str_repeat('s', count($params)); // semua as string tanggal
-    $stmt->bind_param($types, ...$params);
-  }
-  $stmt->execute();
-  $res = $stmt->get_result();
   $out = [];
-  while ($row = $res->fetch_assoc()) {
-    $out[$row['d']] = (int)$row['cnt'];
+  while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+    $out[$row['d']] = (int) $row['cnt'];
   }
-  $stmt->close();
+  sqlsrv_free_stmt($stmt);
   return $out;
 }
 
 // Timeline: Approved (status=selesai & approve=TRUE) by approve_at
 $mapSelesai = grouped_map(
-  $con,
-  "SELECT DATE(approve_at) AS d, COUNT(*) AS cnt
+  $con_lab_sqlsrv,
+  "SELECT CONVERT(date, approve_at) AS d, COUNT(*) AS cnt
    FROM tbl_status_matching
    WHERE status='selesai' AND approve='TRUE'
      AND approve_at IS NOT NULL
      AND approve_at >= ? AND approve_at < ?
-   GROUP BY DATE(approve_at)",
+   GROUP BY CONVERT(date, approve_at)",
   [$start, $endExclusive]
 );
 
 // Timeline: Rejected (status=tutup) by tutup_at
 $mapClosed = grouped_map(
-  $con,
-  "SELECT DATE(tutup_at) AS d, COUNT(*) AS cnt
+  $con_lab_sqlsrv,
+  "SELECT CONVERT(date, tutup_at) AS d, COUNT(*) AS cnt
    FROM tbl_status_matching
    WHERE status='tutup'
      AND tutup_at IS NOT NULL
      AND tutup_at >= ? AND tutup_at < ?
-   GROUP BY DATE(tutup_at)",
+   GROUP BY CONVERT(date, tutup_at)",
   [$start, $endExclusive]
 );
 
 // Timeline: Arsip (distinct idm pada hari log arsip)
 $mapArsip = grouped_map(
-  $con,
-  "SELECT DATE(b.do_at) AS d, COUNT(DISTINCT a.idm) AS cnt
+  $con_lab_sqlsrv,
+  "SELECT CONVERT(date, b.do_at) AS d, COUNT(DISTINCT a.idm) AS cnt
    FROM tbl_status_matching a
    JOIN log_status_matching b ON a.idm = b.ids
    WHERE a.status='arsip' AND b.status='arsip'
      AND b.do_at IS NOT NULL
      AND b.do_at >= ? AND b.do_at < ?
-   GROUP BY DATE(b.do_at)",
+   GROUP BY CONVERT(date, b.do_at)",
   [$start, $endExclusive]
 );
 
@@ -98,9 +98,12 @@ $qPie = "
     SUM(CASE WHEN status='arsip' THEN 1 ELSE 0 END) AS row_arsip
   FROM tbl_status_matching
 ";
-if ($res = $con->query($qPie)) {
-  $pieRow = $res->fetch_assoc();
-  $res->free();
+$stmtPie = sqlsrv_query($con_lab_sqlsrv, $qPie, [], ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+if ($stmtPie && ($row = sqlsrv_fetch_array($stmtPie, SQLSRV_FETCH_ASSOC))) {
+  $pieRow = $row;
+}
+if ($stmtPie) {
+  sqlsrv_free_stmt($stmtPie);
 }
 
 echo json_encode([

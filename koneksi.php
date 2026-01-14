@@ -1,14 +1,25 @@
 <?php
 date_default_timezone_set('Asia/Jakarta');
-// $host="10.0.0.174";
-// $username="ditprogram";
-// $password="Xou@RUnivV!6";
-// $db_name="TM";
-// $time = date('Y-m-d H:i:s');
-// $connInfo = array( "Database"=>$db_name, "UID"=>$username, "PWD"=>$password);
-// $conn     = sqlsrv_connect( $host, $connInfo);
-$con=mysqli_connect("10.0.0.10","dit","4dm1n","db_laborat");
-$con_db_dyeing=mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
+
+function noteConnectionFailure($label, $error)
+{
+    error_log(sprintf('[%s] DB connection failed: %s', $label, $error ?: 'unknown error'));
+}
+
+function safeMysqliConnect($host, $user, $password, $db, $label)
+{
+    // Set timeout singkat agar tidak lama saat host mati
+    $conn = mysqli_init();
+    mysqli_options($conn, MYSQLI_OPT_CONNECT_TIMEOUT, 2);
+    if (!@mysqli_real_connect($conn, $host, $user, $password, $db)) {
+        noteConnectionFailure($label, mysqli_connect_error());
+        return false;
+    }
+    return $conn;
+}
+
+$con              = safeMysqliConnect("10.0.0.10", "dit", "4dm1n", "db_laborat", "db_laborat");
+$con_db_dyeing    = mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
 
 $hostSVR19     = "10.0.0.221";
 $usernameSVR19 = "sa";
@@ -16,7 +27,6 @@ $passwordSVR19 = "Ind@taichen2024";
 $nowprd        = "nowprd";
 $nowprdd       = ["Database" => $nowprd, "UID" => $usernameSVR19, "PWD" => $passwordSVR19];
 $con_nowprd = sqlsrv_connect($hostSVR19, $nowprdd);
-
 
 $cona = mysqli_connect("10.0.0.10","dit","4dm1n","db_adm");
 
@@ -29,7 +39,38 @@ $port="25000";
 $conn_string = "DRIVER={IBM ODBC DB2 DRIVER}; HOSTNAME=$hostname; PORT=$port; PROTOCOL=TCPIP; UID=$user; PWD=$passworddb2; DATABASE=$database;";
 $conn1 = db2_pconnect($conn_string,'', '');
 
-if (mysqli_connect_errno()) {
-printf("Connect failed: %s\n", mysqli_connect_error());
-exit();
+$hostLabSqlsrv = "10.0.0.221";
+$dbLabSqlsrv   = "db_laborat";
+$con_lab_sqlsrv = sqlsrv_connect($hostLabSqlsrv, [
+    "Database" => $dbLabSqlsrv,
+    "UID"      => $usernameSVR19,
+    "PWD"      => $passwordSVR19,
+    "LoginTimeout" => 2,
+]);
+if (! $con_lab_sqlsrv) {
+    noteConnectionFailure($dbLabSqlsrv, print_r(sqlsrv_errors(), true));
 }
+
+if ($con === false) {
+    printf("Connect failed: %s\n", mysqli_connect_error());
+    exit();
+}
+
+// Tutup koneksi saat eksekusi selesai (tidak wajib, tapi eksplisit).
+register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$con_nowprd, &$con_lab_sqlsrv) {
+    foreach ([$con, $con_db_dyeing, $cona] as $mysqliConn) {
+        if ($mysqliConn instanceof mysqli) {
+            $mysqliConn->close();
+        } elseif ($mysqliConn) {
+            mysqli_close($mysqliConn);
+        }
+    }
+
+    if ($con_nowprd) {
+        sqlsrv_close($con_nowprd);
+    }
+    if ($con_lab_sqlsrv) {
+        sqlsrv_close($con_lab_sqlsrv);
+    }
+    // $conn1 adalah pconnect DB2, dibiarkan agar tetap persistent.
+});

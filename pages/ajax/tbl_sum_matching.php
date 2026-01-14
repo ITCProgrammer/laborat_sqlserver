@@ -3,124 +3,124 @@ ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
 
+if (! $con_lab_sqlsrv) {
+    die('Koneksi SQL Server db_laborat gagal.');
+}
+
+// Helper count scalar
+function count_query($sql, array $params = [])
+{
+    global $con_lab_sqlsrv;
+    $stmt = sqlsrv_query($con_lab_sqlsrv, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+    if (! $stmt) {
+        return 0;
+    }
+    $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+    sqlsrv_free_stmt($stmt);
+    return isset($row['count']) ? (int)$row['count'] : 0;
+}
+
 /////////////////// QUERY TABLE !
 function Masuk($jenis_matching)
 {
-    include "../../koneksi.php";
-    $start = date('Y-m-01');
-    $end = date('Y-m-d');
-    $sql = mysqli_fetch_array(mysqli_query($con,"SELECT count(id) as `count` from tbl_matching
-                                         WHERE jenis_matching = '$jenis_matching'
-                                        AND DATE_FORMAT(tgl_buat,'%Y-%m-%d %H:%i') >= '$start 23:00' 
-                                        AND DATE_FORMAT(tgl_buat,'%Y-%m-%d %H:%i') <= '$end  23:00'"));
-
-    return $sql['count'];
+    $start = date('Y-m-01 23:00:00');
+    $end = date('Y-m-d 23:00:00');
+    return count_query(
+        "SELECT COUNT(id) AS count FROM tbl_matching
+         WHERE jenis_matching = ?
+           AND tgl_buat >= ?
+           AND tgl_buat <= ?",
+        [$jenis_matching, $start, $end]
+    );
 }
 function SiapBagi($jenis_matching)
 {
-    include "../../koneksi.php";
-    $sql = mysqli_fetch_array(
-		/*mysqli_query($con,"SELECT count(a.id) as count 
-                                        from tbl_matching a
-                                        left join tbl_status_matching b on a.no_resep = b.idm
-                                        where a.jenis_matching = '$jenis_matching' and a.status_bagi = 'siap bagi' and ifnull(b.`status`, 'siap bagi') = 'siap bagi'")*/
-		mysqli_query($con,"select  count(a.id) as `count` FROM tbl_matching a 
-			left join tbl_status_matching b on a.`no_resep` = b.`idm`
-			where b.approve_at is null  and b.status is null and a.status_bagi = 'siap bagi' and a.jenis_matching = '$jenis_matching'")
-	
-	);
-	
-    return $sql['count'];
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_matching a
+         LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+         WHERE b.approve_at IS NULL AND b.status IS NULL
+           AND a.status_bagi = 'siap bagi'
+           AND a.jenis_matching = ?",
+        [$jenis_matching]
+    );
 }
 function SedangJalan($jenis_matching)
 {
-    include "../../koneksi.php";
-    $sql = mysqli_fetch_array(
-        /*mysqli_query($con,"SELECT count(b.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'batal', 'revisi','tunggu') 
-        and b.jenis_matching = '$jenis_matching'")*/
-		mysqli_query($con,"SELECT count(b.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi','tunggu')
-        and b.jenis_matching = '$jenis_matching'")
+    return count_query(
+        "SELECT COUNT(b.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
-    return $sql['count'];
 }
 function WaitingApprove($jenis_matching)
 {
-    include "../../koneksi.php";
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(b.id) as `count`
-        FROM tbl_status_matching a
-        INNER JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('selesai', 'batal') and a.approve = 'NONE' and b.jenis_matching = '$jenis_matching'")
+    return count_query(
+        "SELECT COUNT(b.id) AS count
+         FROM tbl_status_matching a
+         INNER JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('selesai','batal')
+           AND a.approve = 'NONE'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
-    return $sql['count'];
 }
 
 function Delete($jenis_matching)
 {
-    include "../../koneksi.php";
-    $start = date('Y-m-01');
-    $end = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(id) as `count` FROM db_laborat.historical_delete_matching
-        where jenis_matching = '$jenis_matching' 
-        AND DATE_FORMAT(delete_at ,'%Y-%m-%d %H:%i') >= '$start 23:00' 
-        AND DATE_FORMAT(delete_at ,'%Y-%m-%d %H:%i') <= '$end 23:00'")
+    $start = date('Y-m-01 23:00:00');
+    $end = date('Y-m-d 23:00:00');
+    return count_query(
+        "SELECT COUNT(id) AS count FROM historical_delete_matching
+         WHERE jenis_matching = ?
+           AND delete_at >= ?
+           AND delete_at <= ?",
+        [$jenis_matching, $start, $end]
     );
-
-    return $sql['count'];
 }
 
 function Tunggu($jenis_matching)
 {
-    include "../../koneksi.php";
-    // $dm = date('Y-m');
-    $sql = mysqli_fetch_array(
-        //mysqli_query($con,"SELECT count(id) as `count` from tbl_matching where status_bagi = 'tunggu' and jenis_matching = '$jenis_matching'")
-		mysqli_query($con,"select  count(a.id) as `count` FROM tbl_matching a 
-			left join tbl_status_matching b on a.`no_resep` = b.`idm`
-			where b.approve_at is null  and b.status is null and a.status_bagi = 'tunggu' and a.jenis_matching = '$jenis_matching'")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_matching a
+         LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+         WHERE b.approve_at IS NULL AND b.status IS NULL
+           AND a.status_bagi = 'tunggu'
+           AND a.jenis_matching = ?",
+        [$jenis_matching]
     );
-
-    return $sql['count'];
 }
 function belum_bagi($jenis_matching)
 {
-    include "../../koneksi.php";
-    // $dm = date('Y-m');
-    $sql = mysqli_fetch_array(
-       /* mysqli_query($con,"SELECT count(a.id) as `count` from tbl_matching a
-        left join tbl_status_matching b on a.no_resep = b.idm
-        where a.jenis_matching = '$jenis_matching' and a.status_bagi IS NULL and ifnull(b.`status`, 'siap bagi') = 'siap bagi'")*/
-		mysqli_query($con,"select  count(a.id) as `count` FROM tbl_matching a 
-			left join tbl_status_matching b on a.`no_resep` = b.`idm`
-			where b.approve_at is null  and b.status is null and 
-			a.status_bagi IS NULL and a.jenis_matching = '$jenis_matching'")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_matching a
+         LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+         WHERE b.approve_at IS NULL AND b.status IS NULL
+           AND a.status_bagi IS NULL
+           AND a.jenis_matching = ?",
+        [$jenis_matching]
     );
-
-    return $sql['count'];
 }
 
 function Selesai($jenis_matching)
 {
-    include "../../koneksi.php";
-    $start = date('Y-m-01');
-    $end = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(b.id ) as `count`
-                    FROM tbl_status_matching a 
-                    join tbl_matching b on b.no_resep = a.idm
-                    WHERE b.jenis_matching = '$jenis_matching' and a.approve = 'TRUE'
-                    AND DATE_FORMAT(a.approve_at,'%Y-%m-%d %H:%i') >= '$start 23:00' 
-                    AND DATE_FORMAT(a.approve_at,'%Y-%m-%d %H:%i') <= '$end 23:00'")
+    $start = date('Y-m-01 23:00:00');
+    $end = date('Y-m-d 23:00:00');
+    return count_query(
+        "SELECT COUNT(b.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON b.no_resep = a.idm
+         WHERE b.jenis_matching = ?
+           AND a.approve = 'TRUE'
+           AND a.approve_at >= ?
+           AND a.approve_at <= ?",
+        [$jenis_matching, $start, $end]
     );
-
-    return $sql['count'];
 }
 
 ?>
@@ -255,173 +255,162 @@ function Selesai($jenis_matching)
 <?php
 function MasukYesterday($jenis_matching)
 {
-    include "../../koneksi.php";
 //  $ystrdy = date('Y-m-d', strtotime("-1 days"));
 //	$tody = date('Y-m-d');
 	$ystrdy = date('Y-m-d', strtotime("-2 days"));
 	$tody = date('Y-m-d', strtotime("-1 days"));
-    $sql = mysqli_fetch_array(mysqli_query($con,"SELECT count(id) as `count` from tbl_matching
-                                         WHERE jenis_matching = '$jenis_matching'
-                                        AND DATE_FORMAT(tgl_buat,'%Y-%m-%d %H:%i') BETWEEN '$ystrdy 23:00' AND '$tody 23:00'"));
-
-    return $sql['count'];
+    return count_query(
+        "SELECT COUNT(id) AS count FROM tbl_matching
+         WHERE jenis_matching = ?
+           AND tgl_buat BETWEEN ? AND ?",
+        [$jenis_matching, "$ystrdy 23:00:00", "$tody 23:00:00"]
+    );
 }
 
 function Selesai_Y($jenis_matching)
 {
-    include "../../koneksi.php";
 //  $ystrdy = date('Y-m-d', strtotime("-1 days"));
 //	$tody = date('Y-m-d');
 	$ystrdy = date('Y-m-d', strtotime("-2 days"));
 	$tody = date('Y-m-d', strtotime("-1 days"));
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(b.id ) as `count`
-                    FROM tbl_status_matching a 
-                    join tbl_matching b on b.no_resep = a.idm
-                    WHERE b.jenis_matching = '$jenis_matching' and a.approve = 'TRUE' and 
-					-- a.`status` <> 'hold' and 
-					(a.koreksi_resep <> '' or a.koreksi_resep2 <> '') and 
-					a.`status` = 'selesai' and
-                    DATE_FORMAT(a.approve_at,'%Y-%m-%d %H:%i') BETWEEN '$ystrdy 23:00' and '$tody 23:00'")
+    return count_query(
+        "SELECT COUNT(b.id) AS count
+         FROM tbl_status_matching a 
+         JOIN tbl_matching b ON b.no_resep = a.idm
+         WHERE b.jenis_matching = ?
+           AND a.approve = 'TRUE'
+           AND (a.koreksi_resep <> '' OR a.koreksi_resep2 <> '')
+           AND a.status = 'selesai'
+           AND a.approve_at BETWEEN ? AND ?",
+        [$jenis_matching, "$ystrdy 23:00:00", "$tody 23:00:00"]
     );
-
-    return $sql['count'];
 }
 
 function grpA($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'A' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'A'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
-
-    return $sql['count'];
 }
 function grpB($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'B' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'B'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
-
-    return $sql['count'];
 }
 function grpC($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'C' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'C'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
-
-    return $sql['count'];
 }
 function grpD($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'D' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'D'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
-
-    return $sql['count'];
 }
 function grpE($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'E' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'E'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
-
-    return $sql['count'];
 }
 function grpF($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'F' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'F'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
- 
-    return $sql['count'];
 }
 function SA($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'SA' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'SA'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
- 
-    return $sql['count'];
 }
 function SB($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'SB' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'SB'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
- 
-    return $sql['count'];
 }
 function SC($jenis_matching)
 {
-    include "../../koneksi.php";
 	$tomrw = date('Y-m-d', strtotime("+1 days"));
 	$tody = date('Y-m-d');
-    $sql = mysqli_fetch_array(
-        mysqli_query($con,"SELECT count(a.id) as `count`
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
-        where a.status in ('buka', 'mulai', 'hold', 'revisi', 'tunggu') and a.grp = 'SC' and b.jenis_matching = '$jenis_matching'
-		")
+    return count_query(
+        "SELECT COUNT(a.id) AS count
+         FROM tbl_status_matching a
+         JOIN tbl_matching b ON a.idm = b.no_resep
+         WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+           AND a.grp = 'SC'
+           AND b.jenis_matching = ?",
+        [$jenis_matching]
     );
- 
-    return $sql['count'];
 }
 ?>
 <div class="col-md-6">
