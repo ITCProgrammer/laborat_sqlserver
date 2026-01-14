@@ -1,10 +1,21 @@
 <?php
-ini_set("error_reporting", 1);
 session_start();
 include "../../koneksi.php";
+// Tampilkan error kecuali notice deprecation dari lib QR (override setting dari koneksi.php)
+error_reporting(E_ALL & ~E_DEPRECATED);
+ini_set('error_reporting', E_ALL & ~E_DEPRECATED);
+if (! $con) {
+  die('Koneksi SQL Server db_laborat gagal.');
+}
+
+function normalizeDateVal($val) {
+  return $val instanceof DateTime ? $val->format('Y-m-d H:i:s') : $val;
+}
 //--
+$time = date('Y-m-d H:i:s');
+//-- 
 $idkk = $_REQUEST['idkk'];
-$act = $_GET['g'];
+$act = $_GET['g'] ?? '';
 //-
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -30,16 +41,27 @@ $act = $_GET['g'];
 
 <body>
   <?php
-    $qry = mysqli_query($con, "SELECT *,DATE_FORMAT(now(),'%d %M %Y') as tgl FROM tbl_matching WHERE no_resep='$idkk'");
-    $data = mysqli_fetch_array($qry);
+    $stmtHeader = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_matching WHERE no_resep = ?", [$idkk]);
+    if (! $stmtHeader) {
+        die('Load data matching gagal: ' . print_r(sqlsrv_errors(), true));
+    }
+    $data = sqlsrv_fetch_array($stmtHeader, SQLSRV_FETCH_ASSOC);
+    sqlsrv_free_stmt($stmtHeader);
+    if (! $data) {
+        die('Data matching tidak ditemukan.');
+    }
+    $data['tgl']          = date('d M Y');
+    $data['tgl_in']       = normalizeDateVal($data['tgl_in'] ?? null);
+    $data['tgl_delivery'] = normalizeDateVal($data['tgl_delivery'] ?? null);
+    $tglInDisplay         = !empty($data['tgl_in']) ? date("d-m-Y", strtotime($data['tgl_in'])) : '';
+    $tglDeliveryDisplay   = !empty($data['tgl_delivery']) ? date("d-m-Y", strtotime($data['tgl_delivery'])) : '';
+
     $ip_num = $_SERVER['REMOTE_ADDR'];
-    mysqli_query($con, "INSERT INTO log_status_matching SET
-                        `ids` = '$idkk', 
-                        `status` = 'print', 
-                        `info` = 'cetak kartu matching', 
-                        `do_by` = '$_SESSION[userLAB]', 
-                        `do_at` = '$time', 
-                        `ip_address` = '$ip_num'");
+    sqlsrv_query(
+        $con,
+        "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address) VALUES (?, ?, ?, ?, ?, ?)",
+        [$idkk, 'print', 'cetak kartu matching', $_SESSION['userLAB'] ?? '', $time, $ip_num]
+    );
   ?>
   <?php
     function qr_data_uri(string $text, int $ecc = QR_ECLEVEL_L, int $size = 3, int $margin = 0): string {
@@ -207,7 +229,7 @@ $act = $_GET['g'];
       <tr>
         <td rowspan="2" style="border-right:0px #000000 solid;"><strong style="font-size: 14px;">T</strong>IME <strong style="font-size: 14px;">I</strong>N</td>
         <td rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">:</td>
-        <td rowspan="2" style="border-left:0px #000000 solid;"><strong><?Php echo date("d-m-Y", strtotime($data['tgl_in'])); ?></strong></td>
+        <td rowspan="2" style="border-left:0px #000000 solid;"><strong><?Php echo $tglInDisplay; ?></strong></td>
         <td rowspan="2" style="border-right:0px #000000 solid;"><strong style="font-size: 14px;">K</strong>AIN</td>
         <td rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">:</td>
         <td colspan="5" rowspan="2" style="border-left:0px #000000 solid;"><strong style="font-size: 8px;"><?Php if ($data['jenis_kain'] == "NULL") {
@@ -229,7 +251,7 @@ $act = $_GET['g'];
       <tr>
         <td rowspan="2" style="border-right:0px #000000 solid;"><strong style="font-size: 14px;">D</strong>ELIVERY</td>
         <td rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">:</td>
-        <td rowspan="2" style="border-left:0px #000000 solid;"><strong><?Php echo date("d-m-Y", strtotime($data['tgl_delivery'])); ?></strong></td>
+        <td rowspan="2" style="border-left:0px #000000 solid;"><strong><?Php echo $tglDeliveryDisplay; ?></strong></td>
         <td rowspan="2" style="border-right:0px #000000 solid;"><strong style="font-size: 14px;">B</strong>ENANG</td>
         <td rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">:</td>
         <td colspan="5" rowspan="2" style="border-left:0px #000000 solid;"><strong style="font-size: 8px;"><?Php if ($data['benang'] == "NULL") {
@@ -250,23 +272,31 @@ $act = $_GET['g'];
       <?php
         // Ambil data suhu pertama
         $tempCode1 = $data['temp_code'];
-        $query1 = "SELECT * FROM master_suhu WHERE code = ? AND status = 1";
-        $stmt1 = $con->prepare($query1);
-        $stmt1->bind_param("s", $tempCode1);
-        $stmt1->execute();
-        $result1 = $stmt1->get_result();
-        $row1 = $result1->fetch_assoc();
-        $product_name1 = empty($row1['product_name']) ? '...°C X ...MNT' : $row1['product_name'];
+        $product_name1 = '...°C X ...MNT';
+        if ($tempCode1) {
+            $stmt1 = sqlsrv_query($con, "SELECT product_name FROM db_laborat.master_suhu WHERE code = ? AND status = 1", [$tempCode1]);
+            if ($stmt1) {
+                $row1 = sqlsrv_fetch_array($stmt1, SQLSRV_FETCH_ASSOC);
+                if (! empty($row1['product_name'])) {
+                    $product_name1 = $row1['product_name'];
+                }
+                sqlsrv_free_stmt($stmt1);
+            }
+        }
 
         // Ambil data suhu kedua
         $tempCode2 = $data['temp_code2'];
-        $query2 = "SELECT * FROM master_suhu WHERE code = ? AND status = 1";
-        $stmt2 = $con->prepare($query2);
-        $stmt2->bind_param("s", $tempCode2);
-        $stmt2->execute();
-        $result2 = $stmt2->get_result();
-        $row2 = $result2->fetch_assoc();
-        $product_name2 = empty($row2['product_name']) ? '...°C X ...MNT' : $row2['product_name'];
+        $product_name2 = '...°C X ...MNT';
+        if ($tempCode2) {
+            $stmt2 = sqlsrv_query($con, "SELECT product_name FROM db_laborat.master_suhu WHERE code = ? AND status = 1", [$tempCode2]);
+            if ($stmt2) {
+                $row2 = sqlsrv_fetch_array($stmt2, SQLSRV_FETCH_ASSOC);
+                if (! empty($row2['product_name'])) {
+                    $product_name2 = $row2['product_name'];
+                }
+                sqlsrv_free_stmt($stmt2);
+            }
+        }
       ?>
 
     
@@ -304,17 +334,22 @@ $act = $_GET['g'];
       ?>
 
       <tr><?php $i = 1;
-          $sqlLamp = mysqli_query($con, "SELECT * FROM vpot_lampbuy where buyer = '$data[buyer]' order by flag"); ?>
-        <td rowspan="2" style="border-right:0px #000000 solid;" colspan="3"><strong>LAMPU</strong> : <?php while ($lamp = mysqli_fetch_array($sqlLamp)) {
+          $sqlLamp = sqlsrv_query($con, "SELECT lampu FROM db_laborat.vpot_lampbuy WHERE buyer = ? ORDER BY flag", [$data['buyer']]); ?>
+        <td rowspan="2" style="border-right:0px #000000 solid;" colspan="3"><strong>LAMPU</strong> : <?php if ($sqlLamp) { while ($lamp = sqlsrv_fetch_array($sqlLamp, SQLSRV_FETCH_ASSOC)) {
                                                                                                         echo $i++ . '.(' . $lamp['lampu'] . '), ';
-                                                                                                      } ?>
+                                                                                                      }
+                                                                                                      sqlsrv_free_stmt($sqlLamp);
+                                                                                                    } ?>
         </td>
         <td rowspan="2" style="border-right:0px #000000 solid;">
           <strong style="font-size: 14px;">T</strong>IME <strong style="font-size: 14px;">O</strong>UT
         </td>
         <?php
-        $sql_ci_y = mysqli_query($con, "SELECT * FROM tbl_status_matching WHERE idm = '$data[no_resep]'");
-        $row_ci_y = mysqli_fetch_assoc($sql_ci_y);
+        $sql_ci_y = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_status_matching WHERE idm = ?", [$data['no_resep']]);
+        $row_ci_y = $sql_ci_y ? sqlsrv_fetch_array($sql_ci_y, SQLSRV_FETCH_ASSOC) : [];
+        if ($sql_ci_y) {
+          sqlsrv_free_stmt($sql_ci_y);
+        }
         ?>
         <td rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">:</td>
         <td width="33" rowspan="3" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">&nbsp;</td>
@@ -324,7 +359,7 @@ $act = $_GET['g'];
               <strong style="font-size: 11px;">C</strong>IE
               <strong style="font-size: 11px;">W</strong>I
             </span>
-          </span> : <?= $row_ci_y['cie_wi']; ?>
+          </span> : <?= $row_ci_y['cie_wi'] ?? ''; ?>
         </td>
         <td width="1" rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;"></td>
         <td width="85" rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">
@@ -333,14 +368,14 @@ $act = $_GET['g'];
               <strong style="font-size: 11px;">C</strong>IE
               <strong style="font-size: 11px;">T</strong>INT
             </strong>
-          </span> : <?= $row_ci_y['cie_tint']; ?>
+          </span> : <?= $row_ci_y['cie_tint'] ?? ''; ?>
         </td>
         <td width="35" rowspan="2" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">
           <span style="border-left:0px #000000 solid;">
             <strong style="font-size: 8px;">
               <strong style="font-size: 11px;">Y</strong>Ness
             </strong>
-          </span> : <?= $row_ci_y['yellowness']; ?>
+          </span> : <?= $row_ci_y['yellowness'] ?? ''; ?>
         </td>
         <!-- <td width="33" rowspan="3" style="border-right:0px #000000 solid; border-left:0px #000000 solid;">&nbsp;</td> -->
         <td style="border-right:0px #000000 solid;">PH </td>
@@ -422,8 +457,8 @@ $act = $_GET['g'];
       </tr>
       <?php
         $no = 1;
-        $qry1 = mysqli_query($con, "SELECT * FROM tbl_matching_detail WHERE id_matching='$data[id]' and jenis='cotton' ORDER BY id ASC");
-        while ($r = mysqli_fetch_array($qry1)) { ?>
+        $qry1 = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_matching_detail WHERE id_matching = ? AND jenis = 'cotton' ORDER BY id ASC", [$data['id']]);
+        while ($qry1 && ($r = sqlsrv_fetch_array($qry1, SQLSRV_FETCH_ASSOC))) { ?>
           <tr>
             <?php if ($no < 2) { ?><td rowspan="<?php $sp = 12;
                                                 echo $sp - $no; ?>"><a class="hurufvertical"><strong>SIDE A</strong></a></td> <?php } ?>
@@ -446,6 +481,7 @@ $act = $_GET['g'];
             <td>&nbsp;</td>
           </tr>
       <?php $no++; } ?>
+      <?php if ($qry1) { sqlsrv_free_stmt($qry1); } ?>
       <?php for ($i = $no; $i <= 7; $i++) { ?>
         <tr>
           <?php if ($i < 2) { ?><td rowspan="11" style="border-bottom: double;"><a class="hurufvertical"><strong>SIDE A</strong></a></td> <?php } ?>
@@ -555,8 +591,8 @@ $act = $_GET['g'];
       </tr>
       <?php
         $no1 = 1;
-        $qry2 = mysqli_query($con, "SELECT * FROM tbl_matching_detail WHERE id_matching='$data[id]' and jenis='polyester' ORDER BY id ASC");
-        while ($r1 = mysqli_fetch_array($qry2)) { ?>
+        $qry2 = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_matching_detail WHERE id_matching = ? AND jenis = 'polyester' ORDER BY id ASC", [$data['id']]);
+        while ($qry2 && ($r1 = sqlsrv_fetch_array($qry2, SQLSRV_FETCH_ASSOC))) { ?>
         <tr>
           <?php if ($no1 < 2) { ?><td rowspan="<?php $sp1 = 15;
                                                 echo $sp1 - $no1; ?>"><a class="hurufvertical"><strong>SIDE B</strong></a></td> <?php } ?>
@@ -579,6 +615,7 @@ $act = $_GET['g'];
           <td>&nbsp;</td>
         </tr>
       <?php $no1++; } ?>
+      <?php if ($qry2) { sqlsrv_free_stmt($qry2); } ?>
       <?php for ($i1 = $no1; $i1 <= 7; $i1++) { ?>
         <tr>
           <?php if ($i1 < 2) { ?><td rowspan="11"><a class="hurufvertical"><strong>SIDE B</strong></a></td> <?php } ?>
@@ -680,7 +717,7 @@ $act = $_GET['g'];
         <td align="center">&nbsp;</td>
       </tr>
       <tr> 
-        <?php $sqlOrder = mysqli_query($con, "SELECT * FROM tbl_orderchild where id_matching = '$data[id]' AND NOT `order` = '$data[no_order]' "); ?>
+        <?php $sqlOrder = sqlsrv_query($con, "SELECT [order] FROM db_laborat.tbl_orderchild WHERE id_matching = ? AND [order] <> ?", [$data['id'], $data['no_order']]); ?>
         <td rowspan="2" style="height: 98%;"><a class="hurufvertical"><strong>SAMPLE</strong></a></td>
         <td rowspan="5" colspan="3" valign="top"> 
           <?php if ($data['jenis_matching'] == "L/D") : ?>
@@ -691,8 +728,10 @@ $act = $_GET['g'];
             <strong style="font-size: 21px;">NO.</strong>ORDER :
           <?php endif; ?>
             <?php echo $data['no_order'] ?>,
-            <?php while ($order = mysqli_fetch_array($sqlOrder)) {
+            <?php if ($sqlOrder) { while ($order = sqlsrv_fetch_array($sqlOrder, SQLSRV_FETCH_ASSOC)) {
               echo $order['order'] . ', ';
+            }
+            sqlsrv_free_stmt($sqlOrder);
             } ?>
             <div align="right"><strong style="font-size: 21px;">
                 <?php if ($data['salesman_sample'] == "1") {

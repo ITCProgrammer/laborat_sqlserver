@@ -2,24 +2,15 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
-//$host="10.0.6.145\SQLEXPRESS";
-//$host="DIT\MSSQLSERVER08";
-//$username="sa";
-//$password="123";
-//$db_name="TICKET";
-//--
-
-function db_connect()
-{
-	//global $host, $username, $password, $db_name;
-	//set_time_limit(600);
-	//$ctic=mssql_connect($host, $username, $password) or die("Tidak bisa terkoneksi dengan server Database Laborat !");
-	//mssql_select_db($db_name) or die("Under maintenance");
-}
-
-//db_connect($db_name);
-$qry1 = mysqli_query($con, "SELECT id FROM tbl_matching WHERE no_resep='$_GET[noresep]' LIMIT 1");
-$r1 = mysqli_fetch_array($qry1);
+// Ambil id matching
+$r1 = sqlsrv_fetch_array(
+	sqlsrv_query(
+		$con,
+		"SELECT TOP 1 id FROM db_laborat.tbl_matching WHERE no_resep = ?",
+		[$_GET['noresep']]
+	),
+	SQLSRV_FETCH_ASSOC
+);
 if ($_GET['id'] != "") {
 	$id = $_GET['id'];
 } else {
@@ -32,18 +23,18 @@ if (isset($_POST['save'])) {
 	$lab = str_replace("'", "''", $_POST['lab']);
 	$aktual = str_replace("'", "''", $_POST['aktual']);
 
-	$qry = mysqli_query($con, "INSERT INTO tbl_matching_detail SET
-		id_matching='$id',
-		kode='$kode',
-		nama='$dyes',
-		lab='$lab',
-		jenis='$jns'
-		");
+	$qry = sqlsrv_query(
+		$con,
+		"INSERT INTO db_laborat.tbl_matching_detail (id_matching, kode, nama, lab, jenis)
+		 VALUES (?, ?, ?, ?, ?)",
+		[$id, $kode, $dyes, $lab, $jns]
+	);
 	if ($qry) {
 		echo "<script>alert('Data Tersimpan');</script>";
 		echo "<script>window.location.href='?p=Form-Matching-Detail&noresep=$_GET[noresep]&id=$_GET[id]';</script>";
 	} else {
-		echo "There's been a problem: " . mysqli_error();
+		echo "There's been a problem: ";
+		print_r(sqlsrv_errors());
 	}
 }
 ?>
@@ -170,20 +161,10 @@ if (isset($_POST['save'])) {
 					$no_resep_a = $no_resep . '-A';
 					$no_resep_b = $no_resep . '-B';
 
-					mysqli_query($con, "INSERT INTO log_status_matching SET
-						`ids` = '$no_resep_a',
-						`status` = 'Create No.resep',
-						`info` = 'generate no resep DR-A',
-						`do_by` = '$_SESSION[userLAB]',
-						`do_at` = '$time',
-						`ip_address` = '$ip_num'");
-					mysqli_query($con, "INSERT INTO log_status_matching SET
-						`ids` = '$no_resep_b',
-						`status` = 'Create No.resep',
-						`info` = 'generate no resep DR-B',
-						`do_by` = '$_SESSION[userLAB]',
-						`do_at` = '$time',
-						`ip_address` = '$ip_num'");
+					sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+						VALUES (?, 'Create No.resep', 'generate no resep DR-A', ?, ?, ?)", [$no_resep_a, $_SESSION['userLAB'], $time, $ip_num]);
+					sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+						VALUES (?, 'Create No.resep', 'generate no resep DR-B', ?, ?, ?)", [$no_resep_b, $_SESSION['userLAB'], $time, $ip_num]);
 
 					$url = "http://10.0.0.121:8080/api/v1/document/create";
 					$payload_a = json_encode([
@@ -220,14 +201,8 @@ if (isset($_POST['save'])) {
 						$logMessageA = addslashes($resultA['message'] ?? 'Unknown response');
 						$logSuccessA = isset($resultA['success']) && $resultA['success'] ? 1 : 0;
 					}
-					mysqli_query($con, "INSERT INTO log_printing SET
-						no_resep = '$no_resep_a',
-						ip_address = '$ip_num',
-						success = '$logSuccessA',
-						message = '$logMessageA',
-						response_raw = '" . addslashes($response_a) . "',
-						created_at = NOW(),
-						created_by = '$_SESSION[userLAB]'");
+					sqlsrv_query($con, "INSERT INTO db_laborat.log_printing (no_resep, ip_address, success, message, response_raw, created_at, created_by)
+						VALUES (?, ?, ?, ?, ?, GETDATE(), ?)", [$no_resep_a, $ip_num, $logSuccessA, $logMessageA, $response_a, $_SESSION['userLAB']]);
 
 					if ($error_b) {
 						$logMessageB = "CURL Error: " . addslashes($error_b);
@@ -237,23 +212,12 @@ if (isset($_POST['save'])) {
 						$logMessageB = addslashes($resultB['message'] ?? 'Unknown response');
 						$logSuccessB = isset($resultB['success']) && $resultB['success'] ? 1 : 0;
 					}
-					mysqli_query($con, "INSERT INTO log_printing SET
-						no_resep = '$no_resep_b',
-						ip_address = '$ip_num',
-						success = '$logSuccessB',
-						message = '$logMessageB',
-						response_raw = '" . addslashes($response_b) . "',
-						created_at = NOW(),
-						created_by = '$_SESSION[userLAB]'");
+					sqlsrv_query($con, "INSERT INTO db_laborat.log_printing (no_resep, ip_address, success, message, response_raw, created_at, created_by)
+						VALUES (?, ?, ?, ?, ?, GETDATE(), ?)", [$no_resep_b, $ip_num, $logSuccessB, $logMessageB, $response_b, $_SESSION['userLAB']]);
 					// Tidak perlu alert di sini, karena sudah di-handle di JS
 				} else {
-					mysqli_query($con, "INSERT INTO log_status_matching SET
-						`ids` = '$no_resep',
-						`status` = 'Create No.resep',
-						`info` = 'generate no resep',
-						`do_by` = '$_SESSION[userLAB]',
-						`do_at` = '$time',
-						`ip_address` = '$ip_num'");
+					sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+						VALUES (?, 'Create No.resep', 'generate no resep', ?, ?, ?)", [$no_resep, $_SESSION['userLAB'], $time, $ip_num]);
 
 					$url = "http://10.0.0.121:8080/api/v1/document/create";
 					$payload = json_encode([
@@ -277,14 +241,8 @@ if (isset($_POST['save'])) {
 						$logMessage = addslashes($result['message'] ?? 'Unknown response');
 						$logSuccess = isset($result['success']) && $result['success'] ? 1 : 0;
 					}
-					mysqli_query($con, "INSERT INTO log_printing SET
-						no_resep = '$no_resep',
-						ip_address = '$ip_num',
-						success = '$logSuccess',
-						message = '$logMessage',
-						response_raw = '" . addslashes($response) . "',
-						created_at = NOW(),
-						created_by = '$_SESSION[userLAB]'");
+					sqlsrv_query($con, "INSERT INTO db_laborat.log_printing (no_resep, ip_address, success, message, response_raw, created_at, created_by)
+						VALUES (?, ?, ?, ?, ?, GETDATE(), ?)", [$no_resep, $ip_num, $logSuccess, $logMessage, $response, $_SESSION['userLAB']]);
 				}
 				exit;
 			}
@@ -324,10 +282,12 @@ if (isset($_POST['save'])) {
 					</thead>
 					<tbody>
 						<?php
-						$sql = mysqli_query($con, " SELECT * FROM `tbl_matching_detail` a
-	   INNER JOIN `tbl_matching` b ON b.id=a.id_matching
-	   WHERE b.no_resep='$_GET[noresep]' ");
-						while ($r = mysqli_fetch_array($sql)) {
+						$sql = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_matching_detail a
+							INNER JOIN db_laborat.tbl_matching b ON b.id = a.id_matching
+							WHERE b.no_resep = ?", [$_GET['noresep']]);
+						$no = 0;
+						$col = 0;
+						while ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) {
 							$no++;
 							$bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite'; ?>
 							<tr bgcolor="<?php echo $bgcolor; ?>">

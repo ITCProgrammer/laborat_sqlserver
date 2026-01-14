@@ -157,6 +157,12 @@
 			$jnsMtch 		= $_POST['jen_matching'];
 			$tempCode 		= $_POST['temp_code'];
 			$tempCode2 		= $_POST['temp_code2'];
+			// Rapikan spasi berlebih dan batasi panjang kolom yang rentan truncation
+			$no_po_raw      = preg_replace('/\s+/', ' ', $_POST['no_po']);
+			$no_po_capped   = substr(trim($no_po_raw), 0, 50); // kolom no_po varchar(50)
+			$lebarVal       = isset($_POST['lebar']) ? (int)round((float)$_POST['lebar']) : 0;
+			$qtyVal         = isset($_POST['qty']) ? (float)$_POST['qty'] : 0;
+			$gramasiVal     = isset($_POST['gramasi']) ? (float)$_POST['gramasi'] : 0;
 
 			$suhuchamber 	= $_POST['suhu_chamber'] !== '' ? $_POST['suhu_chamber'] : ($_POST['none_suhu_chamber'] !== '' ? $_POST['none_suhu_chamber'] : null);
 			$warnafluorescent	= $_POST['warna_fluorescent'];
@@ -176,7 +182,7 @@
 			$paramsInsert = [
 				$no_resep,
 				$_POST['no_order'],
-				$_POST['no_po'],
+				$no_po_capped,
 				$langganan,
 				$_POST['no_item1'],
 				$kain,
@@ -185,9 +191,9 @@
 				$cocok_warna,
 				$warna,
 				$nowarna,
-				$_POST['lebar'],
-				$_POST['qty'],
-				$_POST['gramasi'],
+				$lebarVal,
+				$qtyVal,
+				$gramasiVal,
 				$_POST['proses'],
 				$_POST['buyer'],
 				$_POST['tgl_delivery'],
@@ -205,10 +211,10 @@
 			];
 			$qry = sqlsrv_query($con, $sqlInsert, $paramsInsert);
 
-			// update nomor urut terakhir
-			sqlsrv_query($con, "UPDATE db_laborat.no_urut_matching SET nourut = ?", [$nourut]);
-
 			if ($qry) {
+				// update nomor urut terakhir hanya jika insert sukses
+				sqlsrv_query($con, "UPDATE db_laborat.no_urut_matching SET nourut = ?", [$nourut]);
+
 				$time = date('Y-m-d H:i:s');
 				sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
 						VALUES (?, 'Create No.resep', 'generate no resep', ?, ?, ?)", [$no_resep, $_SESSION['userLAB'], $time, $ip_num]);
@@ -227,7 +233,13 @@
 				";
 				exit;
 			} else {
-				echo "There's been a problem: " . print_r(sqlsrv_errors(), true);
+				$err = sqlsrv_errors(SQLSRV_ERR_ERRORS);
+				echo "<pre>There's been a problem:\n";
+				print_r($err);
+				echo "\nParams:\n";
+				print_r($paramsInsert);
+				echo "</pre>";
+				exit;
 			}
 		}
 	?>
