@@ -1,6 +1,8 @@
 <?php
 include '../../koneksi.php';
 
+header('Content-Type: text/html; charset=UTF-8');
+
 $getDyestuff = $_GET['Dystf'] ?? null;
 $getJnsMtcg = $_GET['jnsMtcg'] ?? null;
 
@@ -27,10 +29,10 @@ if ($getDyestuff) {
 		}
 	}
 
-	$query = "SELECT * FROM master_suhu WHERE $where AND status = 1 ORDER BY suhu ASC, waktu ASC";
-	$result = mysqli_query($con, $query);
+	$query = "SELECT * FROM db_laborat.master_suhu WHERE $where AND status = 1 ORDER BY TRY_CONVERT(int, suhu) ASC, waktu ASC";
+	$result = sqlsrv_query($con, $query);
 
-	while ($row = mysqli_fetch_assoc($result)) {
+	while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
 		$info = '';
 		if ($row['program'] == 1) $info = 'KONSTAN';
 		elseif ($row['program'] == 2) $info = 'RAISING';
@@ -43,8 +45,9 @@ if ($getDyestuff) {
 		elseif ($row['dispensing'] == 2) $info .= ' - COTTON';
 		elseif ($row['dispensing'] == 3) $info .= ' - WHITE';
 
-		echo '<option value="' . htmlspecialchars($row['code']) . '">' .
-		     htmlspecialchars($row['product_name']) . ' (' . $info . ')</option>';
+		// Tampilkan apa adanya (tanpa htmlspecialchars) agar simbol ° tidak berubah
+		echo '<option value="' . $row['code'] . '">' .
+		     $row['product_name'] . ' (' . $info . ')</option>';
 	}
 }
 ?>

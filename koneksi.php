@@ -15,7 +15,12 @@ $hostSVR19     = "10.0.0.221";
 $usernameSVR19 = "sa";
 $passwordSVR19 = "Ind@taichen2024";
 $nowprd        = "nowprd";
-$nowprdd       = ["Database" => $nowprd, "UID" => $usernameSVR19, "PWD" => $passwordSVR19];
+$nowprdd       = [
+    "Database" => $nowprd,
+    "UID" => $usernameSVR19,
+    "PWD" => $passwordSVR19,
+    "CharacterSet" => "UTF-8"
+];
 $con_nowprd = sqlsrv_connect($hostSVR19, $nowprdd);
 
 $cona = mysqli_connect("10.0.0.10","dit","4dm1n","db_adm");
@@ -36,6 +41,7 @@ $con = sqlsrv_connect($hostLabSqlsrv, [
     "UID"      => $usernameSVR19,
     "PWD"      => $passwordSVR19,
     "LoginTimeout" => 2,
+    "CharacterSet" => "UTF-8",
 ]);
 if (! $con) {
     noteConnectionFailure($dbLabSqlsrv, print_r(sqlsrv_errors(), true));

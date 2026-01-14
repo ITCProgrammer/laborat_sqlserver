@@ -4,7 +4,7 @@ include '../../koneksi.php';
 $rcode = $_GET['rcode'] ?? null;
 
 // Default: tampilkan semua jika tidak ada rcode
-$where = "1";
+$where = "1=1";
 
 if ($rcode) {
     // Ambil awalan (max 2 huruf pertama)
@@ -40,14 +40,14 @@ if ($rcode) {
 }
 
 $query = "SELECT code, product_name, program, dyeing, dispensing 
-          FROM master_suhu 
+          FROM db_laborat.master_suhu 
           WHERE $where 
           ORDER BY suhu ASC, waktu ASC";
 
-$result = mysqli_query($con, $query);
+$result = sqlsrv_query($con, $query);
 
 $options = [];
-while ($row = mysqli_fetch_assoc($result)) {
+while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
     $options[] = [
         'code' => $row['code'],
         'label' => $row['product_name'],
