@@ -4,13 +4,15 @@
   include "koneksi.php";
 ?>
 <?php
+  $date_input = isset($_POST['date_start']) && $_POST['date_start'] !== '' ? $_POST['date_start'] : date('Y-m-d');
+  $date       = date_create($date_input);
+  $date_curr  = date_format($date, "Y-m-d");
+  $recipe_code  = isset($_POST['recipe_code']) ? $_POST['recipe_code'] : '';
   $query_rate = "SELECT * FROM ITTWEEKLYEXCHANGERATE WHERE INITIALDATE BETWEEN '$date_curr' AND NOW() ORDER BY INITIALDATE ASC LIMIT 1";
-  $date = date_create($_POST['date_start']);
-  $date_curr = date_format($date, "Y-m-d");
 
   $rate = db2_exec($conn1, $query_rate);
   $cek_d_rate = db2_fetch_assoc($rate);
-  if($cek_d_rate['WEEKLYEXCHANGERATE'] == 0){
+  if($cek_d_rate && $cek_d_rate['WEEKLYEXCHANGERATE'] == 0){
     $rate = db2_exec($conn1, "SELECT * FROM ITTWEEKLYEXCHANGERATE ORDER BY INITIALDATE DESC LIMIT 1");
     $d_rate = db2_fetch_assoc($rate);
   }else{
@@ -18,10 +20,6 @@
     $d_rate = db2_fetch_assoc($rate);
   }
 
-  $date = date_create($_POST['date_start']);
-  $date_curr = date_format($date, "Y-m-d");
-  $recipe_code  = $_POST['recipe_code'];
-  
   $sql_curr = db2_exec($conn1, $query_rate);
   $d_curr = db2_fetch_assoc($sql_curr);
   if($d_curr['WEEKLYEXCHANGERATE']){                              
