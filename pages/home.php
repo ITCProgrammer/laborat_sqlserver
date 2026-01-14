@@ -22,7 +22,7 @@ $page  = strtolower($page);
 ?>
 <?php
 // Helper untuk koneksi SQL Server (db_laborat)
-// Gunakan $con_lab_sqlsrv dari koneksi.php
+// Gunakan $con dari koneksi.php
 function sqlsrv_first_row($conn, $sql, array $params = [])
 {
   $stmt = sqlsrv_query($conn, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
@@ -249,7 +249,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
   <div class="row">
     <?php
       $ann = sqlsrv_first_row(
-        $con_lab_sqlsrv,
+        $con,
         "SELECT TOP 1 * FROM announcement WHERE id = 1"
       );
     ?>
@@ -265,7 +265,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
       <div class="small-box bg-aqua">
         <?php
           $Total_resep = sqlsrv_scalar_int(
-            $con_lab_sqlsrv,
+            $con,
             "SELECT COUNT(*) FROM tbl_status_matching WHERE status = 'selesai' AND approve = 'TRUE'"
           );
         ?>
@@ -287,7 +287,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
       <div class="small-box bg-green">
         <?php
           $Total_Dyes = sqlsrv_scalar_int(
-            $con_lab_sqlsrv,
+            $con,
             "SELECT COUNT(*) FROM tbl_dyestuff WHERE is_active = 'TRUE'"
           );
         ?>
@@ -307,11 +307,11 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
     <div class="col-lg-3 col-xs-6" style="margin-top:10px;">
       <?php
         $totalmatcher = sqlsrv_scalar_int(
-          $con_lab_sqlsrv,
+          $con,
           "SELECT COUNT(*) FROM tbl_matcher WHERE status = 'Aktif'"
         );
         $totalcolorist = sqlsrv_scalar_int(
-          $con_lab_sqlsrv,
+          $con,
           "SELECT COUNT(*) FROM tbl_colorist WHERE is_active = 'TRUE'"
         );
       ?>
@@ -332,7 +332,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
     <div class="col-lg-3 col-xs-6" style="margin-top:10px;">
       <?php
         $proses = sqlsrv_scalar_int(
-          $con_lab_sqlsrv,
+          $con,
           "SELECT COUNT(*) FROM master_proses WHERE is_active = 'TRUE'"
         );
       ?>

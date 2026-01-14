@@ -45,7 +45,7 @@
 		ini_set("error_reporting", 1);
 		session_start();
 		include "koneksi.php";
-		$conLab = $con_lab_sqlsrv;
+		$conLab = $con;
 
 		// helper sqlsrv
 		function sqlsrv_first_assoc($conn, $sql, array $params = []) {

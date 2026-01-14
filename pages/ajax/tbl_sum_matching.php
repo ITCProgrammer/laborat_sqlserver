@@ -3,15 +3,15 @@ ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
 
-if (! $con_lab_sqlsrv) {
+if (! $con) {
     die('Koneksi SQL Server db_laborat gagal.');
 }
 
 // Helper count scalar
 function count_query($sql, array $params = [])
 {
-    global $con_lab_sqlsrv;
-    $stmt = sqlsrv_query($con_lab_sqlsrv, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+    global $con;
+    $stmt = sqlsrv_query($con, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
     if (! $stmt) {
         return 0;
     }

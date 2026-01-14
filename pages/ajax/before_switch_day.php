@@ -24,7 +24,7 @@ include '../../koneksi.php';
                 //     $ystrdy         = date('Y-m-d', strtotime("-2 days"));
                 //    $tody           = date('Y-m-d', strtotime("-1 days"));
                 $stmt_23 = sqlsrv_query(
-                    $con_lab_sqlsrv,
+                    $con,
                     "SELECT * FROM sisa_schedule WHERE [time] BETWEEN ? AND ?",
                     ["$ystrdy 23:00:00", "$tody 23:00:00"],
                     ["Scrollable" => SQLSRV_CURSOR_KEYSET]
@@ -83,7 +83,7 @@ include '../../koneksi.php';
             function get_val($jenismatching, $group)
             {
                 include '../../koneksi.php';
-                if (! $con_lab_sqlsrv) {
+                if (! $con) {
                     return 0;
                 }
                 $start_date = date('Y-m-d', strtotime("-2 days"));
@@ -115,7 +115,7 @@ include '../../koneksi.php';
                     GROUP BY a.grp
                 ";
                 $stmt = sqlsrv_query(
-                    $con_lab_sqlsrv,
+                    $con,
                     $sql,
                     [$group, $jenismatching, $start_datetime, $end_datetime],
                     ["Scrollable" => SQLSRV_CURSOR_KEYSET]

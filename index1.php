@@ -691,10 +691,17 @@ $page = strtolower($page);
                             <li class="dropdown messages-menu">
                                 <?php
                                 $hari_ini  = date('Y-m-d');
-                                $sql_login = mysqli_query($con, "SELECT do_by, max(do_at) as do_at from tbl_log where DATE_FORMAT(do_at,'%Y-%m-%d') = '$hari_ini' and what = 'login'
-                                group by do_by
-                                order by do_at asc");
-                                $count_login = mysqli_num_rows($sql_login);
+                                $sql_login = sqlsrv_query(
+                                    $con,
+                                    "SELECT do_by, MAX(do_at) AS do_at
+                                     FROM tbl_log
+                                     WHERE CONVERT(date, do_at) = ? AND what = 'login'
+                                     GROUP BY do_by
+                                     ORDER BY do_at ASC",
+                                    [$hari_ini],
+                                    ["Scrollable" => SQLSRV_CURSOR_KEYSET]
+                                );
+                                $count_login = $sql_login ? sqlsrv_num_rows($sql_login) : 0;
                                 ?>
                                 <!-- <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                                     <i class="fa fa-sign-in"></i>
@@ -704,7 +711,7 @@ $page = strtolower($page);
                                 <!-- <ul class="dropdown-menu">
                                     <li class="header"> <?php echo $count_login ?> Orang Telah Melakukan login hari ini </li>
                                     <li>
-                                        <?php while ($li = mysqli_fetch_array($sql_login)): ?>
+                                        <?php while ($sql_login && ($li = sqlsrv_fetch_array($sql_login, SQLSRV_FETCH_ASSOC))): ?>
                                             <ul class="menu">
                                                 <li>
                                                     <a href="#">

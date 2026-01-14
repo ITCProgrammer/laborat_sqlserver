@@ -4,7 +4,7 @@ header('Content-Type: application/json; charset=utf-8');
 
 include "../../koneksi.php";
 
-if (! $con_lab_sqlsrv) {
+if (! $con) {
   http_response_code(500);
   echo json_encode(['error' => 'Koneksi SQL Server db_laborat gagal.']);
   exit;
@@ -44,7 +44,7 @@ function grouped_map($conn, string $sql, array $params): array {
 
 // Timeline: Approved (status=selesai & approve=TRUE) by approve_at
 $mapSelesai = grouped_map(
-  $con_lab_sqlsrv,
+  $con,
   "SELECT CONVERT(date, approve_at) AS d, COUNT(*) AS cnt
    FROM tbl_status_matching
    WHERE status='selesai' AND approve='TRUE'
@@ -56,7 +56,7 @@ $mapSelesai = grouped_map(
 
 // Timeline: Rejected (status=tutup) by tutup_at
 $mapClosed = grouped_map(
-  $con_lab_sqlsrv,
+  $con,
   "SELECT CONVERT(date, tutup_at) AS d, COUNT(*) AS cnt
    FROM tbl_status_matching
    WHERE status='tutup'
@@ -68,7 +68,7 @@ $mapClosed = grouped_map(
 
 // Timeline: Arsip (distinct idm pada hari log arsip)
 $mapArsip = grouped_map(
-  $con_lab_sqlsrv,
+  $con,
   "SELECT CONVERT(date, b.do_at) AS d, COUNT(DISTINCT a.idm) AS cnt
    FROM tbl_status_matching a
    JOIN log_status_matching b ON a.idm = b.ids
@@ -98,7 +98,7 @@ $qPie = "
     SUM(CASE WHEN status='arsip' THEN 1 ELSE 0 END) AS row_arsip
   FROM tbl_status_matching
 ";
-$stmtPie = sqlsrv_query($con_lab_sqlsrv, $qPie, [], ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
+$stmtPie = sqlsrv_query($con, $qPie, [], ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
 if ($stmtPie && ($row = sqlsrv_fetch_array($stmtPie, SQLSRV_FETCH_ASSOC))) {
   $pieRow = $row;
 }

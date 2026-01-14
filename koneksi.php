@@ -6,19 +6,6 @@ function noteConnectionFailure($label, $error)
     error_log(sprintf('[%s] DB connection failed: %s', $label, $error ?: 'unknown error'));
 }
 
-function safeMysqliConnect($host, $user, $password, $db, $label)
-{
-    // Set timeout singkat agar tidak lama saat host mati
-    $conn = mysqli_init();
-    mysqli_options($conn, MYSQLI_OPT_CONNECT_TIMEOUT, 2);
-    if (!@mysqli_real_connect($conn, $host, $user, $password, $db)) {
-        noteConnectionFailure($label, mysqli_connect_error());
-        return false;
-    }
-    return $conn;
-}
-
-$con              = safeMysqliConnect("10.0.0.10", "dit", "4dm1n", "db_laborat", "db_laborat");
 $con_db_dyeing    = mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
 
 $hostSVR19     = "10.0.0.221";
@@ -41,24 +28,19 @@ $conn1 = db2_pconnect($conn_string,'', '');
 
 $hostLabSqlsrv = "10.0.0.221";
 $dbLabSqlsrv   = "db_laborat";
-$con_lab_sqlsrv = sqlsrv_connect($hostLabSqlsrv, [
+$con = sqlsrv_connect($hostLabSqlsrv, [
     "Database" => $dbLabSqlsrv,
     "UID"      => $usernameSVR19,
     "PWD"      => $passwordSVR19,
     "LoginTimeout" => 2,
 ]);
-if (! $con_lab_sqlsrv) {
+if (! $con) {
     noteConnectionFailure($dbLabSqlsrv, print_r(sqlsrv_errors(), true));
 }
 
-if ($con === false) {
-    printf("Connect failed: %s\n", mysqli_connect_error());
-    exit();
-}
-
 // Tutup koneksi saat eksekusi selesai (tidak wajib, tapi eksplisit).
-register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$con_nowprd, &$con_lab_sqlsrv) {
-    foreach ([$con, $con_db_dyeing, $cona] as $mysqliConn) {
+register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$con_nowprd) {
+    foreach ([$con_db_dyeing, $cona] as $mysqliConn) {
         if ($mysqliConn instanceof mysqli) {
             $mysqliConn->close();
         } elseif ($mysqliConn) {
@@ -69,8 +51,8 @@ register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$co
     if ($con_nowprd) {
         sqlsrv_close($con_nowprd);
     }
-    if ($con_lab_sqlsrv) {
-        sqlsrv_close($con_lab_sqlsrv);
+    if ($con) {
+        sqlsrv_close($con);
     }
     // $conn1 adalah pconnect DB2, dibiarkan agar tetap persistent.
 });
