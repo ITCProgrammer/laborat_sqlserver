@@ -4,9 +4,11 @@ error_reporting(E_ALL);
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 
-function noteConnectionFailure($label, $error)
-{
-    error_log(sprintf('[%s] DB connection failed: %s', $label, $error ?: 'unknown error'));
+if (!function_exists('noteConnectionFailure')) {
+    function noteConnectionFailure($label, $error)
+    {
+        error_log(sprintf('[%s] DB connection failed: %s', $label, $error ?: 'unknown error'));
+    }
 }
 
 $con_db_dyeing    = mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
