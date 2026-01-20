@@ -2,6 +2,11 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
+$time = date('Y-m-d H:i:s');
+$dbAuth = $con; // koneksi SQL Server db_laborat
+if (! $dbAuth) {
+	die('Koneksi login (db_laborat) gagal.');
+}
 $ip = $_SERVER['REMOTE_ADDR'];
 $os = $_SERVER['HTTP_USER_AGENT'];
 // var_dump($_SESSION);
@@ -9,14 +14,13 @@ $os = $_SERVER['HTTP_USER_AGENT'];
 ?>
 <?php
 if ($_POST) { //login user
-	extract($_POST);
-	$username = mysqli_real_escape_string($con,$_POST['username']);
-	$password = mysqli_real_escape_string($con,$_POST['password']);
-	$sql = mysqli_query($con,"SELECT * from tbl_user where username='$username' and password='$password' limit 1");
-	if (mysqli_num_rows($sql) > 0) {
+	$username = trim($_POST['username'] ?? '');
+	$password = trim($_POST['password'] ?? '');
+
+	$sql = sqlsrv_query($dbAuth, "SELECT TOP 1 * FROM db_laborat.tbl_user WHERE username = ? AND password = ?", [$username, $password]);
+	if ($sql && ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC))) {
 		$_SESSION['userLAB'] = $username;
 		$_SESSION['passLAB'] = $password;
-		$r = mysqli_fetch_array($sql);
 		$_SESSION['id'] = $r['id'];
 		$_SESSION['lvlLAB'] = $r['level'];
 		$_SESSION['statusLAB'] = $r['status'];
@@ -31,26 +35,31 @@ if ($_POST) { //login user
 		// 2 == spv
 		// 3 == user
 		//login_validate();
-		mysqli_query($con,"INSERT into tbl_log SET `what` = 'login',
-				`what_do` = 'login into laborat',
-				`do_by` = '$_SESSION[userLAB]',
-				`do_at` = '$time',
-				`ip` = '$ip',
-				`os` = '$os',
-				`remark`='$_SESSION[jabatanLAB]'");
+		sqlsrv_query($dbAuth, "INSERT INTO db_laborat.tbl_log (what, what_do, do_by, do_at, ip, os, remark) VALUES ('login', 'login into laborat', ?, ?, ?, ?, ?)", [
+			$_SESSION['userLAB'],
+			$time,
+			$ip,
+			$os,
+			$_SESSION['jabatanLAB']
+		]);
+		if ($sql) {
+			sqlsrv_free_stmt($sql);
+		}
 		echo "<script>window.location='index1.php?p=Home';</script>";
 	} else {
+		if ($sql) {
+			sqlsrv_free_stmt($sql);
+		}
 		echo "<script>alert('Login Gagal!! $username');window.location='index.php';</script>";
 	}
-} elseif ($_GET['act'] == "logout") { //logout user
-	mysqli_query($con,"INSERT into tbl_log SET
-	`what` = 'Logout',
-	`what_do` = 'Logout from laborat',
-	`do_by` = '$_SESSION[userLAB]',
-	`do_at` = '$time',
-	`ip` = '$ip',
-	`os` = '$os',
-	`remark`='$_SESSION[jabatanLAB]'");
+} elseif (isset($_GET['act']) && $_GET['act'] == "logout") { //logout user
+	sqlsrv_query($dbAuth, "INSERT INTO db_laborat.tbl_log (what, what_do, do_by, do_at, ip, os, remark) VALUES ('Logout', 'Logout from laborat', ?, ?, ?, ?, ?)", [
+		$_SESSION['userLAB'] ?? '',
+		$time,
+		$ip,
+		$os,
+		$_SESSION['jabatanLAB'] ?? ''
+	]);
 	session_destroy();
 	echo "<script>window.location='login';</script>";
 }
