@@ -3,6 +3,7 @@ date_default_timezone_set('Asia/Jakarta');
 
 // tanggal akhir = hari ini
 $akhir = date('Y-m-d');
+// $akhir = date('2025-01-07');
 
 // tanggal awal = 1 hari sebelum hari ini
 $awal = date('Y-m-d', strtotime('-1 day', strtotime($akhir)));
@@ -80,7 +81,7 @@ if (file_exists($logoPath)) {
         border: 1px solid #000;
     }
     /* 2 desimal + pemisah ribuan (Excel akan sesuaikan tanda sesuai regional) */
-    .number { mso-number-format: "#,##0.00"; }
+    .number { mso-number-format: "#,##0"; }
     /* untuk kolom No dengan pemisah ribuan (jika perlu) */
     .int    { mso-number-format: "#,##0"; }
     th { background-color: #f0f0f0; }
@@ -197,9 +198,9 @@ if (file_exists($logoPath)) {
                                             b.DECOSUBCODE02,
                                             b.DECOSUBCODE03,
                                             CASE 
-                                                WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN sum(b.BASEPRIMARYQUANTITYUNIT)*1000
-                                                WHEN b.BASEPRIMARYUNITCODE = 't' THEN sum(b.BASEPRIMARYQUANTITYUNIT)*1000000
-                                                ELSE sum(b.BASEPRIMARYQUANTITYUNIT)
+                                                WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN round(sum(b.BASEPRIMARYQUANTITYUNIT)*1000)
+                                                WHEN b.BASEPRIMARYUNITCODE = 't' THEN round(sum(b.BASEPRIMARYQUANTITYUNIT)*1000000)
+                                                ELSE round(sum(b.BASEPRIMARYQUANTITYUNIT))
                                             END  AS STOCK_BALANCE,
                                             CASE 
                                                 WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN 'g'
@@ -229,7 +230,7 @@ if (file_exists($logoPath)) {
                                             DECOSUBCODE01,
                                             DECOSUBCODE02,
                                             DECOSUBCODE03,
-                                            sum(QTY_TRANSFER) AS QTY_TRANSFER,
+                                            round(sum(QTY_TRANSFER)) AS QTY_TRANSFER,
                                             SATUAN_TRANSFER
                                             from
                                             (SELECT 
@@ -350,7 +351,7 @@ if (file_exists($logoPath)) {
                                             DECOSUBCODE01,
                                             DECOSUBCODE02,
                                             DECOSUBCODE03,
-                                            sum(AKTUAL_QTY_KELUAR) AS AKTUAL_QTY_KELUAR,
+                                            round(sum(AKTUAL_QTY_KELUAR)) AS AKTUAL_QTY_KELUAR,
                                             SATUAN
                                             FROM 
                                             (SELECT
@@ -397,7 +398,7 @@ if (file_exists($logoPath)) {
                                                     DECOSUBCODE01,
                                                     DECOSUBCODE02,
                                                     DECOSUBCODE03,
-                                                    sum(QTY_MASUK) AS QTY_MASUK,
+                                                    round(sum(QTY_MASUK)) AS QTY_MASUK,
                                                     SATUAN_MASUK
                                                     FROM 
                                                     (SELECT 
@@ -461,10 +462,10 @@ if (file_exists($logoPath)) {
                                                             -- AND s.TRANSACTIONDATE BETWEEN '$awal' AND '$akhir'
                                                             AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:00'
                                                             AND s.TEMPLATECODE IN ('QCT','304','OPN','204','125')
-                                                            AND COALESCE(TRIM( CASE 
+                                                            AND NOT COALESCE(TRIM( CASE 
                                                                 WHEN s3.TEMPLATECODE IS NOT NULL THEN s3.TEMPLATECODE
                                                                 ELSE s.TEMPLATECODE
-                                                            END), '') || COALESCE(TRIM(s.LOGICALWAREHOUSECODE), '') <> 'OPNM101'
+                                                            END), '') || COALESCE(TRIM(s.LOGICALWAREHOUSECODE), '')  IN ('OPNM101','303M101','304M510')
                                                         AND s.LOGICALWAREHOUSECODE IN ('M510','M101')
                                                             AND s.DECOSUBCODE01 = '$row[DECOSUBCODE01]' 
                                                             AND s.DECOSUBCODE02 = '$row[DECOSUBCODE02]' 
@@ -497,7 +498,7 @@ if (file_exists($logoPath)) {
                                             DECOSUBCODE03,
                                             DECOSUBCODE04,
                                             DECOSUBCODE05,
-                                            sum(QTY) AS QTY,
+                                            round(sum(QTY)) AS QTY,
                                             BASEPRIMARYUNITCODE
                                             from
                                             (SELECT 
@@ -565,7 +566,7 @@ if (file_exists($logoPath)) {
                                                                                 DECOSUBCODE02,
                                                                                 DECOSUBCODE03,
                                                                                STATUS,
-                                                                                sum(BASEPRIMARYQUANTITY) AS USERPRIMARYQUANTITY,
+                                                                                round(sum(BASEPRIMARYQUANTITY)) AS USERPRIMARYQUANTITY,
                                                                                 BASEPRIMARYUNITCODE
                                                                             FROM 
                                                                                 (
@@ -623,7 +624,7 @@ if (file_exists($logoPath)) {
                                         SUBCODE01,
                                         SUBCODE02,
                                         SUBCODE03,
-                                        SUM(qty_awal) as qty_awal 
+                                        round(SUM(qty_awal)) as qty_awal 
                                         FROM stock_awal_obat_gdkimia_1
                                         WHERE kode_obat = '$kode_obat'
                                         AND logicalwarehouse  IN ('M510','M101')
@@ -641,7 +642,21 @@ if (file_exists($logoPath)) {
                                         DECOSUBCODE01,
                                         DECOSUBCODE02,
                                         DECOSUBCODE03,
-                                        SUM(BASEPRIMARYQUANTITYUNIT*1000) AS qty_awal
+                                        round(SUM(BASEPRIMARYQUANTITYUNIT*1000)) AS qty_awal
+                                    FROM                                                      
+                                     (SELECT distinct 
+                                        tgl_tutup,
+                                        DATE_FORMAT(DATE_SUB(tgl_tutup, INTERVAL 1 MONTH), '%Y-%m') AS tahun_bulan,
+                                        KODE_OBAT,
+                                        LONGDESCRIPTION,
+                                        DECOSUBCODE01,
+                                        DECOSUBCODE02,
+                                        DECOSUBCODE03,
+                                        WAREHOUSELOCATIONCODE,
+                                        LOGICALWAREHOUSECODE,
+                                        WHSLOCATIONWAREHOUSEZONECODE,
+                                        LOTCODE,
+                                        BASEPRIMARYQUANTITYUNIT
                                     FROM tblopname_11 t
                                     WHERE 
                                         KODE_OBAT = '$kode_obat'
@@ -652,8 +667,8 @@ if (file_exists($logoPath)) {
                                             WHERE 
                                                 KODE_OBAT = '$kode_obat'
                                                 AND LOGICALWAREHOUSECODE  IN ('M510','M101')
-                                                AND DATE_FORMAT(DATE_SUB(tgl_tutup, INTERVAL 1 DAY), '%Y-%m-%d')
-                                        )
+                                                AND tgl_tutup = '$awal'
+                                        )) AS SUB
                                     GROUP BY tgl_tutup, KODE_OBAT");    
                                     } 
             $row_qty_awal = mysqli_fetch_array($q_qty_awal) ?: [];
@@ -687,14 +702,14 @@ if (file_exists($logoPath)) {
                 <td class='int' style='text-align:center'>{$no}</td>
                 <td>{$row['KODE_OBAT']}</td>
                 <td>{$row['LONGDESCRIPTION']}</td>
-                <td class='number'>" . number_format($qty_awal, 2, '.', ',') . "</td>
-                <td class='number'>" . number_format($qty_masuk, 2, '.', ',') . "</td>
-                <td class='number'>" . number_format($qty_Keluar, 2, '.', ',') . "</td>
-                <td class='number'>" . number_format($qty_Transfer, 2, '.', ',') . "</td>
-                <td class='number'>" . number_format($total_out, 2, '.', ',') . "</td>
-                <td class='number'>" . number_format($qty_Balance_pisah, 2, '.', ',') . "</td>
-                <td class='number'>" . number_format($qty_stock_minimum, 2, '.', ',') . "</td>
-                <td class='number'>" . number_format($qty_stock_buka_PO, 2, '.', ',') . "</td>
+                <td class='number'>" . number_format($qty_awal, 0, '.', ',') . "</td>
+                <td class='number'>" . number_format($qty_masuk, 0, '.', ',') . "</td>
+                <td class='number'>" . number_format($qty_Keluar, 0, '.', ',') . "</td>
+                <td class='number'>" . number_format($qty_Transfer, 0, '.', ',') . "</td>
+                <td class='number'>" . number_format($total_out, 0, '.', ',') . "</td>
+                <td class='number'>" . number_format($qty_Balance_pisah, 0, '.', ',') . "</td>
+                <td class='number'>" . number_format($qty_stock_minimum, 0, '.', ',') . "</td>
+                <td class='number'>" . number_format($qty_stock_buka_PO, 0, '.', ',') . "</td>
 
                 <td style='{$style}'>" . htmlspecialchars($status) . "</td>
                 <td>{$row['NOTELAB']}</td>
