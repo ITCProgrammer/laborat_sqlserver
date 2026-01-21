@@ -2,74 +2,62 @@
 ini_set("error_reporting", 1);
 session_start();
 include("../koneksi.php");
-if (! $con) {
-    die('Koneksi SQL Server gagal.');
-}
 $time = date('Y-m-d H:i:s');
 if (isset($_POST['savee'])) {
-		$qry1 = sqlsrv_query($con, "UPDATE db_laborat.tbl_status_matching SET
-			  grp=?,
-			  matcher=?,
-			  kt_status=?,
-			  ket=?,
-			  edited_at=GETDATE(),
-			  edited_by=?
-		  	   WHERE id = ?", [
-				$_POST['grp'],
-				$_POST['matcher'],
-				$_POST['ket_st'],
-				$_POST['keteee'],
-				$_SESSION['userLAB'],
-				$_POST['id']
-		  ]);
+	$qry1 = mysqli_query($con, "UPDATE `tbl_status_matching` SET
+		  `grp`='$_POST[grp]',
+		  `matcher`='$_POST[matcher]',
+		  `kt_status`='$_POST[ket_st]',
+		  `ket`='$_POST[keteee]',
+		  `edited_at`= '$time',
+		  `edited_by`= '$_SESSION[userLAB]'
+	  	   WHERE id = '$_POST[id]'
+	  ");
 	$ip_num = $_SERVER['REMOTE_ADDR'];
-		sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching
-			  (ids, status, info, do_by, do_at, ip_address) VALUES (?, ?, ?, ?, GETDATE(), ?)", [
-			$_GET['idm'],
-			'buka',
-			'edit at atur schedule',
-			$_SESSION['userLAB'],
-			$ip_num
-		]);
+	mysqli_query($con, "INSERT INTO log_status_matching SET
+		  `ids` = '$_GET[idm]', 
+		  `status` = 'buka', 
+		  `info`='edit at atur schedule',
+		  `do_by` = '$_SESSION[userLAB]', 
+		  `do_at` = '$time', 
+		  `ip_address` = '$ip_num'");
 	if ($qry1) {
 		echo "<script>window.location.href='?p=Schedule-Matching'</script>";
 	} else {
-			echo "There's been a problem: " . print_r(sqlsrv_errors(), true);
-		}
+		echo "There's been a problem: " . mysqli_error();
 	}
-	$po = urlencode($_GET['po']);
-	$qryPO = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_matching WHERE no_resep = ?", [$_GET['idm']]);
-	$dPO = sqlsrv_fetch_array($qryPO, SQLSRV_FETCH_ASSOC);
-	sqlsrv_free_stmt($qryPO);
-	$qryCek = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_status_matching WHERE idm = ?", [$_GET['idm']]);
-	$rCek = sqlsrv_fetch_array($qryCek, SQLSRV_FETCH_ASSOC);
-	sqlsrv_free_stmt($qryCek);
+}
+$po = urlencode($_GET['po']);
+$qryPO = mysqli_query($con, "SELECT * FROM tbl_matching WHERE `no_resep`='$_GET[idm]' LIMIT 1");
+$dPO = mysqli_fetch_array($qryPO);
+$qryCek = mysqli_query($con, "SELECT * FROM tbl_status_matching WHERE `idm`='$_GET[idm]'");
+$rCek = mysqli_fetch_array($qryCek);
 ?>
 <?php
-	if (isset($_POST['save'])) {
-		$ket = str_replace("'", "''", $_POST['ket']);
-		sqlsrv_query($con, "INSERT INTO db_laborat.tbl_status_matching
-			(idm, grp, matcher, ket, status, kt_status, created_at, created_by, mulai_at, mulai_by)
-			VALUES (?, ?, ?, ?, 'buka', ?, GETDATE(), ?, GETDATE(), ?)", [
-				$_POST['no_resep'],
-				$_POST['grup'],
-				$_POST['matcher'],
-				$ket,
-				$_POST['kt_status'],
-				$_SESSION['userLAB'],
-				$_SESSION['userLAB']
-			]);
-		$ip_num = $_SERVER['REMOTE_ADDR'];
-		sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching
-			(ids, status, info, do_by, do_at, ip_address) VALUES (?, ?, ?, ?, GETDATE(), ?)", [
-			$_POST['no_resep'],
-			'buka',
-			'buka resep',
-			$_SESSION['userLAB'],
-			$ip_num
-		]);
-		echo "<script>window.location.href='?p=Schedule-Matching'</script>";
-	}
+if (isset($_POST['save'])) {
+	$ket = str_replace("'", "''", $_POST['ket']);
+	mysqli_query($con, "INSERT INTO tbl_status_matching SET
+		`idm`='$_POST[no_resep]',
+    	`grp`='$_POST[grup]',
+    	`matcher`='$_POST[matcher]',
+		`ket`='$ket',
+		`status`= 'buka',
+		`kt_status`='$_POST[kt_status]',
+		`created_at`= '$time',
+		`created_by`= '$_SESSION[userLAB]',
+		`mulai_at`= '$time',
+		`mulai_by`= '$_SESSION[userLAB]'
+		");
+	$ip_num = $_SERVER['REMOTE_ADDR'];
+	mysqli_query($con, "INSERT INTO log_status_matching SET
+		`ids` = '$_POST[no_resep]', 
+		`status` = 'buka', 
+		`info` = 'buka resep', 
+		`do_by` = '$_SESSION[userLAB]', 
+		`do_at` = '$time', 
+		`ip_address` = '$ip_num'");
+	echo "<script>window.location.href='?p=Schedule-Matching'</script>";
+}
 ?>
 <div class="box box-info">
 	<form class="form-horizontal" action="" method="post" enctype="multipart/form-data" name="form1">
@@ -146,15 +134,15 @@ if (isset($_POST['savee'])) {
 					<input type="text" class="form-control" value="<?php echo $dPO['buyer']; ?>" readonly>
 				</div>
 			</div>
-				<?php $sqlLamp = sqlsrv_query($con, "SELECT lampu FROM db_laborat.vpot_lampbuy WHERE buyer = ?", [$dPO['buyer']]); ?>
+			<?php $sqlLamp = mysqli_query($con, "SELECT * FROM vpot_lampbuy where buyer = '$dPO[buyer]'"); ?>
 			<div class="form-group">
 				<label for="proses" class="col-sm-2 control-label text-center">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Lampu</label>
 				<div class="col-sm-8">
-						<?php while ($lamp = sqlsrv_fetch_array($sqlLamp, SQLSRV_FETCH_ASSOC)) { ?>
-							<div class="col-sm-2">
-								<input type="text" class="form-control input-sm" value="<?php echo $lamp['lampu'] ?>" readonly>
-							</div>
-						<?php } ?>
+					<?php while ($lamp = mysqli_fetch_array($sqlLamp)) { ?>
+						<div class="col-sm-2">
+							<input type="text" class="form-control input-sm" value="<?php echo $lamp['lampu'] ?>" readonly>
+						</div>
+					<?php } ?>
 				</div>
 			</div>
 			<div class="form-group">
@@ -183,13 +171,13 @@ if (isset($_POST['savee'])) {
 			<div class="form-group">
 				<label for="matcher" class="col-sm-2 control-label">Matcher</label>
 				<div class="col-sm-2">
-						<select name="matcher" id="matcher" class="form-control" required>
-							<option selected disabled value="">Pilih</option>
-							<?php $qrymc = sqlsrv_query($con, "SELECT nama FROM db_laborat.tbl_matcher WHERE status='Aktif' ORDER BY nama ASC");
-							while ($dmc = sqlsrv_fetch_array($qrymc, SQLSRV_FETCH_ASSOC)) { ?>
-								<option value="<?php echo $dmc['nama']; ?>"><?php echo $dmc['nama']; ?></option>
-							<?php } ?>
-						</select>
+					<select name="matcher" id="matcher" class="form-control" required>
+						<option selected disabled value="">Pilih</option>
+						<?php $qrymc = mysqli_query($con, "SELECT * FROM tbl_matcher WHERE `status`='Aktif' ORDER BY nama ASC");
+						while ($dmc = mysqli_fetch_array($qrymc)) { ?>
+							<option value="<?php echo $dmc['nama']; ?>"><?php echo $dmc['nama']; ?></option>
+						<?php } ?>
+					</select>
 				</div>
 			</div>
 			<div class="form-group">
@@ -207,11 +195,10 @@ if (isset($_POST['savee'])) {
 					<textarea name="ket" rows="4" class="form-control" id="Ket" placeholder="Keterangan"><?php echo $dPO['ket']; ?></textarea>
 				</div>
 			</div>
-				<?php
-				$qryM = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_status_matching WHERE idm = ?", [$_GET['idm']]);
-				$rM = sqlsrv_fetch_array($qryM, SQLSRV_FETCH_ASSOC);
-				sqlsrv_free_stmt($qryM);
-				?>
+			<?php
+			$qryM = mysqli_query($con, "SELECT * FROM tbl_status_matching WHERE `idm`='$_GET[idm]'");
+			$rM = mysqli_fetch_array($qryM);
+			?>
 
 			<div class="box-footer">
 				<div class="col-sm-3">
