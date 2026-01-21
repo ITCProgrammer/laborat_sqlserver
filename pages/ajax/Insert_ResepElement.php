@@ -3,6 +3,11 @@ header('Content-Type: application/json');
 
 // koneksi ke DB
 include "../../koneksi.php"; 
+if (! $con) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => 'Koneksi SQL Server gagal']);
+    exit;
+}
 
 // Ambil POST data
 $no_resep   = $_POST['no_resep'] ?? '';
@@ -18,12 +23,9 @@ if ($no_resep === '' || $element_code === '') {
 }
 
 $sqlGetId = "SELECT NUMBERID FROM balance WHERE ELEMENTSCODE = ?";
-$stmt = mysqli_prepare($con, $sqlGetId);
-mysqli_stmt_bind_param($stmt, "s", $element_code);
-mysqli_stmt_execute($stmt);
-$res = mysqli_stmt_get_result($stmt);
-$row = mysqli_fetch_assoc($res);
-mysqli_stmt_close($stmt);
+$stmt = sqlsrv_query($con, $sqlGetId, [$element_code]);
+$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+sqlsrv_free_stmt($stmt);
 
 if (!$row) {
     echo json_encode([
@@ -37,14 +39,10 @@ $element_id = $row['NUMBERID'];
 
 
 // Cek balance: pastikan record balance ada dan qty (BASEPRIMARYQUANTITYUNIT) > 0
-$checkBalanceQuery = "SELECT BASEPRIMARYQUANTITYUNIT FROM balance WHERE NUMBERID = ? LIMIT 1";
-
-$stmt = mysqli_prepare($con, $checkBalanceQuery);
-mysqli_stmt_bind_param($stmt, "s", $element_id);
-mysqli_stmt_execute($stmt);
-$res = mysqli_stmt_get_result($stmt);
-$balanceRow = mysqli_fetch_assoc($res);
-mysqli_stmt_close($stmt);
+$checkBalanceQuery = "SELECT TOP 1 BASEPRIMARYQUANTITYUNIT FROM balance WHERE NUMBERID = ?";
+$stmt = sqlsrv_query($con, $checkBalanceQuery, [$element_id]);
+$balanceRow = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+sqlsrv_free_stmt($stmt);
 
 if (!$balanceRow) {
     echo json_encode([
@@ -64,23 +62,19 @@ if ($qty <= 0) {
 }
 
 // 1. Cek apakah data sudah ada
-$checkQuery = "SELECT COUNT(*) AS total FROM tbl_resep_element WHERE no_resep = ?";
-$stmt = mysqli_prepare($con, $checkQuery);
-mysqli_stmt_bind_param($stmt, "s", $no_resep);
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
-$row = mysqli_fetch_assoc($result);
-mysqli_stmt_close($stmt);
+$checkQuery = "SELECT COUNT(*) AS total FROM db_laborat.tbl_resep_element WHERE no_resep = ?";
+$stmt = sqlsrv_query($con, $checkQuery, [$no_resep]);
+$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+sqlsrv_free_stmt($stmt);
 
 if ($row['total'] > 0) {
     // 2. UPDATE jika sudah ada
-    $updateQuery = "UPDATE tbl_resep_element 
+    $updateQuery = "UPDATE db_laborat.tbl_resep_element 
         SET element_id = ?, element_code = ?
         WHERE no_resep = ?";
-    $stmt = mysqli_prepare($con, $updateQuery);
-    mysqli_stmt_bind_param($stmt, "sss", $element_id, $element_code, $no_resep);
+    $stmt = sqlsrv_query($con, $updateQuery, [$element_id, $element_code, $no_resep]);
 
-    if (mysqli_stmt_execute($stmt)) {
+    if ($stmt) {
         echo json_encode([
             'status' => 'success',
             'mode' => 'update',
@@ -89,19 +83,16 @@ if ($row['total'] > 0) {
     } else {
         echo json_encode([
             'status' => 'error',
-            'message' => mysqli_stmt_error($stmt)
+            'message' => print_r(sqlsrv_errors(), true)
         ]);
     }
 
-    mysqli_stmt_close($stmt);
-
 } else {
     // 3. INSERT jika belum ada
-    $insertQuery = "INSERT INTO tbl_resep_element (no_resep, element_id, element_code) VALUES (?, ?, ?)";
-    $stmt = mysqli_prepare($con, $insertQuery);
-    mysqli_stmt_bind_param($stmt, "sss", $no_resep, $element_id, $element_code);
+    $insertQuery = "INSERT INTO db_laborat.tbl_resep_element (no_resep, element_id, element_code) VALUES (?, ?, ?)";
+    $stmt = sqlsrv_query($con, $insertQuery, [$no_resep, $element_id, $element_code]);
 
-    if (mysqli_stmt_execute($stmt)) {
+    if ($stmt) {
         echo json_encode([
             'status' => 'success',
             'mode' => 'insert',
@@ -110,11 +101,7 @@ if ($row['total'] > 0) {
     } else {
         echo json_encode([
             'status' => 'error',
-            'message' => mysqli_stmt_error($stmt)
+            'message' => print_r(sqlsrv_errors(), true)
         ]);
     }
-
-    mysqli_stmt_close($stmt);
 }
-
-mysqli_close($con);

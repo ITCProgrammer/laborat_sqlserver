@@ -3,9 +3,15 @@ include "../../koneksi.php";
 header('Content-Type: application/json');
 
 $rcode = $_POST['rcode'] ?? '';
-$response = ['needInput' => false, 'isDR' => false];
+$response = ['needInput' => false, 'isDR' => false, 'error' => null];
 
-if (!$con || empty($rcode)) {
+if (!$con) {
+    $response['error'] = 'Koneksi SQL Server gagal';
+    echo json_encode($response);
+    exit;
+}
+if (empty($rcode)) {
+    $response['error'] = 'Kode resep kosong';
     echo json_encode($response);
     exit;
 }
@@ -14,27 +20,26 @@ $isDR = substr($rcode, 0, 2) === 'DR';
 $response['isDR'] = $isDR;
 
 if ($isDR) {
-    $sql = "SELECT temp_code, temp_code2 FROM tbl_matching WHERE no_resep = ?";
-    $stmt = mysqli_prepare($con, $sql);
-    mysqli_stmt_bind_param($stmt, "s", $rcode);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $data = mysqli_fetch_assoc($result);
-
-    if ($data && (empty($data['temp_code']) || empty($data['temp_code2']))) {
-        $response['needInput'] = true;
+    $stmt = sqlsrv_query($con, "SELECT temp_code, temp_code2 FROM db_laborat.tbl_matching WHERE no_resep = ?", [$rcode]);
+    if ($stmt) {
+        $data = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+        if ($data && (empty($data['temp_code']) || empty($data['temp_code2']))) {
+            $response['needInput'] = true;
+        }
+        sqlsrv_free_stmt($stmt);
+    } else {
+        $response['error'] = sqlsrv_errors();
     }
-
 } else {
-    $sql = "SELECT temp_code FROM tbl_matching WHERE no_resep = ?";
-    $stmt = mysqli_prepare($con, $sql);
-    mysqli_stmt_bind_param($stmt, "s", $rcode);
-    mysqli_stmt_execute($stmt);
-    $result = mysqli_stmt_get_result($stmt);
-    $data = mysqli_fetch_assoc($result);
-
-    if ($data && empty($data['temp_code'])) {
-        $response['needInput'] = true;
+    $stmt = sqlsrv_query($con, "SELECT temp_code FROM db_laborat.tbl_matching WHERE no_resep = ?", [$rcode]);
+    if ($stmt) {
+        $data = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+        if ($data && empty($data['temp_code'])) {
+            $response['needInput'] = true;
+        }
+        sqlsrv_free_stmt($stmt);
+    } else {
+        $response['error'] = sqlsrv_errors();
     }
 }
 

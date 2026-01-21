@@ -2,6 +2,9 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
+if (! $con) {
+  die('Koneksi SQL Server db_laborat gagal.');
+}
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -66,6 +69,14 @@ $RCode      = isset($_POST['rcode']) ? $_POST['rcode'] : '';
 $Warna      = isset($_POST['warna']) ? $_POST['warna'] : '';
 $JMatching  = isset($_POST['jmatching']) ? $_POST['jmatching'] : '';
 $Order      = isset($_POST['order']) ? $_POST['order'] : '';
+$filters    = [
+  'a.no_resep'      => $RCode,
+  'a.no_warna'      => $Nowarna,
+  'a.no_item'       => $Item,
+  'a.warna'         => $Warna,
+  'a.no_order'      => $Order,
+  'a.jenis_matching'=> $JMatching,
+];
 ?>
 
 <body>
@@ -119,22 +130,25 @@ $Order      = isset($_POST['order']) ? $_POST['order'] : '';
         <div class="box-header with-border">
           <div class="col-lg-12 overflow-auto table-responsive" style="overflow-x: auto;">
             <?php
-            if ($Nowarna != "" or $Item != "" or $RCode != "" or $Warna != "" or $JMatching != "" or $Order != "") {
-              $sql = mysqli_query($con, "SELECT a.`id`, a.`no_resep`, a.`no_order`, a.`warna`, a.`no_warna`, a.`no_item`, a.`langganan`, a.`no_po`, a.`no_item` ,b.approve, a.jenis_matching, a.benang, re.element_id, re.element_code, a.for_forecast,
-                                                        b.`id` as id_status, b.status, a.status_bagi, ifnull(b.`ket`, a.note) as ket
-                                                        FROM tbl_matching a 
-                                                        left join tbl_status_matching b on a.`no_resep` = b.`idm`
-                                                        left join tbl_resep_element re on a.`no_resep` = re.`no_resep`
-                                                        where b.approve_at is null AND a.no_resep LIKE '%$RCode%' AND a.no_warna LIKE '%$Nowarna%' AND a.no_item LIKE '%$Item%' AND a.warna LIKE '%$Warna%' AND a.no_order LIKE '%$Order%' AND a.jenis_matching LIKE '%$JMatching%'
-                                                        order by a.id desc");
-            } else {
-              $sql = mysqli_query($con, "SELECT a.`id`, a.`no_resep`, a.`no_order`, a.`warna`, a.`no_warna`, a.`no_item`, a.`langganan`, a.`no_po`, a.`no_item` ,b.approve, a.jenis_matching, a.benang, re.element_id, re.element_code, a.for_forecast,
-                                                        b.`id` as id_status, b.status, a.status_bagi, ifnull(b.`ket`, a.note) as ket, a.tgl_update
-                                                        FROM tbl_matching a 
-                                                        left join tbl_status_matching b on a.`no_resep` = b.`idm`
-                                                        left join tbl_resep_element re on a.`no_resep` = re.`no_resep`
-                                                        where b.approve_at is null
-                                                        order by a.id desc");
+            $where = ["b.approve_at IS NULL"];
+            $params = [];
+            foreach ($filters as $col => $val) {
+              if ($val !== '') {
+                $where[] = "$col LIKE ?";
+                $params[] = "%$val%";
+              }
+            }
+            $whereSql = implode(' AND ', $where);
+            $baseSelect = "SELECT a.id, a.no_resep, a.no_order, a.warna, a.no_warna, a.no_item, a.langganan, a.no_po, a.no_item, b.approve, a.jenis_matching, a.benang, re.element_id, re.element_code, a.for_forecast,
+                                      b.id as id_status, b.status, a.status_bagi, ISNULL(b.ket, a.note) as ket, a.tgl_update
+                             FROM db_laborat.tbl_matching a
+                             LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
+                             LEFT JOIN db_laborat.tbl_resep_element re ON a.no_resep = re.no_resep
+                             WHERE $whereSql
+                             ORDER BY a.id DESC";
+            $sql = sqlsrv_query($con, $baseSelect, $params);
+            if (! $sql) {
+              die('Load data gagal: ' . print_r(sqlsrv_errors(), true));
             }
             ?>
             <table id="Table-sm" class="table table-sm display compact" style="width: 100%;">
@@ -156,7 +170,7 @@ $Order      = isset($_POST['order']) ? $_POST['order'] : '';
                 </tr>
               </thead>
               <tbody>
-                <?php while ($li = mysqli_fetch_array($sql)) { ?>
+                <?php while ($li = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) { ?>
                   <tr>
                     <td>
                       <?php if ($li['status'] == null) { ?>
@@ -226,7 +240,14 @@ $Order      = isset($_POST['order']) ? $_POST['order'] : '';
                         </a>
                       <?php endif; ?>
                     </td>
-                    <td><?php echo $li['tgl_update'] ?></td>
+                    <td><?php
+                      $tglUpdate = $li['tgl_update'] ?? '';
+                      if ($tglUpdate instanceof DateTime) {
+                        echo $tglUpdate->format('Y-m-d H:i:s');
+                      } else {
+                        echo $tglUpdate;
+                      }
+                    ?></td>
                     <td class="btn-grp">
                       <!-- <div class="btn-group" role="group" aria-label="1"> -->
                       <?php if ($li['status'] == null) { ?>
@@ -264,7 +285,9 @@ $Order      = isset($_POST['order']) ? $_POST['order'] : '';
                       <!-- </div> -->
                     </td>
                   </tr>
-                <?php } ?>
+                <?php }
+                sqlsrv_free_stmt($sql);
+                ?>
               </tbody>
             </table>
           </div>

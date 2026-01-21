@@ -29,27 +29,44 @@ $rcode = $_POST['rcode'];
 $temp_code1 = $_POST['temp_code'] ?? null;
 $temp_code2 = $_POST['temp_code2'] ?? null;
 
+if (! $con) {
+    echo json_encode(['session' => 'ERROR', 'message' => 'Koneksi SQL Server gagal']);
+    exit;
+}
+
+function json_sql_error($context) {
+    $err = sqlsrv_errors();
+    echo json_encode([
+        'session' => 'ERROR',
+        'context' => $context,
+        'errors' => $err,
+    ]);
+    exit;
+}
+
 // update temp_code
 if ($temp_code1) {
     if (substr($rcode, 0, 2) === 'DR') {
-        $stmt = $con->prepare("UPDATE tbl_matching SET temp_code = ?, temp_code2 = ? WHERE no_resep = ?");
-        $stmt->bind_param("sss", $temp_code1, $temp_code2, $rcode);
-        $stmt->execute();
+        $ok = sqlsrv_query($con, "UPDATE db_laborat.tbl_matching SET temp_code = ?, temp_code2 = ? WHERE no_resep = ?", [$temp_code1, $temp_code2, $rcode]);
+        if (! $ok) json_sql_error('update temp_code DR');
     } else {
-        $stmt = $con->prepare("UPDATE tbl_matching SET temp_code = ? WHERE no_resep = ?");
-        $stmt->bind_param("ss", $temp_code1, $rcode);
-        $stmt->execute();
+        $ok = sqlsrv_query($con, "UPDATE db_laborat.tbl_matching SET temp_code = ? WHERE no_resep = ?", [$temp_code1, $rcode]);
+        if (! $ok) json_sql_error('update temp_code');
     }
 }
 
-mysqli_query($con,"UPDATE tbl_matching set status_bagi = 'siap bagi' where no_resep = '$_POST[rcode]' limit 1");
-mysqli_query($con,"INSERT INTO log_status_matching SET
-            `ids` = '$_POST[rcode]', 
-            `status` = 'siap bagi', 
-            `info` = 'changed status_bagi to siap bagi', 
-            `do_by` = '$_SESSION[userLAB]', 
-            `do_at` = '$time', 
-            `ip_address` = '$ip_num'");
+$ok = sqlsrv_query($con,"UPDATE db_laborat.tbl_matching SET status_bagi = 'siap bagi' WHERE no_resep = ?", [$rcode]);
+if (! $ok) json_sql_error('update status_bagi');
+
+$ok = sqlsrv_query($con,"INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address) VALUES (?, ?, ?, ?, ?, ?)", [
+    $rcode,
+    'siap bagi',
+    'changed status_bagi to siap bagi',
+    $_SESSION['userLAB'] ?? '',
+    $time,
+    $ip_num
+]);
+if (! $ok) json_sql_error('insert log_status_matching');
 
 $response = array(
     'session' => 'LIB_SUCCSS',

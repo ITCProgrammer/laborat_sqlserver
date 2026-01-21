@@ -1,6 +1,11 @@
 <?php
 ini_set("error_reporting", 1);
 include '../../koneksi.php';
+if (! $con) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Koneksi SQL Server gagal']);
+    exit;
+}
 $requestData = $_REQUEST;
 $columns = array(
     0 => 'id',
@@ -14,27 +19,50 @@ $columns = array(
     8 => 'status',
 );
 // set_order_type("desc");
-$sql = "SELECT a.`id`, a.`no_resep`, a.`no_order`, a.`warna`, a.`no_warna`, a.`no_item`, a.`langganan`, a.`no_po`, ifnull(b.`status`, 'siap bagi') as `status` 
-FROM tbl_matching a left join tbl_status_matching b on a.`no_resep` = b.`idm`
-where a.status_bagi = 'siap bagi' and ifnull(b.`status`, 'siap bagi') = 'siap bagi' ";
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku");
-$totalData = mysqli_num_rows($query);
-$totalFiltered = $totalData;
-if (!empty($requestData['search']['value'])) {
-    $sql .= " and a.`no_resep` LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR a.`no_order` LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR a.`warna` LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR a.`no_warna` LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR a.`no_item` LIKE '%" . $requestData['search']['value'] . "%' ";
-    // $sql .= " OR a.`langganan` LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR a.`no_po` LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR ifnull(b.`status`, 'belum bagi') LIKE '%" . $requestData['search']['value'] . "%' ";
+$searchVal = $requestData['search']['value'] ?? '';
+
+$baseSql = "FROM db_laborat.tbl_matching a
+            LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
+            WHERE a.status_bagi = 'siap bagi' AND ISNULL(b.status, 'siap bagi') = 'siap bagi'";
+$params = [];
+if (!empty($searchVal)) {
+    $baseSql .= " AND (a.no_resep LIKE ? OR a.no_order LIKE ? OR a.warna LIKE ? OR a.no_warna LIKE ? OR a.no_item LIKE ? OR a.no_po LIKE ? OR ISNULL(b.status, 'belum bagi') LIKE ?)";
+    $like = '%' . $searchVal . '%';
+    $params = [$like, $like, $like, $like, $like, $like, $like];
 }
-//----------------------------------------------------------------------------------
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku1");
-$totalFiltered = mysqli_num_rows($query);
-$sql .= " GROUP by a.`no_resep` ORDER BY a.`id` desc LIMIT " . $requestData['start'] . " ," . $requestData['length'] . "   ";
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku2");
+
+$countSql = "SELECT COUNT(*) AS cnt " . $baseSql;
+$stmtCount = sqlsrv_query($con, $countSql, $params);
+$rowCount = sqlsrv_fetch_array($stmtCount, SQLSRV_FETCH_ASSOC);
+sqlsrv_free_stmt($stmtCount);
+$totalData = $totalFiltered = $rowCount ? (int)$rowCount['cnt'] : 0;
+
+$orderColIdx = (int)($requestData['order'][0]['column'] ?? 0);
+$orderDir = strtolower($requestData['order'][0]['dir'] ?? 'desc');
+$orderDir = $orderDir === 'asc' ? 'ASC' : 'DESC';
+$start  = (int)($requestData['start'] ?? 0);
+$length = (int)($requestData['length'] ?? 10);
+
+$orderCols = [
+    0 => 'a.id',
+    1 => 'a.no_resep',
+    2 => 'a.no_order',
+    3 => 'a.warna',
+    4 => 'a.no_warna',
+    5 => 'a.no_item',
+    6 => 'a.langganan',
+    7 => 'a.no_po',
+    8 => 'b.status'
+];
+$orderCol = $orderCols[$orderColIdx] ?? 'a.id';
+
+$sql = "SELECT a.id, a.no_resep, a.no_order, a.warna, a.no_warna, a.no_item, a.langganan, a.no_po, ISNULL(b.status, 'siap bagi') AS status "
+      . $baseSql .
+      " GROUP BY a.id, a.no_resep, a.no_order, a.warna, a.no_warna, a.no_item, a.langganan, a.no_po, b.status
+        ORDER BY $orderCol $orderDir
+        OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+$paramsData = array_merge($params, [$start, $length]);
+$query = sqlsrv_query($con, $sql, $paramsData);
 //----------------------------------------------------------------------------------
 $data = array();
 $no = 1;

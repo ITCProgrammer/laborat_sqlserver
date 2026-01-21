@@ -2,6 +2,11 @@
 ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
+if (! $con) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Koneksi SQL Server gagal']);
+    exit;
+}
 $time = date('Y-m-d H:i:s');
 function get_client_ip()
 {
@@ -24,21 +29,28 @@ function get_client_ip()
 }
 $ip = get_client_ip();
 $ip_num = $_SERVER['REMOTE_ADDR'];
-mysqli_query($con,"UPDATE tbl_matching set 
-status_bagi = 'tunggu',
-note = '$_POST[why]' 
-where no_resep = '$_POST[rcode]' limit 1");
 
+$update = sqlsrv_query($con, "UPDATE db_laborat.tbl_matching SET 
+    status_bagi = 'tunggu',
+    note = ?
+    WHERE no_resep = ?", [
+    $_POST['why'],
+    $_POST['rcode']
+]);
 
+if (! $update) {
+    http_response_code(500);
+    echo json_encode(['error' => sqlsrv_errors()]);
+    exit;
+}
 
-
-mysqli_query($con,"INSERT INTO log_status_matching SET
-            `ids` = '$_POST[rcode]', 
-            `status` = 'tunggu', 
-            `info` = 'changed status_bagi to tunggu', 
-            `do_by` = '$_SESSION[userLAB]', 
-            `do_at` = '$time', 
-            `ip_address` = '$ip_num'");
+sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address) VALUES (?, ?, ?, ?, GETDATE(), ?)", [
+    $_POST['rcode'],
+    'tunggu',
+    'changed status_bagi to tunggu',
+    $_SESSION['userLAB'],
+    $ip_num
+]);
 
 $response = array(
     'session' => 'LIB_SUCCSS',

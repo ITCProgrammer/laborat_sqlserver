@@ -9,9 +9,26 @@
     // ini_set("error_reporting", 1);
     // session_start();
     require_once('koneksi.php');
-    $rcode = $_GET['rcode'];
-    $sql = mysqli_query($con, "SELECT * FROM tbl_matching where no_resep = '$rcode' LIMIT 1");
-    $data = mysqli_fetch_array($sql);
+    if (! $con) {
+        die('Koneksi SQL Server gagal.');
+    }
+    function fmtDate($val) {
+        if ($val instanceof DateTimeInterface) {
+            return $val->format('Y-m-d');
+        }
+        $ts = strtotime((string)$val);
+        return $ts ? date('Y-m-d', $ts) : '';
+    }
+    $rcode = $_GET['rcode'] ?? '';
+    $sql = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_matching WHERE no_resep = ?", [$rcode]);
+    if (! $sql) {
+        die('Load data gagal: ' . print_r(sqlsrv_errors(), true));
+    }
+    $data = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
+    sqlsrv_free_stmt($sql);
+    if (! $data) {
+        die('Data tidak ditemukan.');
+    }
 ?>
 
 <?php
@@ -28,51 +45,70 @@
         $tempCode = $_POST['temp_code'];
         $tempCode2 = $_POST['temp_code2'];
 
-        $qry = mysqli_query($con, "UPDATE tbl_matching SET
-            no_order='$_POST[no_order]',
-            no_po='$_POST[no_po]',
-            langganan='$langganan',
-            no_item='$_POST[no_item1]',
-            jenis_kain='$kain',
-            benang='$benang',
-            tgl_in=now(),
-            cocok_warna='$cocok_warna',
-            warna='$warna',
-            no_warna='$nowarna',
-            recipe_code='$recipe',
-            color_code='$colorcode',
-            lebar='$_POST[lebar]',
-            qty_order='$_POST[qty]',
-            gramasi='$_POST[gramasi]',
-            proses='$_POST[proses]',
-            buyer='$_POST[buyer]',
-            tgl_delivery='$_POST[tgl_delivery]',
-            jenis_matching='$_POST[jen_matching]',
-            temp_code='$tempCode',
-            temp_code2='$tempCode2'
-            where no_resep = '$_POST[no_resep]' LIMIT 1
-            ");
+        $qry = sqlsrv_query($con, "UPDATE db_laborat.tbl_matching SET
+            no_order=?,
+            no_po=?,
+            langganan=?,
+            no_item=?,
+            jenis_kain=?,
+            benang=?,
+            tgl_in=GETDATE(),
+            cocok_warna=?,
+            warna=?,
+            no_warna=?,
+            recipe_code=?,
+            color_code=?,
+            lebar=?,
+            qty_order=?,
+            gramasi=?,
+            proses=?,
+            buyer=?,
+            tgl_delivery=?,
+            jenis_matching=?,
+            temp_code=?,
+            temp_code2=?
+            where no_resep = ?", [
+                $_POST['no_order'],
+                $_POST['no_po'],
+                $langganan,
+                $_POST['no_item1'],
+                $kain,
+                $benang,
+                $cocok_warna,
+                $warna,
+                $nowarna,
+                $recipe,
+                $colorcode,
+                $_POST['lebar'],
+                $_POST['qty'],
+                $_POST['gramasi'],
+                $_POST['proses'],
+                $_POST['buyer'],
+                $_POST['tgl_delivery'],
+                $_POST['jen_matching'],
+                $tempCode,
+                $tempCode2,
+                $_POST['no_resep']
+            ]);
 
         if ($qry) {
-            mysqli_query($con, "INSERT INTO log_status_matching SET
-                `ids` = '$_POST[no_resep]',
-                `status` = 'Belum bagi',
-                `info` = 'Update data resep',
-                `do_by` = '$_SESSION[userLAB]',
-                `do_at` = '$time',
-                `ip_address` = '$ip_num'");
+            sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address) VALUES (?, ?, ?, ?, GETDATE(), ?)", [
+                $_POST['no_resep'],
+                'Belum bagi',
+                'Update data resep',
+                $_SESSION['userLAB'],
+                $ip_num
+            ]);
             echo "<script>alert('Data Tersimpan');window.location.href='?p=List-Schedule';</script>";
         } else {
-            echo "There's been a problem: " . mysqli_error();
+            echo "There's been a problem: " . print_r(sqlsrv_errors(), true);
         }
     }
 ?>
 
-
 <body>
     <div class="row">
         <div class="col-md-12">
-            <!-- Custom Tabs -->
             <div class="nav-tabs-custom">
                 <ul class="nav nav-tabs">
                     <li class="active"><a href="#tab_1" data-toggle="tab">Edit Data Matching</a></li>
@@ -126,19 +162,12 @@
                                 </div>
                             </div>
                         </form>
-                        <!-- /.box-body -->
                     </div>
-                    <!-- /.tab-pane -->
-
                 </div>
-                <!-- /.tab-content -->
             </div>
-            <!-- nav-tabs-custom -->
         </div>
-        <!-- /.col -->
     </div>
 </body>
-<!-- Modal -->
 <div class="modal fade" id="staticBackdrop" data-backdrop="static" tabindex="-1" aria-labelledby="staticBackdropLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -159,8 +188,8 @@
                         <tbody>
                             <?php
                             $i = 1;
-                            $sqlmstrcd = mysqli_query($con, "SELECT kode, keterangan from tbl_mstrheadercd;");
-                            while ($title = mysqli_fetch_array($sqlmstrcd)) {
+                            $sqlmstrcd = sqlsrv_query($con, "SELECT kode, keterangan from db_laborat.tbl_mstrheadercd;");
+                            while ($title = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC)) {
                                 echo '<tr><td>' . $i++ . '.</td>
 									<td>' . $title['kode'] . '</td>
 									<td>' . $title['keterangan'] . '</td></tr>';
@@ -176,7 +205,6 @@
         </div>
     </div>
 </div>
-<!-- end modal -->
 <div style="display: none;" id="hidding-choice">
 
 </div>
@@ -307,7 +335,7 @@
     <div class="form-group">
         <label for="tgl_delivery" class="col-sm-2 control-label">Tgl Delivery</label>
         <div class="col-sm-3">
-            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery" value="<?php $date_deliv = date_create($data['tgl_delivery']); echo date_format($date_deliv, "Y-m-d"); ?>">
+            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery" value="<?php echo fmtDate($data['tgl_delivery']); ?>">
         </div>
     </div>
     <div class="form-group">
@@ -320,8 +348,8 @@
         <label for="lampu" class="col-sm-2 control-label">Buyer</label>
         <div class="col-sm-3">
             <select name="buyer" id="buyer" class="form-control selectBuyer1" style="width: 100%;">
-                <?php $sqlbuyer = mysqli_query($con, "SELECT id, buyer FROM vpot_lampbuy group by buyer order by id desc"); ?>
-                <?php while ($option = mysqli_fetch_array($sqlbuyer)) { ?>
+                <?php $sqlbuyer = sqlsrv_query($con, "SELECT buyer FROM db_laborat.vpot_lampbuy group by buyer order by max(id) desc"); ?>
+                <?php while ($option = sqlsrv_fetch_array($sqlbuyer, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $option['buyer'] ?>" <?php if ($data['buyer'] == $option['buyer']) echo "selected"; ?>><?php echo $option['buyer'] ?></option>
                 <?php } ?>
             </select>
@@ -337,8 +365,8 @@
         <label for="proses" class="col-sm-2 control-label">Proses</label>
         <div class="col-sm-3">
             <select class="form-control selectProses1" name="proses" id="proses" style="width: 100%;">
-                <?php $sqlprocss = mysqli_query($con, "SELECT nama_proses FROM master_proses where is_active = 'TRUE' order by id desc"); ?>
-                <?php while ($procss = mysqli_fetch_array($sqlprocss)) { ?>
+                <?php $sqlprocss = sqlsrv_query($con, "SELECT nama_proses FROM db_laborat.master_proses where is_active = 'TRUE' order by id desc"); ?>
+                <?php while ($procss = sqlsrv_fetch_array($sqlprocss, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $procss['nama_proses'] ?>" <?php if ($procss['nama_proses'] == $data['proses']) echo 'selected' ?>><?php echo $procss['nama_proses'] ?></option>
                 <?php } ?>
             </select>
@@ -442,7 +470,7 @@
     <div class="form-group">
         <label for="tgl_delivery" class="col-sm-2 control-label">Tgl Delivery</label>
         <div class="col-sm-3">
-            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" value="<?php echo $data['tgl_delivery'] ?>" placeholder="Tgl Delivery" required>
+            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" value="<?php echo fmtDate($data['tgl_delivery']); ?>" placeholder="Tgl Delivery" required>
         </div>
     </div>
     <!-- HIDDEN INPUT -->
@@ -453,8 +481,8 @@
         <label for="lampu" class="col-sm-2 control-label">Buyer</label>
         <div class="col-sm-3">
             <select name="buyer" id="buyer" class="form-control selectBuyer2" style="width: 100%;">
-                <?php $sqlbuyer = mysqli_query($con, "SELECT id, buyer FROM vpot_lampbuy group by buyer order by id desc"); ?>
-                <?php while ($option = mysqli_fetch_array($sqlbuyer)) { ?>
+                <?php $sqlbuyer = sqlsrv_query($con, "SELECT buyer FROM db_laborat.vpot_lampbuy group by buyer order by max(id) desc"); ?>
+                <?php while ($option = sqlsrv_fetch_array($sqlbuyer, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $option['buyer'] ?>" <?php if ($data['buyer'] == $option['buyer']) echo "selected"; ?>><?php echo $option['buyer'] ?></option>
                 <?php } ?>
             </select>
@@ -470,8 +498,8 @@
         <label for="proses" class="col-sm-2 control-label">Proses</label>
         <div class="col-sm-3">
             <select class="form-control selectProses1" name="proses" id="proses" style="width: 100%;">
-                <?php $sqlprocss = mysqli_query($con, "SELECT nama_proses FROM master_proses where is_active = 'TRUE' order by id desc"); ?>
-                <?php while ($procss = mysqli_fetch_array($sqlprocss)) { ?>
+                <?php $sqlprocss = sqlsrv_query($con, "SELECT nama_proses FROM db_laborat.master_proses where is_active = 'TRUE' order by id desc"); ?>
+                <?php while ($procss = sqlsrv_fetch_array($sqlprocss, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $procss['nama_proses'] ?>" <?php if ($procss['nama_proses'] == $data['proses']) echo 'selected' ?>><?php echo $procss['nama_proses'] ?></option>
                 <?php } ?>
             </select>
@@ -585,7 +613,7 @@
     <div class="form-group">
         <label for="tgl_delivery" class="col-sm-2 control-label">Tgl Delivery</label>
         <div class="col-sm-3">
-            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery" value="<?php echo $data['tgl_delivery'] ?>">
+            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery" value="<?php echo fmtDate($data['tgl_delivery']); ?>">
         </div>
     </div>
     <div class="form-group">
@@ -598,8 +626,8 @@
         <label for="lampu" class="col-sm-2 control-label">Buyer</label>
         <div class="col-sm-3">
             <select name="buyer" id="buyer" class="form-control selectBuyer3" style="width: 100%;">
-                <?php $sqlbuyer = mysqli_query($con, "SELECT id, buyer FROM vpot_lampbuy group by buyer order by id desc"); ?>
-                <?php while ($option = mysqli_fetch_array($sqlbuyer)) { ?>
+                <?php $sqlbuyer = sqlsrv_query($con, "SELECT buyer FROM db_laborat.vpot_lampbuy group by buyer order by max(id) desc"); ?>
+                <?php while ($option = sqlsrv_fetch_array($sqlbuyer, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $option['buyer'] ?>" <?php if ($data['buyer'] == $option['buyer']) echo "selected"; ?>><?php echo $option['buyer'] ?></option>
                 <?php } ?>
             </select>
@@ -615,8 +643,8 @@
         <label for="proses" class="col-sm-2 control-label">Proses</label>
         <div class="col-sm-3">
             <select class="form-control selectProses3" name="proses" id="proses" style="width: 100%;">
-                <?php $sqlprocss = mysqli_query($con, "SELECT nama_proses FROM master_proses where is_active = 'TRUE' order by id desc"); ?>
-                <?php while ($procss = mysqli_fetch_array($sqlprocss)) { ?>
+                <?php $sqlprocss = sqlsrv_query($con, "SELECT nama_proses FROM db_laborat.master_proses where is_active = 'TRUE' order by id desc"); ?>
+                <?php while ($procss = sqlsrv_fetch_array($sqlprocss, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $procss['nama_proses'] ?>" <?php if ($procss['nama_proses'] == $data['proses']) echo 'selected' ?>><?php echo $procss['nama_proses'] ?></option>
                 <?php } ?>
             </select>
@@ -725,7 +753,7 @@
     <div class="form-group">
         <label for="tgl_delivery" class="col-sm-2 control-label">Tgl Delivery</label>
         <div class="col-sm-3">
-            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" value="<?php echo $data['tgl_delivery'] ?>" placeholder="Tgl Delivery" required>
+            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" value="<?php echo fmtDate($data['tgl_delivery']); ?>" placeholder="Tgl Delivery" required>
         </div>
     </div>
     <!-- HIDDEN INPUT -->
@@ -736,8 +764,8 @@
         <label for="lampu" class="col-sm-2 control-label">Buyer</label>
         <div class="col-sm-3">
             <select name="buyer" id="buyer" class="form-control selectBuyer2" style="width: 100%;">
-                <?php $sqlbuyer = mysqli_query($con, "SELECT id, buyer FROM vpot_lampbuy group by buyer order by id desc"); ?>
-                <?php while ($option = mysqli_fetch_array($sqlbuyer)) { ?>
+                <?php $sqlbuyer = sqlsrv_query($con, "SELECT buyer FROM db_laborat.vpot_lampbuy group by buyer order by max(id) desc"); ?>
+                <?php while ($option = sqlsrv_fetch_array($sqlbuyer, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $option['buyer'] ?>" <?php if ($data['buyer'] == $option['buyer']) echo "selected"; ?>><?php echo $option['buyer'] ?></option>
                 <?php } ?>
             </select>
@@ -753,8 +781,8 @@
         <label for="proses" class="col-sm-2 control-label">Proses</label>
         <div class="col-sm-3">
             <select class="form-control selectProses1" name="proses" id="proses" style="width: 100%;">
-                <?php $sqlprocss = mysqli_query($con, "SELECT nama_proses FROM master_proses where is_active = 'TRUE' order by id desc"); ?>
-                <?php while ($procss = mysqli_fetch_array($sqlprocss)) { ?>
+                <?php $sqlprocss = sqlsrv_query($con, "SELECT nama_proses FROM db_laborat.master_proses where is_active = 'TRUE' order by id desc"); ?>
+                <?php while ($procss = sqlsrv_fetch_array($sqlprocss, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $procss['nama_proses'] ?>" <?php if ($procss['nama_proses'] == $data['proses']) echo 'selected' ?>><?php echo $procss['nama_proses'] ?></option>
                 <?php } ?>
             </select>
@@ -879,7 +907,7 @@
     <div class="form-group">
         <label for="tgl_delivery" class="col-sm-2 control-label">Tgl Delivery</label>
         <div class="col-sm-3">
-            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery" value="<?php $date_deliv = date_create($data['tgl_delivery']); echo date_format($date_deliv, "Y-m-d"); ?>">
+            <input name="tgl_delivery" type="text" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery" value="<?php echo fmtDate($data['tgl_delivery']); ?>">
         </div>
     </div>
     <div class="form-group">
@@ -892,8 +920,8 @@
         <label for="lampu" class="col-sm-2 control-label">Buyer</label>
         <div class="col-sm-3">
             <select name="buyer" id="buyer" class="form-control selectBuyer1" style="width: 100%;">
-                <?php $sqlbuyer = mysqli_query($con, "SELECT id, buyer FROM vpot_lampbuy group by buyer order by id desc"); ?>
-                <?php while ($option = mysqli_fetch_array($sqlbuyer)) { ?>
+                <?php $sqlbuyer = sqlsrv_query($con, "SELECT buyer FROM db_laborat.vpot_lampbuy group by buyer order by max(id) desc"); ?>
+                <?php while ($option = sqlsrv_fetch_array($sqlbuyer, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $option['buyer'] ?>" <?php if ($data['buyer'] == $option['buyer']) echo "selected"; ?>><?php echo $option['buyer'] ?></option>
                 <?php } ?>
             </select>
@@ -909,8 +937,8 @@
         <label for="proses" class="col-sm-2 control-label">Proses</label>
         <div class="col-sm-3">
             <select class="form-control selectProses1" name="proses" id="proses" style="width: 100%;">
-                <?php $sqlprocss = mysqli_query($con, "SELECT nama_proses FROM master_proses where is_active = 'TRUE' order by id desc"); ?>
-                <?php while ($procss = mysqli_fetch_array($sqlprocss)) { ?>
+                <?php $sqlprocss = sqlsrv_query($con, "SELECT nama_proses FROM db_laborat.master_proses where is_active = 'TRUE' order by id desc"); ?>
+                <?php while ($procss = sqlsrv_fetch_array($sqlprocss, SQLSRV_FETCH_ASSOC)) { ?>
                     <option value="<?php echo $procss['nama_proses'] ?>" <?php if ($procss['nama_proses'] == $data['proses']) echo 'selected' ?>><?php echo $procss['nama_proses'] ?></option>
                 <?php } ?>
             </select>
@@ -947,6 +975,7 @@
 <!-- Development -->
 <script>
     $(document).ready(function() {
+
         $('.datepicker').datepicker({
             autoclose: true,
             format: 'yyyy-mm-dd',
@@ -1110,8 +1139,8 @@
             $('#NowForm').appendTo('#echoing_the_choice');
             $("#NowForm").show();
             toggleTemp2();
+            
         }
-
 
         $('.selectNoItem').select2();
 
@@ -1316,29 +1345,6 @@
     });
 </script>
 
-<!-- <script>
-	function toggleTemp2() {
-		const noResepInput = document.getElementById('no_resep');
-		const temp2Wrapper = document.getElementById('temp2-wrapper');
-
-		if (noResepInput && temp2Wrapper) {
-			// Cek apakah value no_resep diawali dengan 'DR'
-			if (noResepInput.value.trim().toUpperCase().startsWith('DR')) {
-				temp2Wrapper.style.display = 'flex';
-			} else {
-				temp2Wrapper.style.display = 'none';
-			}
-		}
-	}
-
-	document.addEventListener('DOMContentLoaded', function () {
-		const noResepInput = document.getElementById('no_resep');
-		if (noResepInput) {
-			toggleTemp2();
-			noResepInput.addEventListener('input', toggleTemp2);
-		}
-	});
-</script> -->
 <script>
 	function toggleTemp2() {
 		const noResepInput = document.getElementById('no_resep');

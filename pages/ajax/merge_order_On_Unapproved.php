@@ -2,9 +2,19 @@
 ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
-$idm = $_GET['idm'];
-$sql = mysqli_query($con,"SELECT * from tbl_matching where no_resep = '$idm' LIMIT 1");
-$data = mysqli_fetch_array($sql);
+if (! $con) {
+    die('Koneksi SQL Server gagal.');
+}
+$idm = $_GET['idm'] ?? '';
+$sql = sqlsrv_query($con, "SELECT TOP 1 * from db_laborat.tbl_matching where no_resep = ?", [$idm]);
+if (! $sql) {
+    die('Load data gagal: ' . print_r(sqlsrv_errors(), true));
+}
+$data = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
+sqlsrv_free_stmt($sql);
+if (! $data) {
+    die('Data tidak ditemukan.');
+}
 ?>
 <style>
     .lookupST {
@@ -96,7 +106,7 @@ $data = mysqli_fetch_array($sql);
                                     </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <p class="text-center" style="text-shadow: black; font-weight: bold;">Additional Order <?php echo $data['idm'] ?></p>
+                                    <p class="text-center" style="text-shadow: black; font-weight: bold;">Additional Order <?php echo $data['no_resep'] ?></p>
                                     <table class="table table-bordered table-sm" id="additional_order_table" width="100%">
                                         <thead class="bg-primary">
                                             <th>id</th>
