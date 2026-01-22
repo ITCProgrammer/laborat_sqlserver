@@ -4,58 +4,67 @@ session_start();
 include("../koneksi.php");
 $time = date('Y-m-d H:i:s');
 if (isset($_POST['savee'])) {
-	$qry1 = mysqli_query($con, "UPDATE `tbl_status_matching` SET
-		  `grp`='$_POST[grp]',
-		  `matcher`='$_POST[matcher]',
-		  `kt_status`='$_POST[ket_st]',
-		  `ket`='$_POST[keteee]',
-		  `edited_at`= '$time',
-		  `edited_by`= '$_SESSION[userLAB]'
-	  	   WHERE id = '$_POST[id]'
-	  ");
+$qry1 = sqlsrv_query($con, "UPDATE db_laborat.tbl_status_matching SET
+          grp=?,
+          matcher=?,
+          kt_status=?,
+          ket=?,
+          edited_at=GETDATE(),
+          edited_by=?
+           WHERE id = ?
+      ", [
+            $_POST['grp'],
+            $_POST['matcher'],
+            $_POST['ket_st'],
+            $_POST['keteee'],
+            $_SESSION['userLAB'],
+            $_POST['id']
+      ]);
 	$ip_num = $_SERVER['REMOTE_ADDR'];
-	mysqli_query($con, "INSERT INTO log_status_matching SET
-		  `ids` = '$_GET[idm]', 
-		  `status` = 'buka', 
-		  `info`='edit at atur schedule',
-		  `do_by` = '$_SESSION[userLAB]', 
-		  `do_at` = '$time', 
-		  `ip_address` = '$ip_num'");
+    sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+          VALUES (?, ?, ?, ?, GETDATE(), ?)", [
+            $_GET['idm'],
+            'buka',
+            'edit at atur schedule',
+            $_SESSION['userLAB'],
+            $ip_num
+    ]);
 	if ($qry1) {
 		echo "<script>window.location.href='?p=Schedule-Matching'</script>";
 	} else {
-		echo "There's been a problem: " . mysqli_error();
-	}
+        echo "There's been a problem: " . print_r(sqlsrv_errors(), true);
+    }
 }
 $po = urlencode($_GET['po']);
-$qryPO = mysqli_query($con, "SELECT * FROM tbl_matching WHERE `no_resep`='$_GET[idm]' LIMIT 1");
-$dPO = mysqli_fetch_array($qryPO);
-$qryCek = mysqli_query($con, "SELECT * FROM tbl_status_matching WHERE `idm`='$_GET[idm]'");
-$rCek = mysqli_fetch_array($qryCek);
+$qryPO = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_matching WHERE no_resep=?", [$_GET['idm']]);
+$dPO = sqlsrv_fetch_array($qryPO, SQLSRV_FETCH_ASSOC);
+$qryCek = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_status_matching WHERE idm=?", [$_GET['idm']]);
+$rCek = sqlsrv_fetch_array($qryCek, SQLSRV_FETCH_ASSOC);
 ?>
 <?php
 if (isset($_POST['save'])) {
-	$ket = str_replace("'", "''", $_POST['ket']);
-	mysqli_query($con, "INSERT INTO tbl_status_matching SET
-		`idm`='$_POST[no_resep]',
-    	`grp`='$_POST[grup]',
-    	`matcher`='$_POST[matcher]',
-		`ket`='$ket',
-		`status`= 'buka',
-		`kt_status`='$_POST[kt_status]',
-		`created_at`= '$time',
-		`created_by`= '$_SESSION[userLAB]',
-		`mulai_at`= '$time',
-		`mulai_by`= '$_SESSION[userLAB]'
-		");
-	$ip_num = $_SERVER['REMOTE_ADDR'];
-	mysqli_query($con, "INSERT INTO log_status_matching SET
-		`ids` = '$_POST[no_resep]', 
-		`status` = 'buka', 
-		`info` = 'buka resep', 
-		`do_by` = '$_SESSION[userLAB]', 
-		`do_at` = '$time', 
-		`ip_address` = '$ip_num'");
+    $ket = str_replace("'", "''", $_POST['ket']);
+    sqlsrv_query($con, "INSERT INTO db_laborat.tbl_status_matching
+        (idm, grp, matcher, ket, status, kt_status, created_at, created_by, mulai_at, mulai_by)
+        VALUES (?, ?, ?, ?, 'buka', ?, GETDATE(), ?, GETDATE(), ?)", [
+            $_POST['no_resep'],
+            $_POST['grup'],
+            $_POST['matcher'],
+            $ket,
+            $_POST['kt_status'],
+            $_SESSION['userLAB'],
+            $_SESSION['userLAB']
+        ]);
+    $ip_num = $_SERVER['REMOTE_ADDR'];
+    sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching
+        (ids, status, info, do_by, do_at, ip_address)
+        VALUES (?, ?, ?, ?, GETDATE(), ?)", [
+        $_POST['no_resep'],
+        'buka',
+        'buka resep',
+        $_SESSION['userLAB'],
+        $ip_num
+    ]);
 	echo "<script>window.location.href='?p=Schedule-Matching'</script>";
 }
 ?>
@@ -124,7 +133,16 @@ if (isset($_POST['save'])) {
 				<label for="qty_order" class="col-sm-2 control-label">Qty Order</label>
 				<div class="col-sm-2">
 					<div class="input-group">
-						<input readonly name="qty_order" type="text" class="form-control" id="qty_order" value="<?php echo $dPO['qty_order']; ?>" placeholder="0.00" required style="text-align: right;"><span class="input-group-addon">KG</span>
+                        <?php 
+                            $qtyVal = $dPO['qty_order'];
+                            if ($qtyVal === null || $qtyVal === '' || $qtyVal === false) {
+                                $qtyVal = 0;
+                            }
+                            if (is_numeric($qtyVal)) {
+                                $qtyVal = number_format((float)$qtyVal, 2, '.', '');
+                            }
+                        ?>
+                        <input readonly name="qty_order" type="text" class="form-control" id="qty_order" value="<?php echo $qtyVal; ?>" placeholder="0.00" required style="text-align: right;"><span class="input-group-addon">KG</span>
 					</div>
 				</div>
 			</div>
@@ -134,11 +152,11 @@ if (isset($_POST['save'])) {
 					<input type="text" class="form-control" value="<?php echo $dPO['buyer']; ?>" readonly>
 				</div>
 			</div>
-			<?php $sqlLamp = mysqli_query($con, "SELECT * FROM vpot_lampbuy where buyer = '$dPO[buyer]'"); ?>
+<?php $sqlLamp = sqlsrv_query($con, "SELECT lampu FROM db_laborat.vpot_lampbuy where buyer = ?", [$dPO['buyer']]); ?>
 			<div class="form-group">
 				<label for="proses" class="col-sm-2 control-label text-center">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Lampu</label>
 				<div class="col-sm-8">
-					<?php while ($lamp = mysqli_fetch_array($sqlLamp)) { ?>
+                    <?php while ($lamp = sqlsrv_fetch_array($sqlLamp, SQLSRV_FETCH_ASSOC)) { ?>
 						<div class="col-sm-2">
 							<input type="text" class="form-control input-sm" value="<?php echo $lamp['lampu'] ?>" readonly>
 						</div>
@@ -173,8 +191,8 @@ if (isset($_POST['save'])) {
 				<div class="col-sm-2">
 					<select name="matcher" id="matcher" class="form-control" required>
 						<option selected disabled value="">Pilih</option>
-						<?php $qrymc = mysqli_query($con, "SELECT * FROM tbl_matcher WHERE `status`='Aktif' ORDER BY nama ASC");
-						while ($dmc = mysqli_fetch_array($qrymc)) { ?>
+                    <?php $qrymc = sqlsrv_query($con, "SELECT nama FROM db_laborat.tbl_matcher WHERE status='Aktif' ORDER BY nama ASC");
+                    while ($dmc = sqlsrv_fetch_array($qrymc, SQLSRV_FETCH_ASSOC)) { ?>
 							<option value="<?php echo $dmc['nama']; ?>"><?php echo $dmc['nama']; ?></option>
 						<?php } ?>
 					</select>
@@ -195,10 +213,10 @@ if (isset($_POST['save'])) {
 					<textarea name="ket" rows="4" class="form-control" id="Ket" placeholder="Keterangan"><?php echo $dPO['ket']; ?></textarea>
 				</div>
 			</div>
-			<?php
-			$qryM = mysqli_query($con, "SELECT * FROM tbl_status_matching WHERE `idm`='$_GET[idm]'");
-			$rM = mysqli_fetch_array($qryM);
-			?>
+    <?php 
+    $qryM = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_status_matching WHERE idm=?", [$_GET['idm']]);
+    $rM = sqlsrv_fetch_array($qryM, SQLSRV_FETCH_ASSOC);
+    ?>
 
 			<div class="box-footer">
 				<div class="col-sm-3">
@@ -267,18 +285,21 @@ if (isset($_POST['save'])) {
 						</tr>
 					</thead>
 					<tbody>
-						<?php
-						$sql = mysqli_query($con, " SELECT a.id, a.idm, a.matcher, a.created_at, a.`status`, a.grp,b.langganan,
-												b.no_order, b.no_item, b.warna, b.no_warna, b.jenis_kain
-												FROM tbl_status_matching a
-												JOIN tbl_matching b ON a.idm = b.no_resep
-												where a.status in ('buka', 'mulai')
-												ORDER BY a.id DESC
-												LIMIT 100 ");
-						while ($r = mysqli_fetch_array($sql)) {
-							$no++;
-							$bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
-						?>
+                        <?php 
+                        $sql = sqlsrv_query($con, "SELECT TOP 100 a.id, a.idm, a.matcher, a.created_at, a.status, a.grp,b.langganan,
+                                                b.no_order, b.no_item, b.warna, b.no_warna, b.jenis_kain
+                                                FROM db_laborat.tbl_status_matching a
+                                                JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                                                where a.status in ('buka', 'mulai')
+                                                ORDER BY a.id DESC");
+	                        while ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) {
+								$no++;
+								$bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
+								$created_at = '';
+								if (!empty($r['created_at'])) {
+									$created_at = $r['created_at'] instanceof DateTime ? $r['created_at']->format('Y-m-d H:i') : date('Y-m-d H:i', strtotime($r['created_at']));
+								}
+							?>
 							<tr bgcolor="<?php echo $bgcolor; ?>">
 								<td align="center">
 									<?php echo $no; ?>
@@ -286,32 +307,32 @@ if (isset($_POST['save'])) {
 								<td align="center">
 									<?php echo $r['idm']; ?>
 								</td>
-								<td align="center">
-									<?php echo $r['matcher']; ?>
-								</td>
-								<td align="center">
-									<?php echo $r['grp']; ?>
-								</td>
+									<td align="center">
+										<?php echo $r['matcher']; ?>
+									</td>
+									<td align="center">
+										<?php echo $r['grp']; ?>
+									</td>
 								<td align="left">
 									<?php echo $r['langganan']; ?>
 								</td>
-								<td align="center">
-									<?php echo $r['no_order']; ?>
-								</td>
-								<td align="center">
-									<?php echo $r['no_item']; ?>
-								</td>
+									<td align="center">
+										<?php echo $r['no_order']; ?>
+									</td>
+									<td align="center">
+										<?php echo $r['no_item']; ?>
+									</td>
 								<td align="left">
 									<?php echo $r['jenis_kain']; ?>
 								</td>
-								<td align="center">
-									<?php echo $r['no_warna']; ?>
-								</td>
-								<td align="center">
-									<?php echo $r['warna']; ?>
-								</td>
-								<td align="center">
-									<div class="btn-group">
+									<td align="center">
+										<?php echo $r['no_warna']; ?>
+									</td>
+									<td align="center">
+										<?php echo $r['warna']; ?>
+									</td>
+									<td align="center">
+										<div class="btn-group">
 										<a href="#" class="btn btn-xs btn-primary dataMatching_edit <?php if ($_SESSION['lvlLAB'] == "3") {
 																										echo "disabled";
 																									} ?>" id="<?php echo $r['id']; ?>"><i class="fa fa-edit"></i> </a>&nbsp;&nbsp;
