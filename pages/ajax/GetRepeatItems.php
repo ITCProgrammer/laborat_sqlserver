@@ -9,26 +9,44 @@ try {
     $statuses = ['repeat'];
     $statusList = "'" . implode("','", $statuses) . "'";
 
-    $result = mysqli_query($con, "
+    $sql = "
         SELECT 
-            tps.*, 
+            tps.id,
+            tps.no_resep,
+            tps.code,
+            tps.no_machine,
+            tps.status,
+            tps.is_old_data,
+            tps.is_old_cycle,
+            tps.is_test,
+            tps.is_bonresep,
+            tps.order_index,
+            tps.user_scheduled,
             ms.product_name,
             ms.suhu,
             ms.waktu,
             ms.dispensing
-        FROM tbl_preliminary_schedule tps
+        FROM db_laborat.tbl_preliminary_schedule tps
         INNER JOIN (
             SELECT MIN(id) AS id
-            FROM tbl_preliminary_schedule
+            FROM db_laborat.tbl_preliminary_schedule
             WHERE status IN ($statusList) AND is_old_cycle = 0
             GROUP BY no_resep
         ) AS sub ON tps.id = sub.id
-        LEFT JOIN master_suhu ms ON tps.code = ms.code
-        ORDER BY (tps.status = 'repeat') DESC, tps.id ASC
-    ");
+        LEFT JOIN db_laborat.master_suhu ms 
+            ON CONVERT(VARCHAR(50), tps.code) = CONVERT(VARCHAR(50), ms.code)
+        ORDER BY 
+            CASE WHEN tps.status = 'repeat' THEN 1 ELSE 0 END DESC,
+            tps.id ASC
+    ";
+
+    $result = sqlsrv_query($con, $sql);
+    if (!$result) {
+        throw new Exception(print_r(sqlsrv_errors(), true));
+    }
 
     $data = [];
-    while ($row = mysqli_fetch_assoc($result)) {
+    while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
         $data[] = $row;
     }
 

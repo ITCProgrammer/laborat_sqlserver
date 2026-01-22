@@ -3,22 +3,23 @@ header('Content-Type: application/json');
 include "../../koneksi.php";
 
 try {
-    $result = mysqli_query($con, "
+    $sql = "
         SELECT
             tps.*,
             ms.product_name,
             ms.suhu,
             ms.waktu,
             ms.dispensing,
-            tm.jenis_matching
-        FROM tbl_preliminary_schedule AS tps
-        LEFT JOIN master_suhu AS ms
+            tm.jenis_matching,
+            br.min_order_index
+        FROM db_laborat.tbl_preliminary_schedule AS tps
+        LEFT JOIN db_laborat.master_suhu AS ms
             ON tps.code = ms.code
-        LEFT JOIN tbl_matching AS tm
+        LEFT JOIN db_laborat.tbl_matching AS tm
             ON (
                 CASE
                     WHEN LEFT(tps.no_resep, 2) = 'DR'
-                        THEN LEFT(tps.no_resep, CHAR_LENGTH(tps.no_resep) - 2)
+                        THEN LEFT(tps.no_resep, LEN(tps.no_resep) - 2)
                     ELSE tps.no_resep
                 END
             ) = tm.no_resep
@@ -26,7 +27,7 @@ try {
             SELECT
                 no_resep,
                 MIN(order_index) AS min_order_index
-            FROM tbl_preliminary_schedule
+            FROM db_laborat.tbl_preliminary_schedule
             WHERE is_bonresep = 1
             GROUP BY no_resep
         ) AS br
@@ -38,7 +39,6 @@ try {
                 WHEN tm.jenis_matching IN ('Matching Ulang', 'Matching Ulang NOW', 'Matching Development', 'Perbaikan', 'Perbaikan NOW') THEN 2
                 ELSE 3
             END,
-
             CASE
                 WHEN tps.order_index > 0 THEN 0
                 ELSE 1
@@ -51,21 +51,22 @@ try {
                 WHEN tps.is_bonresep = 1 THEN tps.no_resep
                 ELSE ''
             END ASC,
-
-            /* urutan detail dalam group */
             tps.order_index ASC,
             ms.suhu DESC,
             ms.waktu DESC,
             tps.no_resep,
             tps.no_machine ASC,
-            tps.is_old_data ASC;
-    ");
+            tps.is_old_data ASC";
+
+    $result = sqlsrv_query($con, $sql);
+    if (!$result) {
+        throw new Exception(print_r(sqlsrv_errors(), true));
+    }
 
     $data = [];
     $usedIndexes = [];
 
-    // Step 1: Simpan semua data & kumpulkan order_index yang sudah terpakai
-    while ($row = mysqli_fetch_assoc($result)) {
+    while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
         if ((int)$row['order_index'] > 0) {
             $usedIndexes[] = (int)$row['order_index'];
         }
@@ -74,16 +75,15 @@ try {
         }
     }
 
-    // Step 2: Isi order_index yang masih 0 dengan nilai unik berikutnya
+    // Isi order_index yang masih 0 dengan nilai unik berikutnya
     $nextIndex = 1;
     foreach ($data as &$row) {
         if ((int)$row['order_index'] === 0) {
             while (in_array($nextIndex, $usedIndexes)) {
                 $nextIndex++;
             }
-
             $id = (int)$row['id'];
-            mysqli_query($con, "UPDATE tbl_preliminary_schedule SET order_index = $nextIndex WHERE id = $id AND pass_dispensing = 0");
+            sqlsrv_query($con, "UPDATE db_laborat.tbl_preliminary_schedule SET order_index = ? WHERE id = ? AND pass_dispensing = 0", [$nextIndex, $id]);
             $row['order_index'] = $nextIndex;
             $usedIndexes[] = $nextIndex;
             $nextIndex++;
@@ -91,9 +91,8 @@ try {
     }
     unset($row);
 
-    // Step 3: Group data berdasarkan dispensing (1,2,3)
+    // Group data per dispensing code
     $grouped = ['1' => [], '2' => [], '3' => []];
-
     foreach ($data as $row) {
         $code = $row['dispensing'] ?? '';
         if (in_array($code, ['1', '2', '3'])) {
@@ -103,24 +102,18 @@ try {
 
     $finalData = [];
     $rowsPerCycle = 16;
-
-    // Step 4: Di setiap group, urutkan berdasarkan order_index lalu beri rowNumber & cycleNumber
     foreach ($grouped as $dispCode => $items) {
         usort($items, fn($a, $b) => $a['order_index'] - $b['order_index']);
-
         $rowCounter = 0;
         $cycleCounter = 1;
-
         foreach ($items as &$item) {
             $rowCounter++;
             $item['rowNumber'] = $rowCounter;
             $item['cycleNumber'] = $cycleCounter;
-
             if ($rowCounter >= $rowsPerCycle) {
                 $cycleCounter++;
                 $rowCounter = 0;
             }
-
             $finalData[] = $item;
         }
     }

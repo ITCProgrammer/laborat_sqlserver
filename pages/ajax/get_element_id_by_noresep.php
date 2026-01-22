@@ -23,21 +23,18 @@ if (strtoupper(substr($no_resep, 0, 2)) === 'DR' && strlen($no_resep) > 2) {
 }
 
 // --- Ambil element_id berdasarkan no_resep ---
-$queryElement = " SELECT element_id, element_code
-    FROM tbl_resep_element 
+$queryElement = " SELECT TOP 1 element_id, element_code
+    FROM db_laborat.tbl_resep_element 
     WHERE no_resep = ?
-    LIMIT 1
 ";
 
-$stmt = $con->prepare($queryElement);
-$stmt->bind_param("s", $no_resep);
-$stmt->execute();
-$result = $stmt->get_result();
-
-if ($row = $result->fetch_assoc()) {
-    $response['element_id'] = $row['element_id'];
+$stmt = sqlsrv_query($con, $queryElement, [$no_resep]);
+if ($stmt && ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC))) {
+    $response['element_id']   = $row['element_id'];
     $response['element_code'] = $row['element_code'];
-    $response['success'] = true;
+    $response['success']      = true;
+} else {
+    $response['error'] = sqlsrv_errors();
 }
 
 echo json_encode($response);

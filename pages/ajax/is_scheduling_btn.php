@@ -3,8 +3,8 @@
     session_start();
     include '../../koneksi.php';
 
-    $isScheduling = "UPDATE tbl_is_scheduling SET is_scheduling = 1";
-    mysqli_query($con, $isScheduling);
+    $isScheduling = "UPDATE db_laborat.tbl_is_scheduling SET is_scheduling = 1";
+    sqlsrv_query($con, $isScheduling);
 
     // $currentDate = date('Y-m-d');       // Misal: 2025-05-09
     // $datePrefix = date('Ymd');          // Untuk prefix ID: 20250509

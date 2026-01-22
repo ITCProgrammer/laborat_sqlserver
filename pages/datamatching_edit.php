@@ -3,8 +3,8 @@ ini_set("error_reporting", 1);
 session_start();
 include("../koneksi.php");
 $modal_id = $_GET['id'];
-$modal = mysqli_query($con,"SELECT * FROM `tbl_status_matching` WHERE id='$modal_id' ");
-while ($r = mysqli_fetch_array($modal)) {
+$modal = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_status_matching WHERE id = ?", [$modal_id]);
+while ($r = sqlsrv_fetch_array($modal, SQLSRV_FETCH_ASSOC)) {
 ?>
   <div class="modal-dialog ">
     <div class="modal-content">
@@ -55,8 +55,8 @@ while ($r = mysqli_fetch_array($modal)) {
             <label for="matcher" class="col-md-3 control-label">Matcher</label>
             <div class="col-md-6">
               <select name="matcher" class="form-control select2" id="matcher" required>
-                <?php $qrymc = mysqli_query($con,"SELECT * FROM tbl_matcher ORDER BY nama ASC");
-                while ($dmc = mysqli_fetch_array($qrymc)) { ?>
+                <?php $qrymc = sqlsrv_query($con,"SELECT nama FROM db_laborat.tbl_matcher ORDER BY nama ASC");
+                while ($dmc = sqlsrv_fetch_array($qrymc, SQLSRV_FETCH_ASSOC)) { ?>
                   <option value="<?php echo $dmc['nama']; ?>" <?php if ($dmc['nama'] == $r['matcher']) {
                                                               echo "selected";
                                                             } ?>><?php echo $dmc['nama']; ?></option>

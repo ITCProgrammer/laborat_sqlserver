@@ -26,33 +26,26 @@ if (empty($all_ids) && empty($assignments)) {
     exit;
 }
 
-mysqli_query($con, "UPDATE tbl_is_scheduling SET is_scheduling = 0");
+sqlsrv_query($con, "UPDATE db_laborat.tbl_is_scheduling SET is_scheduling = 0");
 
 try {
     // ===== 1) Ambil mesin sibuk SEBELUM update apa pun =====
     $busyStatuses = ['scheduled', 'in_progress_dispensing', 'in_progress_dyeing', 'stop_dyeing'];
-    $ph = implode(',', array_fill(0, count($busyStatuses), '?'));
-    $types = str_repeat('s', count($busyStatuses));
-
+    $ph = "'" . implode("','", $busyStatuses) . "'";
     $sqlBusy = "
         SELECT DISTINCT no_machine
-        FROM tbl_preliminary_schedule
+        FROM db_laborat.tbl_preliminary_schedule
         WHERE status IN ($ph)
           AND no_machine IS NOT NULL
           AND no_machine <> ''
     ";
-    $stmtBusy = $con->prepare($sqlBusy);
-    if (!$stmtBusy) throw new Exception("Prepare busy failed: " . $con->error);
-
-    $stmtBusy->bind_param($types, ...$busyStatuses);
-    $stmtBusy->execute();
-    $resBusy = $stmtBusy->get_result();
+    $stmtBusy = sqlsrv_query($con, $sqlBusy);
+    if (!$stmtBusy) throw new Exception("Query busy failed: " . print_r(sqlsrv_errors(), true));
 
     $mesin_sibuk_sebelumnya = [];
-    while ($row = $resBusy->fetch_assoc()) {
+    while ($row = sqlsrv_fetch_array($stmtBusy, SQLSRV_FETCH_ASSOC)) {
         $mesin_sibuk_sebelumnya[] = $row['no_machine'];
     }
-    $stmtBusy->close();
 
     // ===== 2) Stock check (hanya yang memang punya mesin valid) =====
     $assignmentsForStock = array_values(array_filter($assignments, function($it){
@@ -73,21 +66,16 @@ try {
     // ===== 3) Base update: semua all_ids jadi scheduled (BON ikut) =====
     if (!empty($all_ids)) {
         $phIds = implode(',', array_fill(0, count($all_ids), '?'));
-        $typesIds = str_repeat('i', count($all_ids));
-
         $sqlBase = "
-            UPDATE tbl_preliminary_schedule
+            UPDATE db_laborat.tbl_preliminary_schedule
             SET status = 'scheduled',
                 user_scheduled = ?,
                 pass_dispensing = 0
             WHERE id IN ($phIds)
         ";
-        $stmtBase = $con->prepare($sqlBase);
-        if (!$stmtBase) throw new Exception("Prepare base update failed: " . $con->error);
-
-        $stmtBase->bind_param('s' . $typesIds, $userScheduled, ...$all_ids);
-        $stmtBase->execute();
-        $stmtBase->close();
+        $paramsBase = array_merge([$userScheduled], $all_ids);
+        $stmtBase = sqlsrv_query($con, $sqlBase, $paramsBase);
+        if (!$stmtBase) throw new Exception("Prepare/exec base update failed: " . print_r(sqlsrv_errors(), true));
     }
 
     // ===== 4) Update assignment mesin (non-BON) + insertBalance + is_old_data =====
@@ -103,19 +91,12 @@ try {
             continue;
         }
 
-        $stmt = $con->prepare("
-            UPDATE tbl_preliminary_schedule
-            SET no_machine = ?,
-                id_group = ?,
-                status = 'scheduled',
-                user_scheduled = ?
+        $stmt = sqlsrv_query($con, "
+            UPDATE db_laborat.tbl_preliminary_schedule
+            SET no_machine = ?, id_group = ?, status = 'scheduled', user_scheduled = ?
             WHERE id = ?
-        ");
-        if (!$stmt) throw new Exception("Prepare update assignment failed: " . $con->error);
-
-        $stmt->bind_param("sssi", $machine, $group, $userScheduled, $id);
-        $stmt->execute();
-        $stmt->close();
+        ", [$machine, $group, $userScheduled, $id]);
+        if (!$stmt) throw new Exception("Update assignment failed: " . print_r(sqlsrv_errors(), true));
 
         $submitted_ids[] = $id;
 
@@ -123,10 +104,7 @@ try {
 
         // tandai is_old_data kalau mesin sudah sibuk sebelumnya (exclude bon)
         if (in_array($machine, $mesin_sibuk_sebelumnya, true)) {
-            $stmtOld = $con->prepare("UPDATE tbl_preliminary_schedule SET is_old_data = 1 WHERE id = ? AND is_bonresep = 0");
-            $stmtOld->bind_param("i", $id);
-            $stmtOld->execute();
-            $stmtOld->close();
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_preliminary_schedule SET is_old_data = 1 WHERE id = ? AND is_bonresep = 0", [$id]);
         }
     }
 
@@ -137,13 +115,9 @@ try {
 
         if (!empty($not_selected_ids)) {
             $phNot = implode(',', array_fill(0, count($not_selected_ids), '?'));
-            $typesNot = str_repeat('i', count($not_selected_ids));
-
-            $sqlNot = "UPDATE tbl_preliminary_schedule SET is_old_data = 1 WHERE id IN ($phNot) AND is_bonresep = 0";
-            $stmtNot = $con->prepare($sqlNot);
-            $stmtNot->bind_param($typesNot, ...$not_selected_ids);
-            $stmtNot->execute();
-            $stmtNot->close();
+            $sqlNot = "UPDATE db_laborat.tbl_preliminary_schedule SET is_old_data = 1 WHERE id IN ($phNot) AND is_bonresep = 0";
+            $stmtNot = sqlsrv_query($con, $sqlNot, $not_selected_ids);
+            if (!$stmtNot) throw new Exception("Update not-selected failed: " . print_r(sqlsrv_errors(), true));
         }
     }
 

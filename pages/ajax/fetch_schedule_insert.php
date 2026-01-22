@@ -12,18 +12,18 @@ $statuses = [
 
 $statusList = "'" . implode("','", $statuses) . "'";
 
-$sql = "SELECT tps.no_resep, tps.no_machine, tps.status, ms.`group`, ms.product_name
-        FROM tbl_preliminary_schedule tps
-        LEFT JOIN master_suhu ms ON tps.code = ms.code
+$sql = "SELECT tps.no_resep, tps.no_machine, tps.status, ms.[group], ms.product_name
+        FROM db_laborat.tbl_preliminary_schedule tps
+        LEFT JOIN db_laborat.master_suhu ms ON tps.code = ms.code
         WHERE tps.status IN ($statusList)
         ORDER BY tps.no_machine ASC, tps.id ASC";
 
-$result = mysqli_query($con, $sql);
+$result = sqlsrv_query($con, $sql);
 
 $data = [];
 $maxPerMachine = 0;
 
-while ($row = mysqli_fetch_assoc($result)) {
+while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
     $machine = $row['no_machine'] ?: 'UNASSIGNED';
     $group = $row['group'];
 
@@ -57,12 +57,11 @@ foreach ($data as $machine => $entries) {
         $groupName = $firstGroup;
 
         // Dapatkan nilai dyeing
-        $stmt = $con->prepare("SELECT dyeing FROM master_suhu WHERE `group` = ? LIMIT 1");
-        $stmt->bind_param("s", $groupName);
-        $stmt->execute();
-        $stmt->bind_result($dyeingValue);
-        $stmt->fetch();
-        $stmt->close();
+        $stmt = sqlsrv_query($con, "SELECT TOP 1 dyeing FROM db_laborat.master_suhu WHERE [group] = ?", [$groupName]);
+        $dyeingValue = null;
+        if ($stmt && ($rowD = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC))) {
+            $dyeingValue = $rowD['dyeing'];
+        }
 
         $keterangan = '';
         if ($dyeingValue == "1") {
@@ -72,12 +71,8 @@ foreach ($data as $machine => $entries) {
         }
 
         // Ambil informasi suhu
-        $stmtTemp = $con->prepare("SELECT program, suhu, product_name FROM master_suhu WHERE `group` = ? LIMIT 1");
-        $stmtTemp->bind_param("s", $groupName);
-        $stmtTemp->execute();
-        $result = $stmtTemp->get_result();
-        $row = $result->fetch_assoc();
-        $stmtTemp->close();
+        $stmtTemp = sqlsrv_query($con, "SELECT TOP 1 program, suhu, product_name FROM db_laborat.master_suhu WHERE [group] = ?", [$groupName]);
+        $row = $stmtTemp ? sqlsrv_fetch_array($stmtTemp, SQLSRV_FETCH_ASSOC) : null;
 
         if ($row) {
             $desc = '';

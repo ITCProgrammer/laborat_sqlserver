@@ -1,18 +1,20 @@
-<?php session_start(); ?>
 <?php
-include "../koneksi.php"; // pastikan $con adalah koneksi mysqli
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+include dirname(__FILE__) . "/../koneksi.php"; // koneksi SQL Server
 
 // Ambil identitas user sekarang (sesuaikan sumbernya)
 $meUser = $_SESSION['userLAB'] ?? ($_SESSION['userLAB'] ?? 'unknown');
 $meIp   = $_SERVER['REMOTE_ADDR'] ?? '';
 
 // --- Ambil data terakhir dari log_preliminary
-$sqlCekLog   = "SELECT * FROM log_preliminary ORDER BY id DESC LIMIT 1";
-$resultCekLog = mysqli_query($con, $sqlCekLog);
+$sqlCekLog   = "SELECT TOP 1 * FROM db_laborat.log_preliminary ORDER BY id DESC";
+$resultCekLog = sqlsrv_query($con, $sqlCekLog);
 if (!$resultCekLog) {
-    die("Query gagal: " . mysqli_error($con));
+    die("Query gagal: " . print_r(sqlsrv_errors(), true));
 }
-$lastCekLog = mysqli_fetch_assoc($resultCekLog);
+$lastCekLog = sqlsrv_fetch_array($resultCekLog, SQLSRV_FETCH_ASSOC);
 
 // Normalisasi status terakhir (jika ada)
 $lastStatusCekLog = strtolower(trim($lastCekLog['status'] ?? ''));
@@ -44,7 +46,11 @@ if (!$bolehAkses) {
     http_response_code(423); // Locked
     $pemegang = htmlspecialchars($lastCekLog['username'] ?? '-', ENT_QUOTES);
     $status   = htmlspecialchars($lastCekLog['status'] ?? '-', ENT_QUOTES);
-    $waktu    = htmlspecialchars($lastCekLog['creationdatetime'] ?? '-', ENT_QUOTES);
+    $rawWaktu = $lastCekLog['creationdatetime'] ?? '-';
+    if ($rawWaktu instanceof DateTime) {
+        $rawWaktu = $rawWaktu->format('Y-m-d H:i:s');
+    }
+    $waktu = htmlspecialchars((string)$rawWaktu, ENT_QUOTES);
 
     echo "<center>
                 <h3>Halaman sedang dipakai oleh <b>{$pemegang}</b>.</h3>
@@ -360,10 +366,9 @@ if (!$bolehAkses) {
             </div>
 
             <?php
-            include "../koneksi.php";
-
-            $query = mysqli_query($con, "SELECT is_scheduling FROM tbl_is_scheduling LIMIT 1");
-            $row = mysqli_fetch_assoc($query);
+            // cek status scheduling
+            $query = sqlsrv_query($con, "SELECT TOP 1 is_scheduling FROM db_laborat.tbl_is_scheduling");
+            $row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC);
             $showButton = ($row['is_scheduling'] == 0);
             ?>
 
@@ -458,10 +463,9 @@ if (!$bolehAkses) {
 <?php endif; ?>
 
 <?php
-include "../koneksi.php";
-
-$query = mysqli_query($con, "SELECT is_scheduling FROM tbl_is_scheduling LIMIT 1");
-$row = mysqli_fetch_assoc($query);
+// sudah include di atas, cukup pakai $con
+$query = sqlsrv_query($con, "SELECT TOP 1 is_scheduling FROM db_laborat.tbl_is_scheduling");
+$row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC);
 $is_scheduling = ($row['is_scheduling'] == 1);
 ?>
 <?php if ($is_scheduling): ?>
@@ -1468,7 +1472,6 @@ $is_scheduling = ($row['is_scheduling'] == 1);
             // hanya jika diawali angka dan formatnya 00234124-503
             if (/^\d/.test(code) && /^(\d+)\-(\d+)$/.test(code)) {
                 tempScanTimer = setTimeout(function() {
-
                     $('#no_resep').closest('.form-group')
                         .append(`
                             <label id="bonResepLoading" class="control-label" style="margin-left:10px; color:#999;">
@@ -1567,6 +1570,7 @@ $is_scheduling = ($row['is_scheduling'] == 1);
                 },
                 dataType: 'json',
                 success: function(response) {
+                    console.log('Response temp codes:', response);
                     if (response.success) {
                         const codes = response.codes;
                         if (codes.length === 2) {

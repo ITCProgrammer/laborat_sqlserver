@@ -6,33 +6,38 @@ ini_set("display_errors", 1);
 include "../../koneksi.php"; // pastikan file ini hanya koneksi
 
 try {
-    // $result = mysqli_query($con, "SELECT * FROM tbl_preliminary_schedule ORDER BY id DESC");
-    $result = mysqli_query($con, "SELECT
-                                        tbl_preliminary_schedule.*,
-                                        master_suhu.product_name,
-                                        tbl_matching.jenis_matching,
-                                        tbl_preliminary_schedule_element.element_id,
-                                        balance.ELEMENTSCODE AS element_code,
-                                        tbl_preliminary_schedule_element.qty AS element_qty,
-                                        tbl_matching.for_forecast as for_forecast
-                                    FROM
-                                        tbl_preliminary_schedule
-                                        LEFT JOIN master_suhu ON tbl_preliminary_schedule.CODE = master_suhu.CODE 
-                                        LEFT JOIN tbl_matching ON 
-                                                                CASE WHEN LEFT(tbl_preliminary_schedule.no_resep, 2) = 'DR' 
-                                                                    THEN LEFT(tbl_preliminary_schedule.no_resep, LENGTH(tbl_preliminary_schedule.no_resep) - 2)
-                                                                    ELSE tbl_preliminary_schedule.no_resep
-                                                                END = tbl_matching.no_resep
-                                        LEFT JOIN tbl_preliminary_schedule_element ON tbl_preliminary_schedule.id = tbl_preliminary_schedule_element.tbl_preliminary_schedule_id 
-                                        LEFT JOIN balance ON tbl_preliminary_schedule_element.element_id = balance.numberid 
-                                    WHERE
-                                        tbl_preliminary_schedule.STATUS = 'ready' 
-                                    ORDER BY
-                                        tbl_preliminary_schedule.id DESC");
+    $sql = "SELECT
+                tps.*,
+                ms.product_name,
+                tm.jenis_matching,
+                tpse.element_id,
+                bal.ELEMENTSCODE AS element_code,
+                tpse.qty AS element_qty,
+                tm.for_forecast as for_forecast
+            FROM
+                db_laborat.tbl_preliminary_schedule tps
+                LEFT JOIN db_laborat.master_suhu ms ON tps.code = ms.code 
+                LEFT JOIN db_laborat.tbl_matching tm ON 
+                    CASE WHEN LEFT(tps.no_resep, 2) = 'DR' 
+                        THEN LEFT(tps.no_resep, LEN(tps.no_resep) - 2)
+                        ELSE tps.no_resep
+                    END = tm.no_resep
+                LEFT JOIN db_laborat.tbl_preliminary_schedule_element tpse ON tps.id = tpse.tbl_preliminary_schedule_id 
+                -- Hindari error konversi nvarchar->numeric: samakan tipe jadi varchar
+                LEFT JOIN db_laborat.balance bal ON CONVERT(VARCHAR(50), tpse.element_id) = CONVERT(VARCHAR(50), bal.numberid)
+            WHERE
+                tps.STATUS = 'ready' 
+            ORDER BY
+                tps.id DESC";
 
+    $result = sqlsrv_query($con, $sql);
+
+    if (!$result) {
+        throw new Exception(print_r(sqlsrv_errors(), true));
+    }
 
     $data = [];
-    while ($row = mysqli_fetch_assoc($result)) {
+    while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
         $data[] = $row;
     }
 

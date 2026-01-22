@@ -66,7 +66,7 @@ $query = sqlsrv_query($con, $sql, $paramsData);
 //----------------------------------------------------------------------------------
 $data = array();
 $no = 1;
-while ($row = mysqli_fetch_array($query)) {
+while ($row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC)) {
     $status =  '<a href="#" class="btn btn-xs btn-success"><strong>' . $row['status'] . '</strong></a href="#">';
     $nestedData = array();
 

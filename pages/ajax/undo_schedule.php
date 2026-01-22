@@ -3,9 +3,11 @@ include '../../koneksi.php';
 
 $response = ['success' => false];
 
-$query = "UPDATE tbl_is_scheduling SET is_scheduling = 0";
+$query = "UPDATE db_laborat.tbl_is_scheduling SET is_scheduling = 0";
 
-if (mysqli_query($con, $query)) {
+$stmt = sqlsrv_query($con, $query);
+
+if ($stmt) {
     $response['success'] = true;
 }
 

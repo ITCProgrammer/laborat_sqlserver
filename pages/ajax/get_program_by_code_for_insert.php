@@ -5,17 +5,17 @@ header('Content-Type: application/json');
 
 
 if (isset($_GET['code']) && isset($_GET['machine'])) {
-    $code = mysqli_real_escape_string($con, $_GET['code']);
-    $machine = mysqli_real_escape_string($con, $_GET['machine']);
+    $code = $_GET['code'];
+    $machine = $_GET['machine'];
 
-    $groupQuery = mysqli_query($con, "SELECT id_group FROM tbl_preliminary_schedule WHERE no_machine = '$machine' LIMIT 1");
+    $groupQuery = sqlsrv_query($con, "SELECT TOP 1 id_group FROM db_laborat.tbl_preliminary_schedule WHERE no_machine = ?", [$machine]);
     
-    if ($groupRow = mysqli_fetch_assoc($groupQuery)) {
+    if ($groupQuery && ($groupRow = sqlsrv_fetch_array($groupQuery, SQLSRV_FETCH_ASSOC))) {
         $id_group = $groupRow['id_group'];
 
-        $checkCodeQuery = mysqli_query($con, "SELECT product_name FROM master_suhu WHERE code = '$code' AND `group` = '$id_group' LIMIT 1");
+        $checkCodeQuery = sqlsrv_query($con, "SELECT TOP 1 product_name FROM db_laborat.master_suhu WHERE code = ? AND [group] = ?", [$code, $id_group]);
 
-        if ($codeRow = mysqli_fetch_assoc($checkCodeQuery)) {
+        if ($checkCodeQuery && ($codeRow = sqlsrv_fetch_array($checkCodeQuery, SQLSRV_FETCH_ASSOC))) {
             echo json_encode([
                 'status' => 'success',
                 'product_name' => $codeRow['product_name'],

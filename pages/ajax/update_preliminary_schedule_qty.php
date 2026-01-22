@@ -26,11 +26,10 @@ if ($qty < 0) {
 }
 
 // Update ke database
-$updateQuery = "UPDATE tbl_preliminary_schedule_element SET qty = ? WHERE tbl_preliminary_schedule_id = ?";
-$stmt = mysqli_prepare($con, $updateQuery);
-mysqli_stmt_bind_param($stmt, "di", $qty, $id);
+$updateQuery = "UPDATE db_laborat.tbl_preliminary_schedule_element SET qty = ? WHERE tbl_preliminary_schedule_id = ?";
+$stmt = sqlsrv_query($con, $updateQuery, [$qty, $id]);
 
-if (mysqli_stmt_execute($stmt)) {
+if ($stmt) {
     echo json_encode([
         'success' => true,
         'message' => 'Qty berhasil diupdate'
@@ -38,10 +37,8 @@ if (mysqli_stmt_execute($stmt)) {
 } else {
     echo json_encode([
         'success' => false,
-        'message' => 'Gagal update database: ' . mysqli_stmt_error($stmt)
+        'message' => 'Gagal update database',
+        'error'   => sqlsrv_errors()
     ]);
 }
-
-mysqli_stmt_close($stmt);
-mysqli_close($con);
 ?>

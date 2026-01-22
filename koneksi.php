@@ -11,6 +11,12 @@ if (!function_exists('noteConnectionFailure')) {
     }
 }
 
+// Hindari inisialisasi ganda bila file di-include berulang
+if (defined('LAB_KONEKSI_INITIALIZED')) {
+    return;
+}
+define('LAB_KONEKSI_INITIALIZED', true);
+
 $con_db_dyeing    = mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
 
 $hostSVR19     = "10.0.0.221";
@@ -53,9 +59,12 @@ if (! $con) {
 register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$con_nowprd) {
     foreach ([$con_db_dyeing, $cona] as $mysqliConn) {
         if ($mysqliConn instanceof mysqli) {
-            $mysqliConn->close();
+            // Tutup hanya jika masih aktif (mysqli_ping true)
+            if (@mysqli_ping($mysqliConn)) {
+                $mysqliConn->close();
+            }
         } elseif ($mysqliConn) {
-            mysqli_close($mysqliConn);
+            @mysqli_close($mysqliConn);
         }
     }
 
