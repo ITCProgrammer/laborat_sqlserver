@@ -63,17 +63,20 @@ try {
         exit;
     }
 
-    // ===== 3) Base update: semua all_ids jadi scheduled (BON ikut) =====
-    if (!empty($all_ids)) {
-        $phIds = implode(',', array_fill(0, count($all_ids), '?'));
+    // Kumpulkan ID yang benar-benar diproses (yang dipilih)
+    $idsSelected = array_values(array_unique(array_map('intval', array_column($assignments, 'id_schedule'))));
+
+    // ===== 3) Base update: HANYA id terpilih yang dipasang status scheduled =====
+    if (!empty($idsSelected)) {
+        $phIds = implode(',', array_fill(0, count($idsSelected), '?'));
         $sqlBase = "
             UPDATE db_laborat.tbl_preliminary_schedule
             SET status = 'scheduled',
                 user_scheduled = ?,
                 pass_dispensing = 0
-            WHERE id IN ($phIds)
+            WHERE id IN ($phIds) AND pass_dispensing = 0
         ";
-        $paramsBase = array_merge([$userScheduled], $all_ids);
+        $paramsBase = array_merge([$userScheduled], $idsSelected);
         $stmtBase = sqlsrv_query($con, $sqlBase, $paramsBase);
         if (!$stmtBase) throw new Exception("Prepare/exec base update failed: " . print_r(sqlsrv_errors(), true));
     }
@@ -94,7 +97,7 @@ try {
         $stmt = sqlsrv_query($con, "
             UPDATE db_laborat.tbl_preliminary_schedule
             SET no_machine = ?, id_group = ?, status = 'scheduled', user_scheduled = ?
-            WHERE id = ?
+            WHERE id = ? AND pass_dispensing = 0
         ", [$machine, $group, $userScheduled, $id]);
         if (!$stmt) throw new Exception("Update assignment failed: " . print_r(sqlsrv_errors(), true));
 
@@ -109,13 +112,15 @@ try {
     }
 
     // ===== 5) Tandai data yg tidak dipilih (non-bon) sebagai old =====
-    if (!empty($all_ids)) {
+    if (!empty($idsSelected) || !empty($all_ids)) {
         $submitted_ids = array_values(array_unique($submitted_ids));
-        $not_selected_ids = array_values(array_diff($all_ids, $submitted_ids));
+        // Gunakan all_ids jika masih dikirim; kalau tidak, pakai idsSelected sebagai basis
+        $basisIds = !empty($all_ids) ? $all_ids : $idsSelected;
+        $not_selected_ids = array_values(array_diff($basisIds, $submitted_ids));
 
         if (!empty($not_selected_ids)) {
             $phNot = implode(',', array_fill(0, count($not_selected_ids), '?'));
-            $sqlNot = "UPDATE db_laborat.tbl_preliminary_schedule SET is_old_data = 1 WHERE id IN ($phNot) AND is_bonresep = 0";
+            $sqlNot = "UPDATE db_laborat.tbl_preliminary_schedule SET is_old_data = 1 WHERE id IN ($phNot) AND is_bonresep = 0 AND pass_dispensing = 0";
             $stmtNot = sqlsrv_query($con, $sqlNot, $not_selected_ids);
             if (!$stmtNot) throw new Exception("Update not-selected failed: " . print_r(sqlsrv_errors(), true));
         }

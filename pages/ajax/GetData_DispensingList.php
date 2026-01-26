@@ -5,16 +5,27 @@ include "../../koneksi.php";
 try {
     $sql = "
         SELECT
-            tps.*,
+            tps.id,
+            tps.no_resep,
+            tps.code,
+            tps.no_machine,
+            tps.status,
+            tps.order_index,
+            tps.pass_dispensing,
+            tps.is_old_data,
+            tps.is_bonresep,
+            tps.is_test,
+            tps.id_group,
             ms.product_name,
             ms.suhu,
             ms.waktu,
-            ms.dispensing,
+            CAST(ms.dispensing AS VARCHAR(5)) AS ms_dispensing,
+            CAST(ms.dispensing AS VARCHAR(5)) AS dispensing,
             tm.jenis_matching,
             br.min_order_index
         FROM db_laborat.tbl_preliminary_schedule AS tps
         LEFT JOIN db_laborat.master_suhu AS ms
-            ON tps.code = ms.code
+            ON LTRIM(RTRIM(tps.code)) = LTRIM(RTRIM(ms.code))
         LEFT JOIN db_laborat.tbl_matching AS tm
             ON (
                 CASE
@@ -94,7 +105,7 @@ try {
     // Group data per dispensing code
     $grouped = ['1' => [], '2' => [], '3' => []];
     foreach ($data as $row) {
-        $code = $row['dispensing'] ?? '';
+        $code = trim((string)($row['ms_dispensing'] ?? ''));
         if (in_array($code, ['1', '2', '3'])) {
             $grouped[$code][] = $row;
         }

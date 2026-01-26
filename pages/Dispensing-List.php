@@ -662,17 +662,8 @@
                 });
             }
 
-            console.log(
-                '[getDispensingCodeFromNoResep]',
-                '\n  input        :', `"${noResep}"`,
-                '\n  target_trim  :', `"${target}"`,
-                '\n  candidates   :', candidates,
-                '\n  chosen_match :', match,
-                '\n  dispensing   :', match ? `"${(match.dispensing || "").trim()}"` : null
-            );
-
             if (!match) return null;
-            return (match.dispensing || "").trim();
+            return ((match.dispensing ?? match.ms_dispensing ?? "").toString().trim());
         }
 
     });
@@ -695,10 +686,10 @@
                     '3': []
                 };
                 data.forEach(item => {
-                    const code = item.dispensing?.trim() ?? '';
+                    const code = (item.dispensing ?? item.ms_dispensing ?? '').toString().trim();
                     if (['1', '2'].includes(code)) {
                         fullGroupedData[code].push(item);
-                    } else {
+                    } else if (code === '3') {
                         fullGroupedData['3'].push(item);
                     }
                 });
@@ -751,9 +742,24 @@
             data.filter(it => (it.no_resep || "").toLowerCase().includes(searchTerm)) :
             data;
 
-        renderTable(dataForRender, tbodyPoly, "1");
-        renderTable(dataForRender, tbodyCotton, "2");
-        renderTable(dataForRender, tbodyWhite, "3");
+        // Pisahkan sekali saja biar nggak nyampur
+        const bucket = { '1': [], '2': [], '3': [] };
+        dataForRender.forEach(it => {
+            const code = (it.dispensing ?? it.ms_dispensing ?? '').toString().trim();
+            if (code === '1') bucket['1'].push(it);
+            else if (code === '2') bucket['2'].push(it);
+            else if (code === '3') bucket['3'].push(it);
+        });
+
+        console.log('[DispensingList] count poly/cotton/white =', {
+            poly: bucket['1'].length,
+            cotton: bucket['2'].length,
+            white: bucket['3'].length
+        });
+
+        renderTable(bucket['1'], tbodyPoly, null);
+        renderTable(bucket['2'], tbodyCotton, null);
+        renderTable(bucket['3'], tbodyWhite, null);
 
         document.getElementById("polyTableWrapper").style.display = tbodyPoly.innerHTML.trim() ? "block" : "none";
         document.getElementById("cottonTableWrapper").style.display = tbodyCotton.innerHTML.trim() ? "block" : "none";
@@ -772,8 +778,13 @@
     function renderTable(dataArray, tbodyElement, dispensingCode) {
         const rowsPerBlock = 16; // tetap dipakai untuk konsistensi cycleNumber dari backend
 
-        // 1) Filter berdasar dispensing code
-        const filtered = dataArray.filter(item => String(item.dispensing || '').trim() === dispensingCode);
+        // 1) Jika parameter dispensingCode ada, filter; kalau null, pakai dataArray apa adanya
+        const filtered = dispensingCode === null
+            ? dataArray
+            : dataArray.filter(item => {
+                const code = (item.dispensing ?? item.ms_dispensing ?? '').toString().trim();
+                return code === dispensingCode;
+            });
 
         // 2) Group per cycleNumber (ini kunci agar warna kembali sesuai cycle)
         const groupedByCycle = {};
