@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 function toInt($v){ return ($v === '' || $v === null) ? 0 : (int)$v; }
 
@@ -20,21 +20,18 @@ $suffix_json = json_encode([
   "cotton" => $suffix_cotton,
 ], JSON_UNESCAPED_UNICODE);
 
-$sql="INSERT INTO summary_dyeing
+$sql="INSERT INTO db_laborat.summary_dyeing
       (tgl,shift,ttl_kloter_poly,ttl_kloter_cotton,suffix,botol)
+      OUTPUT INSERTED.id
       VALUES (?,?,?,?,?,?)";
 
-$stmt=$con->prepare($sql);
-if(!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
-$stmt->bind_param(
-  "ssiisi",
+$stmt = sqlsrv_query($con, $sql, [
   $tgl,$shift,
   $ttl_kloter_poly,$ttl_kloter_cotton,
   $suffix_json,$botol
-);
-
-if(!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
-$id=$stmt->insert_id;
-$stmt->close();
+]);
+if(!$stmt){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
+$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+$id = $row['id'] ?? null;
 
 echo json_encode(["ok"=>true,"id"=>$id,"message"=>"Tersimpan"]);

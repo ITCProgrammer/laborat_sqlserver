@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 /**
  * Input:
@@ -46,16 +46,13 @@ if ($shift === '1'){
 
 /* ambil schedule + mapping dispensing */
 $sql = "SELECT s.no_resep, s.is_test, ms.code, ms.dispensing
-        FROM tbl_preliminary_schedule s
-        LEFT JOIN master_suhu ms ON ms.code = s.code
+        FROM db_laborat.tbl_preliminary_schedule s
+        LEFT JOIN db_laborat.master_suhu ms ON LTRIM(RTRIM(ms.code)) = LTRIM(RTRIM(s.code))
         WHERE s.dispensing_start BETWEEN ? AND ?
           AND s.no_resep IS NOT NULL AND s.no_resep <> ''";
 
-$stmt = $con->prepare($sql);
-if (!$stmt){ json_error($con->error); }
-$stmt->bind_param('ss', $start, $end);
-if (!$stmt->execute()){ json_error($stmt->error); }
-$res = $stmt->get_result();
+$stmt = sqlsrv_query($con, $sql, [$start, $end]);
+if (!$stmt){ json_error(sqlsrv_errors()); }
 
 /* hitung:
    - total_rows  : semua baris (duplikat ikut)
@@ -66,7 +63,7 @@ $total_rows = 0;
 $poly_set = [];   $cotton_set = [];   $white_set = [];
 $poly_count = []; $cotton_count = []; $white_count = [];
 
-while($row = $res->fetch_assoc()){
+while($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
   $nr = trim($row['no_resep']);
   if ($nr === '') continue;
   $total_rows++;
@@ -86,7 +83,7 @@ while($row = $res->fetch_assoc()){
     $white_count[$labelForDetail] = ($white_count[$labelForDetail] ?? 0) + 1;
   }
 }
-$stmt->close();
+sqlsrv_free_stmt($stmt);
 
 /* urut alfabet biar rapi */
 ksort($poly_count); ksort($cotton_count); ksort($white_count);

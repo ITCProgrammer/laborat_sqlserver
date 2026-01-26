@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 function toInt($v){ return ($v === '' || $v === null) ? 0 : (int)$v; }
 
@@ -23,22 +23,20 @@ $suffix_json = json_encode([
   "white"  => $suffix_white,
 ], JSON_UNESCAPED_UNICODE);
 
-$sql = "INSERT INTO summary_dispensing
+$sql = "INSERT INTO db_laborat.summary_dispensing
         (tgl, shift, ttl_kloter_poly, ttl_kloter_cotton, ttl_kloter_white, suffix, botol)
+        OUTPUT INSERTED.id
         VALUES (?,?,?,?,?,?,?)";
 
-$stmt = $con->prepare($sql);
-if(!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
-
-$stmt->bind_param(
-  "ssiiisi",
+$params = [
   $tgl, $shift,
   $ttl_kloter_poly, $ttl_kloter_cotton, $ttl_kloter_white,
   $suffix_json, $botol
-);
+];
 
-if(!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
-$id = $stmt->insert_id;
-$stmt->close();
+$stmt = sqlsrv_query($con, $sql, $params);
+if(!$stmt){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
+$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+$id = $row['id'] ?? null;
 
 echo json_encode(["ok"=>true,"id"=>$id,"message"=>"Tersimpan"], JSON_UNESCAPED_UNICODE);

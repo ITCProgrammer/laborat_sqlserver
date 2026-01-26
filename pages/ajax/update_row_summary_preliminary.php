@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 function I($k){ return isset($_POST[$k]) && $_POST[$k]!=='' ? (int)$_POST[$k] : 0; }
 function S($k){ return isset($_POST[$k]) && $_POST[$k]!=='' ? $_POST[$k] : null; }
@@ -8,7 +8,7 @@ function S($k){ return isset($_POST[$k]) && $_POST[$k]!=='' ? $_POST[$k] : null;
 if (!isset($_POST['id']) || $_POST['id']===''){ echo json_encode(["ok"=>false,"message"=>"ID kosong"]); exit; }
 $id = (int)$_POST['id'];
 
-$sql = "UPDATE summary_preliminary SET
+$sql = "UPDATE db_laborat.summary_preliminary SET
   tgl=?, jam=?, shift=?, kloter=?, jenis_kain=?, status=?,
 
   visual_hendrik_ld=?, visual_hendrik_bulk=?,
@@ -28,10 +28,7 @@ $sql = "UPDATE summary_preliminary SET
   color_joni_ld=?, color_joni_bulk=?,
 
   resep_asal=?, x6=?, t_report=?, t_ulang=?, t_gabung=?, warna_ctrl=?, resep_lain=?, jml=?
-  WHERE id=?
-";
-$stmt = $con->prepare($sql);
-if(!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
+  WHERE id=?";
 
 $vals = [
   S('tgl'), S('jam'), S('shift'), I('kloter'), S('jenis_kain'), S('status'),
@@ -53,10 +50,7 @@ $vals = [
   I('t_gabung'), I('warna_ctrl'), I('resep_lain'), I('jml'),
   $id
 ];
-$types = 'sss' . 'i' . 's' . 's' .
-          str_repeat('i', 14) . str_repeat('i', 14) . str_repeat('i', 8) . 'i';
-
-$stmt->bind_param($types, ...$vals);
-if(!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
+$stmt = sqlsrv_query($con, $sql, $vals);
+if($stmt === false){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
 
 echo json_encode(["ok"=>true,"message"=>"Ter-update"]);

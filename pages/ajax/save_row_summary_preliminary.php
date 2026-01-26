@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 function I($k){ return isset($_POST[$k]) && $_POST[$k]!=='' ? (int)$_POST[$k] : 0; }
 function S($k){ return isset($_POST[$k]) && $_POST[$k]!=='' ? $_POST[$k] : null; }
@@ -25,9 +25,7 @@ $cols = "
 ";
 $placeholders = implode(',', array_fill(0, 6 + 14 + 14 + 8, '?'));
 
-$sql = "INSERT INTO summary_preliminary ($cols) VALUES ($placeholders)";
-$stmt = $con->prepare($sql);
-if(!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
+$sql = "INSERT INTO db_laborat.summary_preliminary ($cols) OUTPUT INSERTED.id VALUES ($placeholders)";
 
 $vals = [
   S('tgl'), S('jam'), S('shift'), I('kloter'), S('jenis_kain'), S('status'),
@@ -48,9 +46,9 @@ $vals = [
   I('resep_asal'), I('x6'), I('t_report'), I('t_ulang'),
   I('t_gabung'), I('warna_ctrl'), I('resep_lain'), I('jml')
 ];
-$types = 'sss' . 'i' . 's' . 's' . str_repeat('i', 14) . str_repeat('i', 14) . str_repeat('i', 8);
+$stmt = sqlsrv_query($con, $sql, $vals);
+if($stmt === false){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
+$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+$newId = $row['id'] ?? null;
 
-$stmt->bind_param($types, ...$vals);
-if(!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
-
-echo json_encode(["ok"=>true, "id"=>$con->insert_id, "message"=>"Tersimpan"]);
+echo json_encode(["ok"=>true, "id"=>$newId, "message"=>"Tersimpan"]);

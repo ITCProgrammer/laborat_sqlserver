@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 /* --- default: 30 hari terakhir (zona Asia/Jakarta) --- */
 date_default_timezone_set('Asia/Jakarta');
@@ -21,7 +21,6 @@ if ($from !== '' && $to !== '' && $valid($from) && $valid($to) && $from > $to){
 
 $where = [];
 $params = [];
-$types  = '';
 
 /* jika user tidak kirim from/to, pakai default 30 hari terakhir */
 if (($from === '' || !$valid($from)) && ($to === '' || !$valid($to))) {
@@ -31,40 +30,30 @@ if (($from === '' || !$valid($from)) && ($to === '' || !$valid($to))) {
 
 if ($from !== '' && $valid($from)){
   $where[] = "tgl >= ?";
-  $types  .= 's';
   $params[] = $from;
 }
 if ($to !== '' && $valid($to)){
   $where[] = "tgl <= ?";
-  $types  .= 's';
   $params[] = $to;
 }
 
-$sql = "SELECT * FROM summary_preliminary";
+$sql = "SELECT * FROM db_laborat.summary_preliminary";
 if (!empty($where)){
   $sql .= " WHERE ".implode(" AND ", $where);
 }
 $sql .= " ORDER BY tgl DESC, jam DESC, id DESC";
 
-$stmt = $con->prepare($sql);
-if (!$stmt){
-  echo json_encode(["ok"=>false, "message"=>$con->error]); exit;
-}
-if ($types !== ''){
-  $stmt->bind_param($types, ...$params);
-}
-if (!$stmt->execute()){
-  echo json_encode(["ok"=>false, "message"=>$stmt->error]); exit;
+$stmt = sqlsrv_query($con, $sql, $params);
+if ($stmt === false){
+  echo json_encode(["ok"=>false, "message"=>sqlsrv_errors()]); exit;
 }
 
-$res = $stmt->get_result();
 $data = [];
-while($row = $res->fetch_assoc()){
-  if (isset($row['jam']) && $row['jam'] !== null){
-    $row['jam'] = substr($row['jam'], 0, 5);
+while($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
+  if (isset($row['jam']) && $row['jam'] instanceof DateTimeInterface){
+    $row['jam'] = $row['jam']->format('H:i');
   }
   $data[] = $row;
 }
-$stmt->close();
 
 echo json_encode(["ok"=>true,"data"=>$data]);

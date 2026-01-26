@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 function toInt($v){ return ($v === '' || $v === null) ? 0 : (int)$v; }
 
@@ -26,23 +26,18 @@ $suffix_json = json_encode([
   "white"  => $suffix_white,
 ], JSON_UNESCAPED_UNICODE);
 
-$sql = "UPDATE summary_dispensing
+$sql = "UPDATE db_laborat.summary_dispensing
         SET tgl=?, shift=?,
             ttl_kloter_poly=?, ttl_kloter_cotton=?, ttl_kloter_white=?,
             suffix=?, botol=?
         WHERE id=?";
 
-$stmt = $con->prepare($sql);
-if(!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
-
-$stmt->bind_param(
-  "ssiiisii",
+$stmt = sqlsrv_query($con, $sql, [
   $tgl, $shift,
   $ttl_kloter_poly, $ttl_kloter_cotton, $ttl_kloter_white,
   $suffix_json, $botol, $id
-);
+]);
 
-if(!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
-$stmt->close();
+if(!$stmt){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
 
 echo json_encode(["ok"=>true,"message"=>"Update selesai"], JSON_UNESCAPED_UNICODE);
