@@ -1,9 +1,14 @@
 <?php
-include '../../koneksi.php';
+include __DIR__ . '/../../koneksi.php';
 
-$no_resep = $_POST['no_resep'];
+$no_resep = $_POST['no_resep'] ?? '';
 
-$query = mysqli_query($con, "
+function fmtDt($v) {
+    if ($v instanceof DateTimeInterface) return $v->format('Y-m-d H:i:s');
+    return $v;
+}
+
+$sql = "
     SELECT 
         t.no_resep,
         t.creationdatetime,
@@ -13,24 +18,22 @@ $query = mysqli_query($con, "
 
         -- Ambil dispensing_start terbaru
         (
-            SELECT dispensing_start 
-            FROM tbl_preliminary_schedule 
+            SELECT TOP 1 dispensing_start 
+            FROM db_laborat.tbl_preliminary_schedule 
             WHERE no_resep = t.no_resep
                 AND creationdatetime = t.creationdatetime 
                 AND dispensing_start IS NOT NULL
             ORDER BY dispensing_start DESC 
-            LIMIT 1
         ) AS dispensing_start,
 
         -- Ambil user_dispensing terbaru
         (
-            SELECT user_dispensing 
-            FROM tbl_preliminary_schedule 
+            SELECT TOP 1 user_dispensing 
+            FROM db_laborat.tbl_preliminary_schedule 
             WHERE no_resep = t.no_resep
                 AND creationdatetime = t.creationdatetime 
                 AND dispensing_start IS NOT NULL
             ORDER BY dispensing_start DESC 
-            LIMIT 1
         ) AS user_dispensing,
 
         MAX(t.dyeing_start) AS dyeing_start,
@@ -43,11 +46,12 @@ $query = mysqli_query($con, "
         MAX(t.username) AS username,
         MAX(t.user_scheduled) AS user_scheduled
 
-    FROM tbl_preliminary_schedule t
-    WHERE t.no_resep = '$no_resep'
+    FROM db_laborat.tbl_preliminary_schedule t
+    WHERE t.no_resep = ?
     GROUP BY t.no_resep, t.creationdatetime
-    ORDER BY t.creationdatetime ASC
-");
+    ORDER BY t.creationdatetime ASC";
+
+$stmt = sqlsrv_query($con, $sql, [$no_resep]);
 ?>
 
 <table id="detailTable" class="table table-sm table-bordered table-sm display compact">
@@ -67,15 +71,15 @@ $query = mysqli_query($con, "
     <tbody>
     <?php
     $no = 1;
-    while ($row = mysqli_fetch_assoc($query)) :
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) :
     ?>
         <tr>
         <td><?= $no ?></td>
 
         <td class="text-nowrap">
-            <?= $row['creationdatetime'] ?>
+            <?= fmtDt($row['creationdatetime']) ?>
             <?php if (!empty($row['username'])): ?>
-            <br><small class="text-muted">User: <?= $row['username'] ?></small>
+            <br><small class="text-muted">User: <?= htmlspecialchars($row['username']) ?></small>
             <?php endif; ?>
         </td>
 
@@ -95,35 +99,35 @@ $query = mysqli_query($con, "
         </td>
 
         <td>
-            <?= $row['dispensing_start'] ?>
+            <?= fmtDt($row['dispensing_start']) ?>
             <?php if (!empty($row['dispensing_start'])): ?>
-            <br><small class="text-muted">User: <?= $row['user_dispensing'] ?></small>
+            <br><small class="text-muted">User: <?= htmlspecialchars($row['user_dispensing']) ?></small>
             <?php endif; ?>
         </td>
 
         <td>
-            <?= $row['dyeing_start'] ?>
+            <?= fmtDt($row['dyeing_start']) ?>
             <?php if (!empty($row['dyeing_start'])): ?>
-            <br><small class="text-muted">User: <?= $row['user_dyeing'] ?></small>
+            <br><small class="text-muted">User: <?= htmlspecialchars($row['user_dyeing']) ?></small>
             <?php endif; ?>
         </td>
 
         <td>
-            <?= $row['darkroom_start'] ?>
+            <?= fmtDt($row['darkroom_start']) ?>
             <?php if (!empty($row['darkroom_start'])): ?>
-            <br><small class="text-muted">User: <?= $row['user_darkroom_start'] ?></small>
+            <br><small class="text-muted">User: <?= htmlspecialchars($row['user_darkroom_start']) ?></small>
             <?php endif; ?>
         </td>
 
         <td>
-            <?= $row['darkroom_end'] ?>
+            <?= fmtDt($row['darkroom_end']) ?>
             <?php if (!empty($row['darkroom_end'])): ?>
-            <br><small class="text-muted">User: <?= $row['user_darkroom_end'] ?></small>
+            <br><small class="text-muted">User: <?= htmlspecialchars($row['user_darkroom_end']) ?></small>
             <?php endif; ?>
         </td>
 
         <td>
-        <?= $row['status'] ?>
+        <?= htmlspecialchars($row['status']) ?>
         <?php
             $byUser = '';
 

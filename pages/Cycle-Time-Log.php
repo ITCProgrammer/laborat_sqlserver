@@ -1,3 +1,4 @@
+<?php include __DIR__ . '/../koneksi.php'; ?>
 <style>
     table#resepTable > tbody > tr.active > td {
         background-color: #337ab7 !important;
@@ -52,12 +53,13 @@
                 </thead>
                 <tbody>
                     <?php
-                    $result = mysqli_query($con, "SELECT DISTINCT no_resep FROM tbl_preliminary_schedule ORDER BY no_resep ASC");
+                    $result = sqlsrv_query($con, "SELECT DISTINCT no_resep FROM db_laborat.tbl_preliminary_schedule ORDER BY no_resep ASC");
                     $no = 1;
-                    while ($row = mysqli_fetch_assoc($result)) {
-                        echo "<tr class='resep-item' data-resep='{$row['no_resep']}'>
+                    while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
+                        $resep = htmlspecialchars($row['no_resep']);
+                        echo "<tr class='resep-item' data-resep='{$resep}'>
                                 <td>$no</td>
-                                <td>{$row['no_resep']}</td>
+                                <td>{$resep}</td>
                             </tr>";
                         $no++;
                     }
