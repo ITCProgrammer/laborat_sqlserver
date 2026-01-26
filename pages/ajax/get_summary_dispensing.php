@@ -30,12 +30,15 @@ if($stmt === false){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]);
 
 $data=[];
 while($row=sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
-//   if (isset($row['jam']) && $row['jam']!==null){ $row['jam']=substr($row['jam'],0,5); }
+  //   if (isset($row['jam']) && $row['jam']!==null){ $row['jam']=substr($row['jam'],0,5); }
   $sx = json_decode($row['suffix'] ?? 'null', true) ?: [];
   $row['suffix_poly']   = $sx['poly']   ?? null;
   $row['suffix_cotton'] = $sx['cotton'] ?? null;
   $row['suffix_white']  = $sx['white']  ?? null;
   unset($row['suffix']);
+  if ($row['tgl'] instanceof DateTimeInterface){
+    $row['tgl'] = $row['tgl']->format('Y-m-d');
+  }
   $data[]=$row;
 }
 

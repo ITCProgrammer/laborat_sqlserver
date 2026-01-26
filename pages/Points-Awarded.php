@@ -2,7 +2,7 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-include "koneksi.php";
+include __DIR__ . "/koneksi.php";
 
 /* =========================
    Helpers
@@ -119,7 +119,7 @@ $activeUser = '';
 $sql = "
 SELECT
   ps.no_resep                                            AS no_resep,
-  DATE(ps.creationdatetime)                              AS tgl,
+  CONVERT(date, ps.creationdatetime)                     AS tgl,
   'Preliminary'                                          AS stage,
   sm.timer                                               AS timer,
   ps.username,
@@ -127,12 +127,12 @@ SELECT
   ps.user_dyeing,
   COALESCE(ps.user_darkroom_end, ps.user_darkroom_start) AS user_darkroom,
   ps.is_test
-FROM tbl_preliminary_schedule ps
-INNER JOIN tbl_status_matching sm
+FROM db_laborat.tbl_preliminary_schedule ps
+INNER JOIN db_laborat.tbl_status_matching sm
   ON sm.idm = (
     CASE
       WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep, 2) IN ('-A','-B')
-        THEN LEFT(ps.no_resep, CHAR_LENGTH(ps.no_resep) - 2)
+        THEN LEFT(ps.no_resep, LEN(ps.no_resep) - 2)
       ELSE ps.no_resep
     END
   )
@@ -143,7 +143,7 @@ WHERE ps.creationdatetime BETWEEN ? AND ?
 UNION ALL
 SELECT
   ps.no_resep,
-  DATE(ps.dispensing_start)                              AS tgl,
+  CONVERT(date, ps.dispensing_start)                     AS tgl,
   'Dispensing'                                           AS stage,
   sm.timer,
   ps.username,
@@ -151,12 +151,12 @@ SELECT
   ps.user_dyeing,
   COALESCE(ps.user_darkroom_end, ps.user_darkroom_start) AS user_darkroom,
   ps.is_test
-FROM tbl_preliminary_schedule ps
-INNER JOIN tbl_status_matching sm
+FROM db_laborat.tbl_preliminary_schedule ps
+INNER JOIN db_laborat.tbl_status_matching sm
   ON sm.idm = (
     CASE
       WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep, 2) IN ('-A','-B')
-        THEN LEFT(ps.no_resep, CHAR_LENGTH(ps.no_resep) - 2)
+        THEN LEFT(ps.no_resep, LEN(ps.no_resep) - 2)
       ELSE ps.no_resep
     END
   )
@@ -167,7 +167,7 @@ WHERE ps.dispensing_start BETWEEN ? AND ?
 UNION ALL
 SELECT
   ps.no_resep,
-  DATE(ps.dyeing_start)                                  AS tgl,
+  CONVERT(date, ps.dyeing_start)                         AS tgl,
   'Dyeing'                                               AS stage,
   sm.timer,
   ps.username,
@@ -175,12 +175,12 @@ SELECT
   ps.user_dyeing,
   COALESCE(ps.user_darkroom_end, ps.user_darkroom_start) AS user_darkroom,
   ps.is_test
-FROM tbl_preliminary_schedule ps
-INNER JOIN tbl_status_matching sm
+FROM db_laborat.tbl_preliminary_schedule ps
+INNER JOIN db_laborat.tbl_status_matching sm
   ON sm.idm = (
     CASE
       WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep, 2) IN ('-A','-B')
-        THEN LEFT(ps.no_resep, CHAR_LENGTH(ps.no_resep) - 2)
+        THEN LEFT(ps.no_resep, LEN(ps.no_resep) - 2)
       ELSE ps.no_resep
     END
   )
@@ -191,7 +191,7 @@ WHERE ps.dyeing_start BETWEEN ? AND ?
 UNION ALL
 SELECT
   ps.no_resep,
-  DATE(
+  CONVERT(date,
     CASE
       WHEN ps.darkroom_end   IS NOT NULL AND ps.darkroom_end   BETWEEN ? AND ? THEN ps.darkroom_end
       WHEN ps.darkroom_start IS NOT NULL AND ps.darkroom_start BETWEEN ? AND ? THEN ps.darkroom_start
@@ -205,12 +205,12 @@ SELECT
   ps.user_dyeing,
   COALESCE(ps.user_darkroom_end, ps.user_darkroom_start) AS user_darkroom,
   ps.is_test
-FROM tbl_preliminary_schedule ps
-INNER JOIN tbl_status_matching sm
+FROM db_laborat.tbl_preliminary_schedule ps
+INNER JOIN db_laborat.tbl_status_matching sm
   ON sm.idm = (
     CASE
       WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep, 2) IN ('-A','-B')
-        THEN LEFT(ps.no_resep, CHAR_LENGTH(ps.no_resep) - 2)
+        THEN LEFT(ps.no_resep, LEN(ps.no_resep) - 2)
       ELSE ps.no_resep
     END
   )
@@ -231,26 +231,25 @@ ORDER BY tgl, no_resep, stage
    Run query only when "Tampilkan" clicked
 ========================= */
 if ($shouldRun) {
-  $stmt = $con->prepare($sql);
-  if (!$stmt) die("Query prepare gagal: " . $con->error);
-
-  // total 14 params
-  $stmt->bind_param(
-    str_repeat('s', 14),
+  $params = [
     $dtStart, $dtEnd, // Preliminary
     $dtStart, $dtEnd, // Dispensing
     $dtStart, $dtEnd, // Dyeing
-    $dtStart, $dtEnd, $dtStart, $dtEnd, // Darkroom (SELECT CASE)
-    $dtStart, $dtEnd, $dtStart, $dtEnd  // Darkroom (WHERE CASE)
-  );
+    $dtStart, $dtEnd, $dtStart, $dtEnd, // Darkroom SELECT CASE
+    $dtStart, $dtEnd, $dtStart, $dtEnd  // Darkroom WHERE CASE
+  ];
 
-  $stmt->execute();
-  $res = $stmt->get_result();
+  $stmt = sqlsrv_query($con, $sql, $params);
+  if ($stmt === false) die("Query gagal: " . print_r(sqlsrv_errors(), true));
 
-  while ($row = $res->fetch_assoc()) {
+  while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
     if (empty($row['tgl'])) continue;
 
-    $tgl     = $row['tgl'];
+    $tglVal  = $row['tgl'];
+    if ($tglVal instanceof DateTimeInterface) {
+      $tglVal = $tglVal->format('Y-m-d');
+    }
+    $tgl     = $tglVal;
     $base    = base_job($row['no_resep']);
     $hours   = timer_to_hours($row['timer']);
     $points  = hours_to_points($hours);
@@ -285,7 +284,7 @@ if ($shouldRun) {
       $data[$stage][$user][$tgl][$base]['possible'] = $possible;
     }
   }
-  $stmt->close();
+  sqlsrv_free_stmt($stmt);
 
   /* =========================
      Dedup berantai per user PER HARI

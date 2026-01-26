@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 function toInt($v){ return ($v === '' || $v === null) ? 0 : (int)$v; }
 function norm_suffix($s){
@@ -26,15 +26,10 @@ if ($jumlah <= 0 && $suffix_str !== ''){
 
 $suffix_json = json_encode(["all" => $suffix_str], JSON_UNESCAPED_UNICODE);
 
-$sql = "UPDATE summary_darkroom
+$sql = "UPDATE db_laborat.summary_darkroom
         SET tgl=?, shift=?, jumlah=?, suffix=?, ket=?
         WHERE id=?";
-$stmt = $con->prepare($sql);
-if(!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
-
-$stmt->bind_param('ssissi', $tgl, $shift, $jumlah, $suffix_json, $ket, $id);
-
-if(!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
-$stmt->close();
+$stmt = sqlsrv_query($con, $sql, [$tgl, $shift, $jumlah, $suffix_json, $ket, $id]);
+if(!$stmt){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
 
 echo json_encode(["ok"=>true,"message"=>"Update selesai"], JSON_UNESCAPED_UNICODE);

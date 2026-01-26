@@ -1,7 +1,7 @@
 <?php
 ini_set("error_reporting", 1);
 session_start();
-include "koneksi.php";
+include __DIR__ . "/koneksi.php";
 
 ?>
 
@@ -104,15 +104,30 @@ include "koneksi.php";
               </thead>
               <tbody>
                 <?php
-				          $sql = mysqli_query($con,"SELECT *, a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
-                                            FROM tbl_status_matching a
-                                            JOIN tbl_matching b ON a.idm = b.no_resep
-                                            where a.status in ('buka', 'mulai', 'hold', 'revisi','tunggu')
-                                            group by a.idm, b.no_resep
-                                            ORDER BY a.id desc");  
-                while ($r = mysqli_fetch_array($sql)) {
-                  $no++;
-                  $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
+                  $sql = "
+                  WITH latest AS (
+                    SELECT a.*,
+                           ROW_NUMBER() OVER(PARTITION BY a.idm ORDER BY a.id DESC) AS rn
+                    FROM db_laborat.tbl_status_matching a
+                    WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
+                  )
+                  SELECT l.*, b.*,
+                         l.id         AS id_status,
+                         l.created_at AS tgl_buat_status,
+                         l.created_by AS status_created_by
+                  FROM latest l
+                  JOIN db_laborat.tbl_matching b ON l.idm = b.no_resep
+                  WHERE l.rn = 1
+                  ORDER BY l.id DESC";
+
+                  $stmt = sqlsrv_query($con, $sql);
+                  if ($stmt === false) {
+                    echo "<tr><td colspan='40'>Query error</td></tr>";
+                  } else {
+                    $no = 0; $col = 0;
+                    while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+                      $no++;
+                      $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
                 ?>
                   <tr>
                     <td valign="center" class="details-control">

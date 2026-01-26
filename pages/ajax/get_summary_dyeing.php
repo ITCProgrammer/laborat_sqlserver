@@ -35,6 +35,9 @@ while($row=sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
   $row['suffix_poly']   = $sx['poly']   ?? null;
   $row['suffix_cotton'] = $sx['cotton'] ?? null;
   unset($row['suffix']);
+  if ($row['tgl'] instanceof DateTimeInterface){
+    $row['tgl'] = $row['tgl']->format('Y-m-d');
+  }
   $data[]=$row;
 }
 

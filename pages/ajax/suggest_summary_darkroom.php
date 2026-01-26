@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 function json_error($m){ echo json_encode(["ok"=>false,"message"=>$m]); exit; }
 
@@ -37,18 +37,15 @@ if ($date < $cutoff) {
 }
 
 $sql = "SELECT s.no_resep, s.is_test
-        FROM tbl_preliminary_schedule s
+        FROM db_laborat.tbl_preliminary_schedule s
         WHERE s.$time_column BETWEEN ? AND ?
           AND s.no_resep IS NOT NULL AND s.no_resep <> ''";
 
-$stmt = $con->prepare($sql);
-if (!$stmt){ json_error($con->error); }
-$stmt->bind_param('ss', $start, $end);
-if (!$stmt->execute()){ json_error($stmt->error); }
-$res = $stmt->get_result();
+$stmt = sqlsrv_query($con, $sql, [$start, $end]);
+if (!$stmt){ json_error(sqlsrv_errors()); }
 
 $list = [];
-while($row = $res->fetch_assoc()){
+while($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
   $nr = trim($row['no_resep']);
   if ($nr!=='') $list[] = $nr;
   // if ($nr === '') continue;
@@ -58,7 +55,7 @@ while($row = $res->fetch_assoc()){
 
   // $list[] = $label;
 }
-$stmt->close();
+sqlsrv_free_stmt($stmt);
 
 $list = array_values(array_unique($list));
 sort($list, SORT_NATURAL | SORT_FLAG_CASE);

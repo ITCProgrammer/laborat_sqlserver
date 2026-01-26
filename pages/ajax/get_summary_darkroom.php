@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 $from = isset($_GET['from']) ? trim($_GET['from']) : '';
 $to   = isset($_GET['to'])   ? trim($_GET['to'])   : '';
@@ -16,14 +16,12 @@ if ($from === '' || !$valid($from) || $to === '' || !$valid($to)){
 }
 
 $sql = "SELECT id,tgl,shift,jumlah,suffix,ket
-        FROM summary_darkroom
+        FROM db_laborat.summary_darkroom
         WHERE tgl BETWEEN ? AND ?
         ORDER BY tgl DESC, id DESC";
 
-$stmt = $con->prepare($sql);
-if (!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
-$stmt->bind_param('ss', $from, $to);
-if (!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
+$stmt = sqlsrv_query($con, $sql, [$from, $to]);
+if ($stmt === false){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
 
 function suffix_to_string($v){
   // Terima array/string → rapikan jadi string spasi-tunggal
@@ -31,10 +29,13 @@ function suffix_to_string($v){
   return trim(preg_replace('/\s+/', ' ', (string)$v));
 }
 
-$res = $stmt->get_result();
 $data = [];
-while($row = $res->fetch_assoc()){
+$row = null;
+while($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
   $row['jumlah'] = (int)$row['jumlah'];
+  if ($row['tgl'] instanceof DateTimeInterface){
+    $row['tgl'] = $row['tgl']->format('Y-m-d');
+  }
 
   // Decode JSON → ambil key "all" (fallback: "list" / array / string)
   $sfx = '';
@@ -53,6 +54,6 @@ while($row = $res->fetch_assoc()){
 
   $data[] = $row;
 }
-$stmt->close();
+sqlsrv_free_stmt($stmt);
 
 echo json_encode(["ok"=>true, "data"=>$data], JSON_UNESCAPED_UNICODE);
