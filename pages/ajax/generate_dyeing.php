@@ -1,11 +1,17 @@
 <?php
 session_start();
-include '../../koneksi.php';
+include __DIR__ . '/../../koneksi.php';
 
+// Ambil daftar mesin
 $allMachines = [];
-$sqlMachines = "SELECT no_machine FROM master_mesin";
-$resMachines = mysqli_query($con, $sqlMachines);
-while ($row = mysqli_fetch_assoc($resMachines)) {
+$sqlMachines = "SELECT no_machine FROM db_laborat.master_mesin";
+$resMachines = sqlsrv_query($con, $sqlMachines);
+if ($resMachines === false) {
+    http_response_code(500);
+    echo json_encode(['error' => 'get machines failed', 'detail' => sqlsrv_errors()]);
+    exit;
+}
+while ($row = sqlsrv_fetch_array($resMachines, SQLSRV_FETCH_ASSOC)) {
     $allMachines[] = $row['no_machine'];
 }
 
@@ -19,20 +25,19 @@ $statuses = [
 
 $statusList = "'" . implode("','", $statuses) . "'";
 
-$sql = "SELECT tps.no_resep, tps.no_machine, tps.status, tps.dyeing_start,tps.is_test, ms.`group`, ms.product_name, ms.waktu
-        FROM tbl_preliminary_schedule tps
-        LEFT JOIN master_suhu ms ON tps.code = ms.code
-        LEFT JOIN tbl_matching ON 
+$sql = "SELECT tps.no_resep, tps.no_machine, tps.status, tps.dyeing_start, tps.is_test, ms.[group], ms.product_name, ms.waktu
+        FROM db_laborat.tbl_preliminary_schedule tps
+        LEFT JOIN db_laborat.master_suhu ms ON LTRIM(RTRIM(tps.code)) = LTRIM(RTRIM(ms.code))
+        LEFT JOIN db_laborat.tbl_matching ON 
             CASE WHEN LEFT(tps.no_resep, 2) = 'DR' 
-                THEN LEFT(tps.no_resep, LENGTH(tps.no_resep) - 2)
+                THEN LEFT(tps.no_resep, LEN(tps.no_resep) - 2)
                 ELSE tps.no_resep
-            END = tbl_matching.no_resep
-        WHERE tps.status IN ($statusList) AND tps.is_old_data = 0 AND is_old_cycle = 0
+            END = db_laborat.tbl_matching.no_resep
+        WHERE tps.status IN ($statusList) AND tps.is_old_data = 0 AND tps.is_old_cycle = 0
         ORDER BY
-            tps.no_resep,
             CASE 
-                WHEN tbl_matching.jenis_matching IN ('LD', 'LD NOW') THEN 1
-                WHEN tbl_matching.jenis_matching IN ('Matching Ulang', 'Matching Ulang NOW', 'Matching Development', 'Perbaikan' , 'Perbaikan NOW') THEN 2
+                WHEN db_laborat.tbl_matching.jenis_matching IN ('LD', 'LD NOW') THEN 1
+                WHEN db_laborat.tbl_matching.jenis_matching IN ('Matching Ulang', 'Matching Ulang NOW', 'Matching Development', 'Perbaikan' , 'Perbaikan NOW') THEN 2
                 ELSE 3
             END,
             CASE 
@@ -44,23 +49,28 @@ $sql = "SELECT tps.no_resep, tps.no_machine, tps.status, tps.dyeing_start,tps.is
             ms.waktu DESC, 
             tps.no_resep ASC";
 
-$result = mysqli_query($con, $sql);
+$result = sqlsrv_query($con, $sql);
+if ($result === false) {
+    http_response_code(500);
+    echo json_encode(['error' => 'main query failed', 'detail' => sqlsrv_errors(), 'sql' => $sql]);
+    exit;
+}
 
 $data = [];
 $maxPerMachine = 0;
 
-while ($row = mysqli_fetch_assoc($result)) {
+while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
     $machine = $row['no_machine'] ?: 'UNASSIGNED';
     $group = $row['group'];
 
     $data[$machine][] = [
-        'no_resep' => $row['no_resep'],
-        'status' => $row['status'],
-        'group' => $group,
-        'product_name' => $row['product_name'],
-        'dyeing_start' => $row['dyeing_start'],
-        'waktu' => $row['waktu'],
-        'is_test' => $row['is_test']
+        'no_resep'    => $row['no_resep'],
+        'status'      => $row['status'],
+        'group'       => $group,
+        'product_name'=> $row['product_name'],
+        'dyeing_start'=> $row['dyeing_start'],
+        'waktu'       => $row['waktu'],
+        'is_test'     => $row['is_test']
     ];
 
     if (count($data[$machine]) > $maxPerMachine) {
@@ -80,14 +90,19 @@ foreach ($data as $machine => $entries) {
 
 // Ambil old data (is_old_data = 1)
 $oldDataList = [];
-$oldQuery = "SELECT tps.no_resep, tps.no_machine, tps.status, tps.dyeing_start, tps.is_test, ms.`group`, ms.product_name, ms.waktu
-             FROM tbl_preliminary_schedule tps
-             LEFT JOIN master_suhu ms ON tps.code = ms.code
-             WHERE tps.is_old_data = 1 AND tps.status IN ($statusList) AND is_old_cycle = 0
+$oldQuery = "SELECT tps.no_resep, tps.no_machine, tps.status, tps.dyeing_start, tps.is_test, ms.[group], ms.product_name, ms.waktu
+             FROM db_laborat.tbl_preliminary_schedule tps
+             LEFT JOIN db_laborat.master_suhu ms ON LTRIM(RTRIM(tps.code)) = LTRIM(RTRIM(ms.code))
+             WHERE tps.is_old_data = 1 AND tps.status IN ($statusList) AND tps.is_old_cycle = 0
              ORDER BY tps.no_resep";
-$oldResult = mysqli_query($con, $oldQuery);
+$oldResult = sqlsrv_query($con, $oldQuery);
+if ($oldResult === false) {
+    http_response_code(500);
+    echo json_encode(['error' => 'old query failed', 'detail' => sqlsrv_errors()]);
+    exit;
+}
 
-while ($row = mysqli_fetch_assoc($oldResult)) {
+while ($row = sqlsrv_fetch_array($oldResult, SQLSRV_FETCH_ASSOC)) {
     $oldDataList[] = $row;
 }
 
@@ -149,12 +164,9 @@ foreach ($data as $machine => $entries) {
         $groupName = $firstGroup;
 
         // Ambil info dyeing
-        $stmt = $con->prepare("SELECT dyeing FROM master_suhu WHERE `group` = ? LIMIT 1");
-        $stmt->bind_param("s", $groupName);
-        $stmt->execute();
-        $stmt->bind_result($dyeingValue);
-        $stmt->fetch();
-        $stmt->close();
+        $stmt = sqlsrv_query($con, "SELECT TOP 1 dyeing FROM db_laborat.master_suhu WHERE [group] = ?", [$groupName]);
+        $rowD = $stmt ? sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC) : null;
+        $dyeingValue = $rowD['dyeing'] ?? null;
 
         $keterangan = '';
         if ($dyeingValue == "1") {
@@ -164,12 +176,8 @@ foreach ($data as $machine => $entries) {
         }
 
         // Ambil informasi suhu
-        $stmtTemp = $con->prepare("SELECT program, suhu, product_name FROM master_suhu WHERE `group` = ? LIMIT 1");
-        $stmtTemp->bind_param("s", $groupName);
-        $stmtTemp->execute();
-        $result = $stmtTemp->get_result();
-        $row = $result->fetch_assoc();
-        $stmtTemp->close();
+        $stmtTemp = sqlsrv_query($con, "SELECT TOP 1 program, suhu, product_name FROM db_laborat.master_suhu WHERE [group] = ?", [$groupName]);
+        $row = $stmtTemp ? sqlsrv_fetch_array($stmtTemp, SQLSRV_FETCH_ASSOC) : null;
 
         if ($row) {
             $desc = '';
@@ -217,12 +225,9 @@ foreach ($oldMachineMap as $machine => $oldEntries) {
         $groupName = $firstGroup;
 
         // Ambil info dyeing
-        $stmt = $con->prepare("SELECT dyeing FROM master_suhu WHERE `group` = ? LIMIT 1");
-        $stmt->bind_param("s", $groupName);
-        $stmt->execute();
-        $stmt->bind_result($dyeingValue);
-        $stmt->fetch();
-        $stmt->close();
+        $stmt = sqlsrv_query($con, "SELECT TOP 1 dyeing FROM db_laborat.master_suhu WHERE [group] = ?", [$groupName]);
+        $rowD = $stmt ? sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC) : null;
+        $dyeingValue = $rowD['dyeing'] ?? null;
 
         $keterangan = '';
         if ($dyeingValue == "1") {
@@ -231,12 +236,8 @@ foreach ($oldMachineMap as $machine => $oldEntries) {
             $keterangan = 'COTTON';
         }
 
-        $stmtTemp = $con->prepare("SELECT program, suhu, product_name FROM master_suhu WHERE `group` = ? LIMIT 1");
-        $stmtTemp->bind_param("s", $groupName);
-        $stmtTemp->execute();
-        $result = $stmtTemp->get_result();
-        $row = $result->fetch_assoc();
-        $stmtTemp->close();
+        $stmtTemp = sqlsrv_query($con, "SELECT TOP 1 program, suhu, product_name FROM db_laborat.master_suhu WHERE [group] = ?", [$groupName]);
+        $row = $stmtTemp ? sqlsrv_fetch_array($stmtTemp, SQLSRV_FETCH_ASSOC) : null;
 
         if ($row) {
             $desc = '';

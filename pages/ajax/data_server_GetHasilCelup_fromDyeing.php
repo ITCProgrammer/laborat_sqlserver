@@ -1,6 +1,6 @@
 <?php
 ini_set("error_reporting", 1);
-include '../../koneksi.php';
+include __DIR__ . '/../../koneksi.php';
 $time = date('Y-m-d H:i:s');
 function cekDesimal($angka)
 								{
@@ -32,10 +32,12 @@ $columns = array(
     12 => 'no_resep',
     13 => 'l_r',
     14 => 'no_mesin',
-	15 => 'tgl_update',
-	16 => 'analisa',
+    15 => 'tgl_update',
+    16 => 'analisa',
 );
-// set_order_type("desc");
+
+$rcode = $_POST['r_code'] ?? '';
+
 $sql = "SELECT 
             b.id, 
             c.no_order, 
@@ -51,7 +53,7 @@ $sql = "SELECT
             d.l_r, 
             c.no_mesin, 
             d.bruto, 
-            ((d.bruto/c.kapasitas) * 100 ) as loading_fix, 
+            (CAST(d.bruto AS FLOAT) / NULLIF(c.kapasitas, 0) * 100) as loading_fix, 
             z.jenis_note, 
             b.analisa_resep,
             z.note,
@@ -59,66 +61,49 @@ $sql = "SELECT
             d.benang,
             d.nodemand,
             c.target,
-            SUBSTRING_INDEX(b.no_resep, '-', 1) AS productionorder_resep1_dye,
-            SUBSTRING_INDEX(b.no_resep, '-', -1) AS line_resep1_dye,
-            SUBSTRING_INDEX(b.no_resep2, '-', 1) AS productionorder_resep2_dye,
-            SUBSTRING_INDEX(b.no_resep2, '-', -1) AS line_resep2_dye,
             b.no_resep as resep1_dye,
             b.no_resep2 as resep2_dye
         FROM db_laborat.tbl_status_matching a
-        join db_laborat.tbl_matching x on a.idm = x.no_resep
-        join db_dying.tbl_hasilcelup b on a.idm = b.rcode
-        join db_dying.tbl_montemp d on b.id_montemp = d.id
-        join db_dying.tbl_schedule c on d.id_schedule = c.id
-        left join tbl_note_celup z on b.nokk = z.kk
-        where a.idm = '$_POST[r_code]' and b.rcode = '$_POST[r_code]'";
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku");
-$totalData = mysqli_num_rows($query);
-$totalFiltered = $totalData;
-if (!empty($requestData['search']['value'])) {
-    $sql .= "and order LIKE '" . $requestData['search']['value'] . "%' ";
+        JOIN db_laborat.tbl_matching x ON a.idm = x.no_resep
+        JOIN db_dying.tbl_hasilcelup b ON a.idm = b.rcode
+        JOIN db_dying.tbl_montemp d ON b.id_montemp = d.id
+        JOIN db_dying.tbl_schedule c ON d.id_schedule = c.id
+        LEFT JOIN db_laborat.tbl_note_celup z ON b.nokk = z.kk
+        WHERE a.idm = ? AND b.rcode = ?
+        ORDER BY b.id DESC";
+
+$stmt = sqlsrv_query($con, $sql, [$rcode, $rcode]);
+$rows = [];
+while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+    $rows[] = $r;
 }
-//----------------------------------------------------------------------------------
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku1");
-$totalFiltered = mysqli_num_rows($query);
-$sql .= " GROUP BY b.nokk ,b.id ORDER BY b.id desc " . $columns[$requestData['order'][0]['column']] . "  " . $requestData['order'][0]['dir'] . "  LIMIT "
-    . $requestData['start'] . " ," . $requestData['length'] . "   ";
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku2");
-//----------------------------------------------------------------------------------
+
+$totalData = count($rows);
+$totalFiltered = $totalData;
+
+// Pagination ala DataTables
+$start  = isset($requestData['start']) ? (int)$requestData['start'] : 0;
+$length = isset($requestData['length']) ? (int)$requestData['length'] : -1;
+if ($length === -1) {
+    $pageRows = $rows;
+} else {
+    $pageRows = array_slice($rows, $start, $length);
+}
+
 $data = array();
-$no = 1;
-while ($row = mysqli_fetch_array($query)) {
-    $idkk = $row["nokk"];
+$no = $start + 1;
+foreach ($pageRows as $row) {
+    $resep1 = $row["resep1_dye"];
+    $resep2 = $row["resep2_dye"];
 
-    // $siquel = sqlsrv_query($conn,"SELECT stockmovement.dono,stockmovement.documentno as no_doku,processcontrolbatches.documentno,lotno,customerid,
-    //                                 processcontrol.productid ,processcontrol.id as pcid, 
-    //                                 sum(stockmovementdetails.weight) as berat,
-    //                                 count(stockmovementdetails.weight) as roll,processcontrolbatches.dated as tgllot
-    //                                 from stockmovement 
-    //                                 LEFT join stockmovementdetails on StockMovement.id=stockmovementdetails.StockmovementID
-    //                                 left join processcontrolbatches on processcontrolbatches.id=stockmovement.pcbid
-    //                                 left join processcontrol on processcontrol.id=processcontrolbatches.pcid
-    //                                 where wid='12' and processcontrolbatches.documentno='$idkk' and (transactiontype='7' or transactiontype='4')
-    //                                 group by stockmovement.DocumentNo,processcontrolbatches.DocumentNo,processcontrolbatches.LotNo,stockmovement.dono,
-    //                                 processcontrol.CustomerID,processcontrol.ProductID,processcontrol.ID,processcontrolbatches.Dated") or die("gagal");
-    // $sqls = sqlsrv_query($conn,"SELECT processcontrolJO.SODID,salesorders.ponumber,processcontrol.productid,salesorders.customerid,joborders.documentno,
-    //                                 salesorders.buyerid,processcontrolbatches.lotno,productcode,productmaster.color,colorno,description,weight,cuttablewidth from Joborders 
-    //                                 left join processcontrolJO on processcontrolJO.joid = Joborders.id
-    //                                 left join salesorders on soid= salesorders.id
-    //                                 left join processcontrol on processcontrolJO.pcid = processcontrol.id
-    //                                 left join processcontrolbatches on processcontrolbatches.pcid = processcontrol.id
-    //                                 left join productmaster on productmaster.id= processcontrol.productid
-    //                                 left join productpartner on productpartner.productid= processcontrol.productid
-    //                                 where processcontrolbatches.documentno='$idkk'");
-    // $ssr = sqlsrv_fetch_array($sqls);
-    // $r = sqlsrv_fetch_array($siquel);
-    // $bng11 = sqlsrv_query($conn,"SELECT CAST(SODetailsAdditional.Note AS NVARCHAR(255)) as note from Joborders left join processcontrolJO on processcontrolJO.joid = Joborders.id
-    //                             left join SODetailsAdditional on processcontrolJO.sodid=SODetailsAdditional.sodid
-    //                             WHERE  JobOrders.documentno='$ssr[documentno]' and processcontrolJO.pcid='$r[pcid]'");
-    // $r3 = sqlsrv_fetch_array($bng11);
+    [$prod1, $line1] = array_pad(explode('-', $resep1, 2), 2, '');
+    [$prod2, $line2] = array_pad(explode('-', $resep2, 2), 2, '');
 
-    
-    $nestedData = array();
+    $tglUpdate = $row["tgl_update"];
+    if ($tglUpdate instanceof DateTimeInterface) {
+        $tglUpdate = $tglUpdate->format('Y-m-d H:i:s');
+    }
+
     if ($_POST['p'] == 'Detail-status-approved') {
         $index = $no++;
         $data_action = '<strong style="border-bottom: solid #808080 1px;">LAB : ' . $row['note'] . ' <br> <br> DYE : ' . $row['analisa_resep'] . '</strong>';
@@ -127,18 +112,17 @@ while ($row = mysqli_fetch_array($query)) {
         </a>';
         $data_action = '<strong style="border-bottom: solid #808080 1px;">LAB : ' . $row['note'] . ' <br> <br> DYE : ' . $row['analisa_resep'] . ' </strong> <br /><a href="javascript:void(0)" class="btn btn-xs btn-warning _addnoteclp" data-kk="' . $row["nokk"] . '"><i class="fa fa-edit"></i></a>';
     }
-    $linkresep = '<a href="https://online.indotaichen.com/laporan/dye_search_detail_recipe.php?prod_order=' . $row["productionorder_resep1_dye"] . '&line=' . $row["line_resep1_dye"] . '" class="btn btn-xs btn-info bon_resep" target="_blank" style="display: block; margin-bottom: 5px;">Resep 1 : ' . $row["resep1_dye"] . '</a>';
 
-    if (!empty($row["productionorder_resep2_dye"]) && !empty($row["line_resep2_dye"])) {
-        // Jika ada, buat link untuk Resep 2
-        $linkresep .= '<a href="https://online.indotaichen.com/laporan/dye_search_detail_recipe.php?prod_order=' . $row["productionorder_resep2_dye"] . '&line=' . $row["line_resep2_dye"] . '" class="btn btn-xs btn-info bon_resep" target="_blank" style="display: block; margin-bottom: 5px;">Resep 2 : ' . $row["resep2_dye"] . '</a>';
+    $linkresep = '<a href="https://online.indotaichen.com/laporan/dye_search_detail_recipe.php?prod_order=' . $prod1 . '&line=' . $line1 . '" class="btn btn-xs btn-info bon_resep" target="_blank" style="display: block; margin-bottom: 5px;">Resep 1 : ' . $resep1 . '</a>';
+
+    if (!empty($prod2) && !empty($line2)) {
+        $linkresep .= '<a href="https://online.indotaichen.com/laporan/dye_search_detail_recipe.php?prod_order=' . $prod2 . '&line=' . $line2 . '" class="btn btn-xs btn-info bon_resep" target="_blank" style="display: block; margin-bottom: 5px;">Resep 2 : ' . $resep2 . '</a>';
     }
 
+    $nestedData = array();
     $nestedData[] = $row["id"];
     $nestedData[] = $index;
     $nestedData[] = $row["no_order"];
-	/*$nestedData[] = $row["nokk"];*/
-    // $nestedData[] = '<a href="javascript:void(0)" data="pages/cetak/posisikk.php?id=' . $row["nokk"] . '" class="posisi_kk">'. $row["nokk"] .'</a>';
     $nestedData[] = '<a target="_BLANK" href="http://online.indotaichen.com/laporan/ppc_filter.php?prod_order='.$row["nokk"].'&kkoke=ya">'. $row["nokk"] .'</a>';
     $nestedData[] = $row["nodemand"];
     $nestedData[] = $row["lot"];
@@ -155,9 +139,8 @@ while ($row = mysqli_fetch_array($query)) {
     $nestedData[] = $row["lama_proses"];
     $nestedData[] = $linkresep;
     $nestedData[] = $data_action;
-	$nestedData[] = $row["tgl_update"];
-	$nestedData[] = $row["analisa"];
-
+    $nestedData[] = $tglUpdate;
+    $nestedData[] = $row["analisa"];
 
     $data[] = $nestedData;
 }

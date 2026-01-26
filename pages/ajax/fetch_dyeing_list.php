@@ -1,19 +1,17 @@
 <?php
 session_start();
-include '../../koneksi.php';
+include __DIR__ . '/../../koneksi.php';
 
-$sql = "SELECT ms.`group`, tps.no_resep, tps.no_machine
-        FROM tbl_preliminary_schedule tps
-        JOIN master_suhu ms ON tps.code = ms.code
+$sql = "SELECT ms.[group], tps.no_resep, tps.no_machine
+        FROM db_laborat.tbl_preliminary_schedule tps
+        JOIN db_laborat.master_suhu ms ON LTRIM(RTRIM(tps.code)) = LTRIM(RTRIM(ms.code))
         WHERE tps.status IN ('scheduled', 'in_progress_dispensing', 'in_progress_dyeing', 'in_progress_darkroom', 'ok')
-        ORDER BY ms.`group`, tps.no_resep";
-$result = mysqli_query($con, $sql);
+        ORDER BY ms.[group], tps.no_resep";
+$result = sqlsrv_query($con, $sql);
 
 $schedules = [];
-while ($row = mysqli_fetch_assoc($result)) {
+while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
     $schedules[$row['group']][] = $row['no_resep'];
 }
-
-mysqli_close($con);
 
 echo json_encode($schedules);
