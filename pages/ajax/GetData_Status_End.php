@@ -3,7 +3,7 @@ header('Content-Type: application/json');
 error_reporting(E_ALL);
 ini_set("display_errors", 1);
 
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 
 try {
     $statuses = [
@@ -16,78 +16,85 @@ try {
     $rcode = isset($_GET['rcode']) ? trim($_GET['rcode']) : '';
     // siapkan filter tambahan (optional)
     $filterResep = '';
+    $params = [];
     if ($rcode !== '') {
-        $safeRcode = mysqli_real_escape_string($con, $rcode);
-
-        // filter ke no_resep asli dan hasil cutting (DR-xxx)
-        $filterResep = "AND tps.no_resep LIKE '%{$safeRcode}%'";
+        $filterResep = "AND tps.no_resep LIKE ?";
+        $params[] = "%{$rcode}%";
     }
 
-    $result = mysqli_query($con, "SELECT 
-                                        tps.*, 
-                                        ms.product_name,
-                                        ms.suhu,
-                                        ms.waktu,
-                                        ms.dispensing,
-                                        tsm.grp,
-                                        tm.warna,
-                                        CASE 
-                                                WHEN LEFT(tps.no_resep, 2) = 'DR' 
-                                                THEN SUBSTRING_INDEX(tps.no_resep, '-', 1)
-                                                ELSE tps.no_resep
-                                        END AS no_resep_cutting
-                                -- 		lsm.status AS info
-                                FROM tbl_preliminary_schedule tps
-                                INNER JOIN (
-                                        SELECT MIN(id) AS id
-                                        FROM tbl_preliminary_schedule
-                                        WHERE status IN ($statusList)
-                                        GROUP BY no_resep
-                                ) AS sub 
-                                        ON tps.id = sub.id
-                                LEFT JOIN master_suhu ms 
-                                        ON tps.code = ms.code
-                                LEFT JOIN tbl_matching tm
-                                        ON (
-                                                CASE 
-                                                        WHEN LEFT(tps.no_resep, 2) = 'DR' 
-                                                        THEN SUBSTRING_INDEX(tps.no_resep, '-', 1)
-                                                        ELSE tps.no_resep
-                                                END
-                                        ) = tm.no_resep
-                                LEFT JOIN tbl_status_matching tsm 
-                                        ON (
-                                                CASE 
-                                                        WHEN LEFT(tps.no_resep, 2) = 'DR' 
-                                                        THEN SUBSTRING_INDEX(tps.no_resep, '-', 1)
-                                                        ELSE tps.no_resep
-                                                END
-                                        ) = tsm.idm
-                                WHERE
-                                    1=1
-                                    {$filterResep}
-                                ORDER BY 
-                                        tps.id ASC LIMIT 100");
+    $sql = "SELECT TOP 100
+                    tps.*, 
+                    ms.product_name,
+                    ms.suhu,
+                    ms.waktu,
+                    ms.dispensing,
+                    tsm.grp,
+                    tm.warna,
+                    CASE 
+                        WHEN LEFT(tps.no_resep, 2) = 'DR' 
+                            THEN LEFT(tps.no_resep, CHARINDEX('-', tps.no_resep + '-')-1)
+                        ELSE tps.no_resep
+                    END AS no_resep_cutting
+            FROM db_laborat.tbl_preliminary_schedule tps
+            INNER JOIN (
+                    SELECT MIN(id) AS id
+                    FROM db_laborat.tbl_preliminary_schedule
+                    WHERE status IN ($statusList)
+                    GROUP BY no_resep
+            ) AS sub 
+                    ON tps.id = sub.id
+            LEFT JOIN db_laborat.master_suhu ms 
+                    ON LTRIM(RTRIM(tps.code)) = LTRIM(RTRIM(ms.code))
+            LEFT JOIN db_laborat.tbl_matching tm
+                    ON (
+                            CASE 
+                                    WHEN LEFT(tps.no_resep, 2) = 'DR' 
+                                    THEN LEFT(tps.no_resep, CHARINDEX('-', tps.no_resep + '-')-1)
+                                    ELSE tps.no_resep
+                            END
+                    ) = tm.no_resep
+            LEFT JOIN db_laborat.tbl_status_matching tsm 
+                    ON (
+                            CASE 
+                                    WHEN LEFT(tps.no_resep, 2) = 'DR' 
+                                    THEN LEFT(tps.no_resep, CHARINDEX('-', tps.no_resep + '-')-1)
+                                    ELSE tps.no_resep
+                            END
+                    ) = tsm.idm
+            WHERE 1=1 {$filterResep}
+            ORDER BY tps.id ASC";
+
+    $result = sqlsrv_query($con, $sql, $params);
+    if ($result === false) {
+        throw new Exception(json_encode(sqlsrv_errors()));
+    }
+
     // prepared statement untuk ambil status terakhir di log_status_matching
-    $stmt = $con->prepare("SELECT `status`
-                            FROM log_status_matching
-                            WHERE ids = ?
-                            ORDER BY id DESC
-                            LIMIT 1");
+    $stmtLog = sqlsrv_prepare(
+        $con,
+        "SELECT TOP 1 status FROM db_laborat.log_status_matching WHERE ids = ? ORDER BY id DESC",
+        [&$cuttingParam]
+    );
 
     $data = [];
-    while ($row = mysqli_fetch_assoc($result)) {
+    while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
         $no_resep_cutting = $row['no_resep_cutting'];
 
         $lastStatus = null;
 
-        if ($stmt) {
-            $stmt->bind_param('s', $no_resep_cutting);
-            $stmt->execute();
-            $res2 = $stmt->get_result();
-            if ($r2 = $res2->fetch_assoc()) {
+        if ($stmtLog) {
+            $cuttingParam = $no_resep_cutting;
+            $exec = sqlsrv_execute($stmtLog);
+            if ($exec && ($r2 = sqlsrv_fetch_array($stmtLog, SQLSRV_FETCH_ASSOC))) {
                 $lastStatus = $r2['status'];
             }
+            // rewind resultset for next loop
+            sqlsrv_free_stmt($stmtLog);
+            $stmtLog = sqlsrv_prepare(
+                $con,
+                "SELECT TOP 1 status FROM db_laborat.log_status_matching WHERE ids = ? ORDER BY id DESC",
+                [&$cuttingParam]
+            );
         }
 
         // tambahin field baru, misal namanya 'status_log'
