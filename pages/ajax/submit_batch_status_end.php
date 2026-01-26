@@ -1,6 +1,6 @@
 <?php
 session_start();
-include '../../koneksi.php';
+include __DIR__ . '/../../koneksi.php';
 
 header('Content-Type: application/json');
 
@@ -23,21 +23,21 @@ if (empty($allNoResep)) {
     exit;
 }
 
-$con->begin_transaction();
+sqlsrv_begin_transaction($con);
 
 try {
     foreach ($data['repeat'] ?? [] as $no_resep) {
         processUpdate($con, $no_resep, 'end', 'repeat');
     }
 
-    $con->commit();
+    sqlsrv_commit($con);
 
     echo json_encode([
         "success" => true,
         "message" => "Semua data berhasil diproses."
     ]);
 } catch (Exception $e) {
-    $con->rollback();
+    sqlsrv_rollback($con);
     http_response_code(500);
     echo json_encode([
         "success" => false,
@@ -45,18 +45,12 @@ try {
     ]);
 }
 
-$con->close();
-
 function processUpdate($con, $no_resep, $expected_status, $new_status, $update_end_time = false) {
     $userDarkroomEnd = $_SESSION['userLAB'] ?? '';
 
     // Cek status sekarang
-    $stmt = $con->prepare("SELECT status FROM tbl_preliminary_schedule WHERE no_resep = ? AND is_old_cycle = 0");
-    $stmt->bind_param("s", $no_resep);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if (!$result || !$row = $result->fetch_assoc()) {
+    $stmt = sqlsrv_query($con, "SELECT status FROM db_laborat.tbl_preliminary_schedule WHERE no_resep = ? AND is_old_cycle = 0", [$no_resep]);
+    if (!$stmt || !$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         throw new Exception("No. Resep $no_resep tidak ditemukan.");
     }
 
@@ -64,27 +58,16 @@ function processUpdate($con, $no_resep, $expected_status, $new_status, $update_e
         throw new Exception("Status No. Resep $no_resep tidak sesuai ($row[status]).");
     }
 
-    $stmt->close();
+    $query = $update_end_time
+        ? "UPDATE db_laborat.tbl_preliminary_schedule 
+           SET status = ?, darkroom_end = GETDATE(), user_darkroom_end = ?
+           WHERE no_resep = ? AND is_old_cycle = 0"
+        : "UPDATE db_laborat.tbl_preliminary_schedule 
+           SET status = ?, user_darkroom_end = ?
+           WHERE no_resep = ? AND is_old_cycle = 0";
 
-    if ($update_end_time) {
-        $update = $con->prepare("
-            UPDATE tbl_preliminary_schedule 
-            SET status = ?, darkroom_end = NOW(), user_darkroom_end = ?
-            WHERE no_resep = ? AND is_old_cycle = 0
-        ");
-        $update->bind_param("sss", $new_status, $userDarkroomEnd, $no_resep);
-    } else {
-        $update = $con->prepare("
-            UPDATE tbl_preliminary_schedule 
-            SET status = ?, user_darkroom_end = ?
-            WHERE no_resep = ? AND is_old_cycle = 0
-        ");
-        $update->bind_param("sss", $new_status, $userDarkroomEnd, $no_resep);
+    $update = sqlsrv_query($con, $query, [$new_status, $userDarkroomEnd, $no_resep]);
+    if (!$update) {
+        throw new Exception("Update gagal untuk $no_resep: " . json_encode(sqlsrv_errors()));
     }
-
-    if (!$update->execute()) {
-        throw new Exception("Update gagal untuk $no_resep: " . $update->error);
-    }
-
-    $update->close();
 }

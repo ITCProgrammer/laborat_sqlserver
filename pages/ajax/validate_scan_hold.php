@@ -1,5 +1,5 @@
 <?php
-include '../../koneksi.php';
+include __DIR__ . '/../../koneksi.php';
 header('Content-Type: application/json');
 
 $noResep = $_GET['no_resep'] ?? '';
@@ -9,14 +9,17 @@ if ($noResep === '') {
     exit;
 }
 
-$stmt = $con->prepare("
-    SELECT COUNT(*) AS total 
-    FROM tbl_preliminary_schedule 
-    WHERE no_resep = ? AND status = 'hold' AND is_old_cycle = 0
-");
-$stmt->bind_param("s", $noResep);
-$stmt->execute();
-$result = $stmt->get_result();
-$data = $result->fetch_assoc();
-
-echo json_encode(["valid" => ($data['total'] > 0)]);
+$stmt = sqlsrv_query(
+    $con,
+    "SELECT COUNT(*) AS total 
+     FROM db_laborat.tbl_preliminary_schedule 
+     WHERE no_resep = ? AND status = 'hold' AND is_old_cycle = 0",
+    [$noResep]
+);
+if (!$stmt) {
+    http_response_code(500);
+    echo json_encode(["valid" => false, "error" => sqlsrv_errors()]);
+    exit;
+}
+$data = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+echo json_encode(["valid" => ($data['total'] ?? 0) > 0]);
