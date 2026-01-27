@@ -23,22 +23,18 @@ $suffix_json = json_encode([
   "cotton" => $suffix_cotton,
 ], JSON_UNESCAPED_UNICODE);
 
-$sql="UPDATE summary_dyeing
+$sql="UPDATE db_laborat.summary_dyeing
       SET tgl=?, shift=?,
           ttl_kloter_poly=?, ttl_kloter_cotton=?,
           suffix=?, botol=?
       WHERE id=?";
-$stmt=$con->prepare($sql);
-if(!$stmt){ echo json_encode(["ok"=>false,"message"=>$con->error]); exit; }
 
-$stmt->bind_param(
-  "ssiisii",
+$stmt = sqlsrv_query($con, $sql, [
   $tgl,$shift,
   $ttl_kloter_poly,$ttl_kloter_cotton,
   $suffix_json,$botol,$id
-);
+]);
 
-if(!$stmt->execute()){ echo json_encode(["ok"=>false,"message"=>$stmt->error]); exit; }
-$stmt->close();
+if(!$stmt){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
 
-echo json_encode(["ok"=>true,"message"=>"Update selesai"]);
+echo json_encode(["ok"=>true,"message"=>"Update selesai"], JSON_UNESCAPED_UNICODE);

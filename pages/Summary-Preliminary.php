@@ -765,7 +765,15 @@
 
     if (clickedBtn){ setBtnSpinner(clickedBtn, false); clickedBtn.disabled = false; }
 
-    alert((resp && resp.message) ? resp.message : (isUpdate ? 'Update selesai' : 'Tersimpan'));
+    // alert((resp && resp.message) ? resp.message : (isUpdate ? 'Update selesai' : 'Tersimpan'));
+    let msg = (resp && resp.message) ? resp.message : (isUpdate ? 'Update selesai' : 'Tersimpan');
+
+    if (typeof msg !== 'string') {
+      msg = JSON.stringify(msg, null, 2);
+    }
+
+    alert(msg);
+    console.log("RESP:", resp);
 
     if (clickedBtn && resp && resp.ok){
       var icon = clickedBtn.querySelector('i');

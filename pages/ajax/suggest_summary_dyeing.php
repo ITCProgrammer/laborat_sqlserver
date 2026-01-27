@@ -45,16 +45,13 @@ if ($shift === '1'){
 
 /* ambil schedule + mapping dyeing (1=poly, 2=cotton) */
 $sql = "SELECT s.no_resep, s.is_test, ms.code, ms.dyeing AS dy
-        FROM tbl_preliminary_schedule s
-        LEFT JOIN master_suhu ms ON ms.code = s.code
+        FROM db_laborat.tbl_preliminary_schedule s
+        LEFT JOIN db_laborat.master_suhu ms ON LTRIM(RTRIM(ms.code)) = LTRIM(RTRIM(s.code))
         WHERE s.dyeing_start BETWEEN ? AND ?
           AND s.no_resep IS NOT NULL AND s.no_resep <> ''";
 
-$stmt = $con->prepare($sql);
-if (!$stmt){ json_error($con->error); }
-$stmt->bind_param('ss', $start, $end);
-if (!$stmt->execute()){ json_error($stmt->error); }
-$res = $stmt->get_result();
+$stmt = sqlsrv_query($con, $sql, [$start, $end]);
+if (!$stmt){ json_error(sqlsrv_errors()); }
 
 /* hitungan:
    - total_rows: semua baris (duplikat dihitung)
@@ -65,7 +62,7 @@ $total_rows = 0;
 $poly_set = [];   $cotton_set = [];
 $poly_count = []; $cotton_count = [];
 
-while($row = $res->fetch_assoc()){
+while($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
   $nr = trim($row['no_resep']);
   if ($nr === '') continue;
   $total_rows++;
@@ -82,7 +79,7 @@ while($row = $res->fetch_assoc()){
     $cotton_count[$labelForDetail] = ($cotton_count[$labelForDetail] ?? 0) + 1;
   }
 }
-$stmt->close();
+sqlsrv_free_stmt($stmt);
 
 /* urut alfabet biar rapi */
 ksort($poly_count); ksort($cotton_count);

@@ -50,6 +50,10 @@ if ($stmt === false){
 
 $data = [];
 while($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
+  if (isset($row['tgl']) && $row['tgl'] instanceof DateTimeInterface){
+    $row['tgl'] = $row['tgl']->format('Y-m-d');
+  }
+  
   if (isset($row['jam']) && $row['jam'] instanceof DateTimeInterface){
     $row['jam'] = $row['jam']->format('H:i');
   }

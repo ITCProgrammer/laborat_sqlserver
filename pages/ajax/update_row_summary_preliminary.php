@@ -51,6 +51,17 @@ $vals = [
   $id
 ];
 $stmt = sqlsrv_query($con, $sql, $vals);
-if($stmt === false){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
+// if($stmt === false){ echo json_encode(["ok"=>false,"message"=>sqlsrv_errors()]); exit; }
+if($stmt === false){
+  $errs = sqlsrv_errors();
+  $msg = "Insert gagal";
+  if ($errs) {
+    $msg = implode(" | ", array_map(function($e){
+      return "SQLSTATE {$e['SQLSTATE']} CODE {$e['code']}: {$e['message']}";
+    }, $errs));
+  }
+  echo json_encode(["ok"=>false,"message"=>$msg,"errors"=>$errs]);
+  exit;
+}
 
 echo json_encode(["ok"=>true,"message"=>"Ter-update"]);
