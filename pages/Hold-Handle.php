@@ -36,7 +36,7 @@ $stmt = sqlsrv_query($con, "SELECT TOP 1 a.id as id_status, a.idm, a.flag, a.grp
         b.no_warna, b.lebar, b.gramasi, b.qty_order, b.tgl_in, b.tgl_out,
         b.proses, b.buyer, a.final_matcher, a.colorist1, a.colorist2, a.colorist3, a.colorist4, a.colorist5, a.colorist6,a.colorist7, a.colorist8, a.create_resep,a.acc_resep1,a.acc_resep2,a.acc_ulang_ok,
         b.tgl_delivery, b.note, b.jenis_matching, b.tgl_buat, b.tgl_update, b.created_by, a.bleaching_sh, a.bleaching_tm, a.second_lr, b.color_code,b.recipe_code,
-        b.suhu_chamber, b.warna_flourescent
+        b.suhu_chamber, b.warna_flourescent, a.howmany_percobaan_ke
         FROM db_laborat.tbl_status_matching a
         INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
         WHERE a.id = ?
@@ -482,7 +482,7 @@ $role = $_SESSION['jabatanLAB']
                             <div class="form-group">
                                 <label for="Matching-ke" class="col-sm-2 control-label">Percobaan berapa kali</label>
                                 <div class="col-md-5">
-                                    <input type="text" class="form-control" required id="howmany_Matching-ke" name="howmany_Matching-ke" maxlength="2" placeholder="Percobaan Berapa Kali">
+                                    <input type="number" class="form-control" required id="howmany_Matching-ke" name="howmany_Matching-ke" value="<?php echo $data['howmany_percobaan_ke'] ?>" maxlength="2" placeholder="Percobaan Berapa Kali">
                                 </div>
                             </div>
                             <div class="form-group">
@@ -2620,7 +2620,7 @@ $role = $_SESSION['jabatanLAB']
                 var bleaching_tm = $("#bleaching_tm").val();
             }
             insertInto_StatusMatching_DetailMatching($("#id_matching").val(), $("#id_status").val(), $("#idm").val(),
-                $('#Matching-ke').val(), $('#BENANG-A').val(), $("#LEBAR-A").val(), $("#GRAMASI-A").val(),
+                $('#Matching-ke').val(), $('#howmany_Matching-ke').val(), $('#BENANG-A').val(), $("#LEBAR-A").val(), $("#GRAMASI-A").val(),
                 $("#L_R").find('option:selected').val(), $("#kadar_air").val(), RC_Suhu, RCWaktu, soapingSuhu,
                 soapingWaktu, $("#CIE_WI").val(), $("#CIE_TINT").val(), $("#YELLOWNESS").val(), $("#Spektro_R").val(),
                 $("#Done_Matching").val(), $("#keterangan").val(), $("#tgl_buat_status").val(), cside_c, cside_min,
@@ -2638,7 +2638,7 @@ $role = $_SESSION['jabatanLAB']
                 $("#colorist_6").find('option:selected').val(), $("#colorist_7").find('option:selected').val(), $("#colorist_8").find('option:selected').val(), $("#Proses").find('option:selected').val(), $("#item").val(), $("#recipe_code").val(), $('#no_warna').val(), $('#warna').val(), $('#Kain').val(), $('#Benang').val(), $('#Lebar').val(), $('#Gramasi').val(), $('#Tgl_delivery ').val(), $('#Order').val(), $('#po_greige').val(), $('#QtyOrder').val(), $('#Matcher').find('option:selected').val(), $('#Group').find('option:selected').val(), $("#Buyer").find('option:selected').val(), bleaching_sh, bleaching_tm, $('#second_lr').find('option:selected').val())
         }
 
-        function insertInto_StatusMatching_DetailMatching(id_matching, id_status, idm, matching_ke,
+        function insertInto_StatusMatching_DetailMatching(id_matching, id_status, idm, matching_ke, howmany_Matching_ke,
             benang_a, lebar_a, gramasi_a, l_R, kadar_air, RC_Suhu, RCWaktu, soapingSuhu,
             soapingWaktu, cie_wi, cie_tint, yellowness, Spektro_R, Done_Matching, keterangan,
             tgl_buat_status, cside_c, cside_min, tside_c, tside_min, kadar_air_true, cocok_warna,
@@ -2657,6 +2657,7 @@ $role = $_SESSION['jabatanLAB']
                     id_status: id_status,
                     idm: idm,
                     matching_ke: matching_ke,
+                    howmany_Matching_ke: howmany_Matching_ke,
                     benang_a: benang_a,
                     lebar_a: lebar_a,
                     gramasi_a: gramasi_a,
