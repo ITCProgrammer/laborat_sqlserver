@@ -3,7 +3,7 @@ ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
 
-$sql_log = mysqli_query($con, "SELECT * from log_status_matching where ids = '$_GET[idm]' order by id desc");
+$sql_log = sqlsrv_query($con, "SELECT * from db_laborat.log_status_matching where ids = ? order by id desc", [$_GET['idm']]);
 
 ?>
 <style>
@@ -195,13 +195,18 @@ $sql_log = mysqli_query($con, "SELECT * from log_status_matching where ids = '$_
     <div class="modal-body">
         <div class="container">
             <ul class="timeline">
-                <?php while ($li = mysqli_fetch_array($sql_log)) : ?>
+                <?php $i = 0; ?>
+                <?php while ($li = sqlsrv_fetch_array($sql_log, SQLSRV_FETCH_ASSOC)) : ?>
                     <li <?php if (($i % 2) == 0) echo 'class="timeline-inverted"' ?>>
                         <div class="timeline-badge info"><i class="glyphicon glyphicon-tags"></i></div>
                         <div class="timeline-panel">
                             <div class="timeline-heading">
                                 <h4 class="timeline-title"><?php echo $li['do_by'] ?> </h4>
-                                <p><small class="text-muted"><i class="glyphicon glyphicon-time"></i> <?php echo date('Y F l H:i:s', strtotime($li['do_at'])); ?></small></p>
+                                <?php
+                                    $doAt = $li['do_at'];
+                                    if ($doAt instanceof DateTime) $doAt = $doAt->format('Y-m-d H:i:s');
+                                ?>
+                                <p><small class="text-muted"><i class="glyphicon glyphicon-time"></i> <?php echo date('Y F l H:i:s', strtotime($doAt)); ?></small></p>
                             </div>
                             <div class="timeline-body">
                                 <p> Status : <?php echo $li['status'] ?>

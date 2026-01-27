@@ -7,33 +7,40 @@ $jenis_suffix           = $_GET['suffix'];
 $number_suffix          = $_GET['numbersuffix'];
 $userLogin              = $_GET['userLogin'];
 
-// PROSES EXPORT RECIPE
-$recipe = mysqli_query($con, "SELECT b.id AS id_matching, a.id AS id_status, b.recipe_code, a.idm AS SUFFIXCODE, b.warna, 
-                                            case 
-                                                when a.lr = 0 then substring(a.second_lr, 3) 
-                                                else substring(a.lr, 3)
-                                            end AS LR,
-                                            SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 1), ' ', -1) as recipe_code_1,
-                                            SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 2), ' ', -1) as recipe_code_2,
-                                            CASE
-                                                WHEN b.jenis_matching = 'LD NOW' THEN '001'
-                                                WHEN b.jenis_matching = 'L/D' THEN '001'
-                                                ELSE
-                                                    case
-                                                        when SUBSTRING(b.no_resep, 1,2) = 'DR' or SUBSTRING(b.no_resep, 1,2) = 'CD' or SUBSTRING(b.no_resep, 1,2) = 'OB' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 3), 'L'), 4)
-                                                        when SUBSTRING(b.no_resep, 1,2) = 'D2' or SUBSTRING(b.no_resep, 1,2) = 'R2' or SUBSTRING(b.no_resep, 1,2) = 'A2' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 2), 'L'), 4)
-                                                    end 
-                                            END as no_resep_convert,
-                                            b.created_by
-                                        FROM tbl_status_matching a
-                                        INNER JOIN tbl_matching b ON a.idm = b.no_resep
-                                        WHERE a.id = '$idstatus'
-                                        ORDER BY a.id desc limit 1");
+// PROSES EXPORT RECIPE (SQL Server)
+$sqlRecipe = "SELECT TOP 1 
+                    b.id AS id_matching, 
+                    a.id AS id_status, 
+                    b.recipe_code, 
+                    a.idm AS SUFFIXCODE, 
+                    b.warna, 
+                    CASE 
+                        WHEN a.lr = '0' THEN SUBSTRING(CONVERT(VARCHAR(50), a.second_lr), 3, LEN(CONVERT(VARCHAR(50), a.second_lr))) 
+                        ELSE SUBSTRING(CONVERT(VARCHAR(50), a.lr), 3, LEN(CONVERT(VARCHAR(50), a.lr))) 
+                    END AS LR,
+                    PARSENAME(REPLACE(b.recipe_code,' ','.'),1) as recipe_code_1,
+                    PARSENAME(REPLACE(b.recipe_code,' ','.'),2) as recipe_code_2,
+                    CASE
+                        WHEN b.jenis_matching IN ('LD NOW','L/D') THEN '001'
+                        ELSE
+                            CASE
+                                WHEN LEFT(b.no_resep, 2) IN ('DR','CD','OB') THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 3, LEN(b.no_resep)-2), 'L'), 4, 100)
+                                WHEN LEFT(b.no_resep, 2) IN ('D2','R2','A2') THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 2, LEN(b.no_resep)-1), 'L'), 4, 100)
+                            END
+                    END as no_resep_convert,
+                    b.created_by
+                FROM db_laborat.tbl_status_matching a
+                INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                WHERE a.id = ?
+                ORDER BY a.id DESC";
+$recipe = sqlsrv_query($con, $sqlRecipe, [$idstatus]);
+if (!$recipe) {
+    die("Query recipe gagal:\n".print_r(sqlsrv_errors(), true));
+}
 $delimiter = ",";
 $filename = "Recipe_" . $_GET['rcode'] . ".csv";
 
-include("koneksi.php");
-while ($r = mysqli_fetch_assoc($recipe)) {
+while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
     if ($jenis_suffix == "1") {
         $RECIPESUBCODE01 = $r['recipe_code_1'];
     } elseif ($jenis_suffix == "2") {

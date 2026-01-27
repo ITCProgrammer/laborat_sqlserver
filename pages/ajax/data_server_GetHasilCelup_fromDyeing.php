@@ -53,7 +53,7 @@ $sql = "SELECT
             d.l_r, 
             c.no_mesin, 
             d.bruto, 
-            (CAST(d.bruto AS FLOAT) / NULLIF(c.kapasitas, 0) * 100) as loading_fix, 
+            (CAST(d.bruto AS DECIMAL(18,4)) / NULLIF(c.kapasitas, 0) * 100) as loading_fix, 
             z.jenis_note, 
             b.analisa_resep,
             z.note,
@@ -72,9 +72,22 @@ $sql = "SELECT
         WHERE a.idm = ? AND b.rcode = ?
         ORDER BY b.id DESC";
 
-$stmt = sqlsrv_query($con, $sql, [$rcode, $rcode]);
+// tbl_hasilcelup dkk ada di MySQL (db_dying), jadi pakai koneksi mysqli ($con_db_dyeing)
+$stmt = mysqli_prepare($con_db_dyeing, $sql);
+mysqli_stmt_bind_param($stmt, 'ss', $rcode, $rcode);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+if (!$result) {
+    http_response_code(500);
+    echo json_encode([
+        'error' => mysqli_error($con_db_dyeing),
+        'sql'   => $sql,
+        'params'=> [$rcode, $rcode]
+    ]);
+    exit;
+}
 $rows = [];
-while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+while ($r = mysqli_fetch_assoc($result)) {
     $rows[] = $r;
 }
 

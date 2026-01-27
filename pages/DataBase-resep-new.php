@@ -121,14 +121,15 @@
                     <div class="col-lg-12 overflow-auto table-responsive" style="overflow-x: auto;">
                         <?php
                         if($Nowarna!="" or $Item!="" or $RCode!="" or $OrderAsal!="" or $Warna!="" or $JMatching!=""){
-                        $sql = mysqli_query($con,"SELECT a.id, a.idm, b.no_order, c.flag, a.grp, b.jenis_kain, c.`order`, c.lot, b.no_item, b.no_po, b.no_warna, b.warna, c.created_at, c.created_by, b.langganan 
-                                            FROM tbl_status_matching a JOIN tbl_matching b ON b.no_resep = a.idm JOIN tbl_orderchild c ON c.id_status = a.id AND c.id_matching = b.id 
-                                            WHERE a.approve = 'TRUE' AND a.status = 'selesai' AND a.idm LIKE '%$RCode%' AND b.no_warna LIKE '%$Nowarna%' AND b.no_item LIKE '%$Item%' AND c.`order` LIKE '%$OrderAsal%' AND b.jenis_matching LIKE '%$JMatching%' AND b.warna LIKE '%$Warna%'
-                                            ORDER BY a.id DESC");
+                        $sql = sqlsrv_query($con,"SELECT a.id, a.idm, b.no_order, c.flag, a.grp, b.jenis_kain, c.[order], c.lot, b.no_item, b.no_po, b.no_warna, b.warna, c.created_at, c.created_by, b.langganan 
+                                            FROM db_laborat.tbl_status_matching a JOIN db_laborat.tbl_matching b ON b.no_resep = a.idm JOIN db_laborat.tbl_orderchild c ON c.id_status = a.id AND c.id_matching = b.id 
+                                            WHERE a.approve = 'TRUE' AND a.status = 'selesai' AND a.idm LIKE ? AND b.no_warna LIKE ? AND b.no_item LIKE ? AND c.[order] LIKE ? AND b.jenis_matching LIKE ? AND b.warna LIKE ?
+                                            ORDER BY a.id DESC",
+                                            ['%'.$RCode.'%','%'.$Nowarna.'%','%'.$Item.'%','%'.$OrderAsal.'%','%'.$JMatching.'%','%'.$Warna.'%']);
                         }else{
-                        $sql = mysqli_query($con,"SELECT a.id, a.idm, b.no_order, c.flag, a.grp, b.jenis_kain, c.`order`, c.lot, b.no_item, b.no_po, b.no_warna, b.warna, c.created_at, c.created_by, b.langganan 
-                                            FROM tbl_status_matching a JOIN tbl_matching b ON b.no_resep = a.idm JOIN tbl_orderchild c ON c.id_status = a.id AND c.id_matching = b.id 
-                                            WHERE a.approve = 'TRUE' AND a.status = 'selesai' ORDER BY a.id DESC LIMIT 100");    
+                        $sql = sqlsrv_query($con,"SELECT TOP 100 a.id, a.idm, b.no_order, c.flag, a.grp, b.jenis_kain, c.[order], c.lot, b.no_item, b.no_po, b.no_warna, b.warna, c.created_at, c.created_by, b.langganan 
+                                            FROM db_laborat.tbl_status_matching a JOIN db_laborat.tbl_matching b ON b.no_resep = a.idm JOIN db_laborat.tbl_orderchild c ON c.id_status = a.id AND c.id_matching = b.id 
+                                            WHERE a.approve = 'TRUE' AND a.status = 'selesai' ORDER BY a.id DESC");    
                         }
                         ?>
                         <table id="Table-sm" class="table table-sm display compact" style="width: 100%;">
@@ -143,7 +144,7 @@
                             </thead>
                             <tbody>
                                 <?php 
-                                while ($row = mysqli_fetch_array($sql)) { ?>
+                                while ($row = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) { ?>
                                     <tr>
                                         <td>
                                             <b>▕ Rcode > <?php echo $row['idm'] ?> &nbsp;&nbsp;▕&nbsp;&nbsp;J.kain > <?php echo $row['jenis_kain'] ?> <br />
