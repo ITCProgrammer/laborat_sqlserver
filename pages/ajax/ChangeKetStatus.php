@@ -1,24 +1,19 @@
 <?php
 ini_set("error_reporting", 1);
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 session_start();
 $time = date('Y-m-d H:i:s');
 
-$dataMain = mysqli_query($con,"UPDATE 
-                                    tbl_status_matching 
-                                SET
-                                    kt_status = '$_POST[newStatus]'
-                                WHERE
-                                    id = '$_POST[id_status]'");
+$newStatus = $_POST['newStatus'] ?? '';
+$idStatus  = $_POST['id_status'] ?? '';
+$idm       = $_POST['idm'] ?? '';
+$userLab   = $_SESSION['userLAB'] ?? '';
+$ip_num    = $_SERVER['REMOTE_ADDR'] ?? '';
 
-$ip_num = $_SERVER['REMOTE_ADDR'];
-mysqli_query($con,"INSERT INTO log_status_matching SET
-                    `ids` = '$_POST[idm]', 
-                    `status` = 'Change ket status to', 
-                    `info` = '$_POST[newStatus]', 
-                    `do_by` = '$_SESSION[userLAB]', 
-                    `do_at` = '$time', 
-                    `ip_address` = '$ip_num'");
+sqlsrv_query($con, "UPDATE db_laborat.tbl_status_matching SET kt_status = ? WHERE id = ?", [$newStatus, $idStatus]);
+sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+                    VALUES (?, 'Change ket status to', ?, ?, ?, ?)",
+                    [$idm, $newStatus, $userLab, $time, $ip_num]);
 
 $response = array(
     'session' => 'LIB_SUCCSS',

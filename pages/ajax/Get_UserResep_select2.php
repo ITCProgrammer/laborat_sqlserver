@@ -2,22 +2,17 @@
 ini_set("error_reporting", 1);
 include "../../koneksi.php";
 
-$search = $_GET['search'];
+$search = isset($_GET['search']) ? $_GET['search'] : '';
 if ($search == "") {
-    $sql = mysqli_query($con,"SELECT id, nama, is_active FROM tbl_user_resep where `is_active` = 'TRUE'");
+    $sql = sqlsrv_query($con,"SELECT id, nama, is_active FROM db_laborat.tbl_user_resep where is_active = 'TRUE'");
 } else {
-    $sql = mysqli_query($con,"SELECT id, nama, is_active FROM tbl_user_resep where `is_active` = 'TRUE' and nama like '%$search%'");
+    $like = '%'.$search.'%';
+    $sql = sqlsrv_query($con,"SELECT id, nama, is_active FROM db_laborat.tbl_user_resep where is_active = 'TRUE' and nama like ?", [$like]);
 }
-$result = mysqli_num_rows($sql);
-if ($result > 0) {
-    $list = array();
-    $key = 0;
-    while ($row = mysqli_fetch_array($sql)) {
-        $list[$key]['id'] = $row['nama'];
-        $list[$key]['text'] = $row['nama'];
-        $key++;
+$list = array();
+if ($sql) {
+    while ($row = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) {
+        $list[] = ['id' => $row['nama'], 'text' => $row['nama']];
     }
-    echo json_encode($list);
-} else {
-    echo "Keyword tidak cocok!";
 }
+echo json_encode($list);

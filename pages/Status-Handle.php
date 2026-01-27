@@ -3,28 +3,30 @@ ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
 $date = date('Y-m-d');
-$sql = mysqli_query($con, "SELECT a.id as id_status, a.idm, a.flag, a.grp, a.matcher, a.cek_warna, a.cek_dye, a.status, a.kt_status, a.koreksi_resep, a.koreksi_resep2,
+
+$idmReq = $_GET['idm'] ?? '';
+$stmt = sqlsrv_query($con, "SELECT TOP 1 a.id as id_status, a.idm, a.flag, a.grp, a.matcher, a.cek_warna, a.cek_dye, a.status, a.kt_status, a.koreksi_resep, a.koreksi_resep2,
                                 a.percobaan_ke, a.benang_aktual, a.lebar_aktual, a.gramasi_aktual, a.soaping_sh, a.soaping_tm, a.rc_sh, a.rc_tm, a.lr, a.cie_wi, a.cie_tint, a.yellowness,
                                 a.spektro_r, a.ket, a.created_at as tgl_buat_status, a.created_by as status_created_by, a.edited_at, a.edited_by, a.target_selesai, 
                                 a.mulai_by, a.mulai_at, a.selesai_by, a.selesai_at, a.approve_by, a.approve_at, a.approve, b.id, b.no_resep, b.no_order, b.no_po, b.langganan, b.no_item,
                                 b.jenis_kain, b.benang, b.cocok_warna, b.warna, b.no_warna, b.lebar, b.gramasi, b.qty_order, b.tgl_in, b.tgl_out, b.proses, b.buyer,
                                 b.tgl_delivery, b.note, b.jenis_matching, b.tgl_buat, b.tgl_update, b.created_by, a.bleaching_sh, a.bleaching_tm,b.color_code,b.recipe_code,
                                 b.suhu_chamber, b.warna_flourescent
-                                FROM tbl_status_matching a
-                                INNER JOIN tbl_matching b ON a.idm = b.no_resep
-                                where a.id = '$_GET[idm]'
-                                ORDER BY a.id desc limit 1");
-$data = mysqli_fetch_array($sql);
-// Mulai sesi
-session_start();
+                                FROM db_laborat.tbl_status_matching a
+                                INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                                WHERE a.id = ?
+                                ORDER BY a.id desc", [$idmReq]);
+$data = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 
-// Mendapatkan nilai $ldorno dari $data["jenis_matching"]
-$ldorno = $data["jenis_matching"];
+// Format semua field DateTime menjadi string agar tidak memutus rendering
+foreach (['tgl_buat_status','edited_at','target_selesai','mulai_at','selesai_at','approve_at','tgl_buat','tgl_update','tgl_delivery','tgl_in','tgl_out'] as $dtField){
+    if (isset($data[$dtField]) && $data[$dtField] instanceof DateTimeInterface){
+        $data[$dtField] = $data[$dtField]->format('Y-m-d H:i:s');
+    }
+}
 
-// Simpan nilai $ldorno dalam sesi
+$ldorno = $data["jenis_matching"] ?? '';
 $_SESSION['jenis_matching'] = $ldorno;
-
-// echo $data['recipe_code'];
 ?>
 <style>
     #Table-sm td,
@@ -312,8 +314,9 @@ $_SESSION['jenis_matching'] = $ldorno;
                             <label for="lampu" class="col-sm-3 control-label">Lampu Buyer :</label>
                             <div class="col-sm-9" id="lampu-buyer1">
                                 <!-- i do some magic here  -->
-                                <?php $sqlLamp = mysqli_query($con, "SELECT * FROM vpot_lampbuy where buyer = '$data[buyer]'"); ?>
-                                <?php while ($lamp = mysqli_fetch_array($sqlLamp)) { ?>
+                                <?php 
+                                  $sqlLamp = sqlsrv_query($con, "SELECT lampu FROM db_laborat.vpot_lampbuy WHERE buyer = ?", [$data['buyer']]); 
+                                  while ($lamp = sqlsrv_fetch_array($sqlLamp, SQLSRV_FETCH_ASSOC)) { ?>
                                     <div class="col-sm-3">
                                         <input type="text" class="form-control input-sm" value="<?php echo $lamp['lampu'] ?>" readonly>
                                     </div>

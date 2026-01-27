@@ -3,6 +3,11 @@ ini_set("error_reporting", 1);
 session_start();
 include __DIR__ . "/koneksi.php";
 
+function fmtDT($v){
+  if ($v instanceof DateTimeInterface) return $v->format('Y-m-d H:i:s');
+  return $v;
+}
+
 ?>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -194,8 +199,13 @@ include __DIR__ . "/koneksi.php";
                     </td>
                     <td valign="center" align="center">
                       <?php
-                        $awal  = strtotime($r['tgl_buat_status']);
-                        $akhir = strtotime(date('Y-m-d H:i:s'));
+                        $tglStatus = $r['tgl_buat_status'];
+                        if ($tglStatus instanceof DateTimeInterface) {
+                          $awal = $tglStatus->getTimestamp();
+                        } else {
+                          $awal = strtotime((string)$tglStatus);
+                        }
+                        $akhir = time();
                         $diff  = $akhir - $awal;
 
                         $hari  = floor($diff / (60 * 60 * 24));
@@ -206,11 +216,17 @@ include __DIR__ . "/koneksi.php";
                       ?>
 
                     </td>
-                    <td valign="center" class="13"><?php echo $r['tgl_buat'] ?></td>
-                    <td class="14"><?php echo $r['tgl_buat_status'] ?></td>
+                    <td valign="center" class="13"><?php
+                        $tgl_buat = $r['tgl_buat'];
+                        echo ($tgl_buat instanceof DateTimeInterface) ? $tgl_buat->format('Y-m-d H:i:s') : $tgl_buat;
+                    ?></td>
+                    <td class="14"><?php
+                        $tgl_buat_status = $r['tgl_buat_status'];
+                        echo ($tgl_buat_status instanceof DateTimeInterface) ? $tgl_buat_status->format('Y-m-d H:i:s') : $tgl_buat_status;
+                    ?></td>
                     <td class="15"><?php echo $r['created_by'] ?></td>
                     <td class="16"><?php echo $r['status_created_by'] ?></td>
-                    <td class="17"><?php echo $r['tgl_selesai'] ?></td>
+                    <td class="17"><?php echo fmtDT($r['tgl_selesai']) ?></td>
                     <td class="18"><?php echo $r['jenis_matching'] ?></td>
                     <td class="19"><?php echo $r['no_po'] ?></td>
                     <td class="20"><?php echo $r['jenis_kain'] ?></td>
@@ -224,9 +240,9 @@ include __DIR__ . "/koneksi.php";
                     <td class="28"><?php echo $r['koreksi_resep'] ?></td>
                     <td class="29"><?php echo $r['cocok_warna'] ?></td>
                     <td class="30"><?php echo $r['qty_order'] ?></td>
-                    <td class="31"><?php echo $r['tgl_delivery'] ?></td>
-                    <td class="32"><?php echo $r['tgl_in'] ?></td>
-                    <td class="33"><?php echo $r['tgl_out'] ?></td>
+                    <td class="31"><?php echo ($r['tgl_delivery'] instanceof DateTimeInterface) ? $r['tgl_delivery']->format('Y-m-d') : $r['tgl_delivery']; ?></td>
+                    <td class="32"><?php echo ($r['tgl_in'] instanceof DateTimeInterface) ? $r['tgl_in']->format('Y-m-d H:i:s') : $r['tgl_in']; ?></td>
+                    <td class="33"><?php echo ($r['tgl_out'] instanceof DateTimeInterface) ? $r['tgl_out']->format('Y-m-d H:i:s') : $r['tgl_out']; ?></td>
                     <td class="34"><?php echo $r['ket'] ?></td>
                     <td class="35"><?php
                                     if ($r['ck_d65'] == 1) {
@@ -297,7 +313,7 @@ include __DIR__ . "/koneksi.php";
                           <?php if ($r['status'] == 'hold' or $r['status'] == 'revisi') { ?>
                             <a href="?p=Hold-Handle&idm=<?php echo $r['id_status'] ?>" class="btn btn-xs bg-purple">Lanjut <i class="fa fa-edit"></i></a>
 
-                          <?php } else { ?></php>
+                          <?php } else { ?>
                             <a style="color: white;" href="?p=Status-Handle&idm=<?php echo $r['id_status'] ?>" class="btn btn-xs btn-success">Resep! <i class="fa fa-pencil"></i></a>
                             <!-- <a style="color: white;" href="?p=Status-Handle-NOW&idm=<?php echo $r['id_status'] ?>" class="btn btn-xs btn-success">Resep NOW! <i class="fa fa-pencil"></i></a> -->
                             <a href="#" class="btn btn-xs btn-danger _ketstatus" value="<?= $r['kt_status'] ?>" attribute="<?= $r['id_status'] ?>" codem="<?= $r['idm'] ?>">Ket. Status <i class="fa fa-exchange" aria-hidden="true"></i>
@@ -314,7 +330,7 @@ include __DIR__ . "/koneksi.php";
                     <?php } ?>
                     <td class="39"><?php echo $r['status'] ?></td>
                   </tr>
-                <?php } ?>
+                <?php } } ?>
               </tbody>
             </table>
           </div>

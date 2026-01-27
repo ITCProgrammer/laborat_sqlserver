@@ -10,31 +10,24 @@
 
     // Validasi kolom yang boleh di-update
     $allowed = ['suhu_chamber', 'warna_flourescent'];
-        if (!$idm || !in_array($setting, $allowed)) {
+    if (!$idm || !in_array($setting, $allowed)) {
         exit('Invalid request');
     }
 
     // 1. Ambil no_resep dari tbl_status_matching
-    $query      = "SELECT idm AS no_resep FROM tbl_status_matching WHERE id = '$idm'";
-    $result     = mysqli_query($con, $query);
-    $row        = mysqli_fetch_assoc($result);
-    $no_resep   = $row['no_resep'] ?? '';
+    $stmt = sqlsrv_query($con, "SELECT idm AS no_resep FROM db_laborat.tbl_status_matching WHERE id = ?", [$idm]);
+    $row  = $stmt ? sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC) : null;
+    $no_resep = $row['no_resep'] ?? '';
 
     if ($no_resep) {
         // 2. Update tbl_matching pakai no_resep
-        $update = "UPDATE tbl_matching SET $setting = '$value' WHERE no_resep = '$no_resep'";
-        if (mysqli_query($con, $update)) {
+        $update = sqlsrv_query($con, "UPDATE db_laborat.tbl_matching SET $setting = ? WHERE no_resep = ?", [$value, $no_resep]);
+        if ($update) {
             // 3. Log perubahan
-            $SQL_rcode  = mysqli_query($con,"SELECT idm from tbl_status_matching where idm = '$idm' LIMIT 1");
-            $rcode_ = mysqli_fetch_array($SQL_rcode);
             $ip_num = $_SERVER['REMOTE_ADDR'];
-            mysqli_query($con,"INSERT INTO log_status_matching set 
-                                    `ids` = '$rcode_[idm]',
-                                    `status` = 'selesai',
-                                    `info` = 'Perubaahan $setting menjadi $value',
-                                    `do_by` = '$_SESSION[userLAB]', 
-                                    `do_at` = '$time', 
-                                    `ip_address` = '$ip_num'");
+            sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids,status,info,do_by,do_at,ip_address)
+                                VALUES (?,?,?,?,?,?)",
+                                [$no_resep, 'selesai', "Perubahan $setting menjadi $value", $_SESSION['userLAB'], $time, $ip_num]);
             echo 'OK';
         } else {
             echo 'ERROR';
@@ -43,5 +36,5 @@
         echo 'ERROR';
     }
 
-    mysqli_close($con);
+    sqlsrv_close($con);
 ?>

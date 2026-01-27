@@ -1,21 +1,18 @@
 <?php
 ini_set("error_reporting", 1);
-include "../../koneksi.php";
+include __DIR__ . "/../../koneksi.php";
 session_start();
 $time = date('Y-m-d H:i:s');
 $ip_num = $_SERVER['REMOTE_ADDR'];
-mysqli_query($con,"UPDATE `tbl_status_matching` SET
-            `status`='hold'
-            where `id` = '$_POST[id_status]'");
-$sqlNoResep = mysqli_query($con,"SELECT idm from tbl_status_matching where id = '$_POST[id_status]'");
-$NoResep = mysqli_fetch_array($sqlNoResep);
-mysqli_query($con,"INSERT INTO log_status_matching SET
-            `ids` = '$NoResep[idm]', 
-            `status` = 'hold', 
-            `info` = 'lanjutkan after wait', 
-            `do_by` = '$_SESSION[userLAB]', 
-            `do_at` = '$time', 
-            `ip_address` = '$ip_num'");
+$idStatus = $_POST['id_status'] ?? '';
+$user = $_SESSION['userLAB'] ?? '';
+
+sqlsrv_query($con, "UPDATE db_laborat.tbl_status_matching SET status='hold' WHERE id = ?", [$idStatus]);
+$sqlNoResep = sqlsrv_query($con, "SELECT idm FROM db_laborat.tbl_status_matching WHERE id = ?", [$idStatus]);
+$NoResep = sqlsrv_fetch_array($sqlNoResep, SQLSRV_FETCH_ASSOC);
+$idm = $NoResep['idm'] ?? '';
+sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+            VALUES (?, 'hold', 'lanjutkan after wait', ?, ?, ?)", [$idm, $user, $time, $ip_num]);
 
 $response = array(
     'session' => 'LIB_SUCCSS',

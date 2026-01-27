@@ -2,10 +2,22 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
+$time = date('Y-m-d H:i:s');
+
+// helper untuk menampilkan pesan error SQLSRV lalu stop
+function stopOnFail($stmt, $context)
+{
+    if ($stmt === false) {
+        $err = print_r(sqlsrv_errors(), true);
+        echo "<pre>[$context] gagal.\n$err</pre>";
+        exit;
+    }
+}
+
 $id_matching = $_POST['id_matching'];
 $id_status = $_POST['id_status'];
-mysqli_query($con,"delete from tbl_matching_detail where id_matching = '$id_matching' and id_status = '$id_status'");
-mysqli_query($con,"UPDATE `tbl_status_matching` SET `status` = 'hold' where id = '$id_status'");
+stopOnFail(sqlsrv_query($con,"DELETE FROM db_laborat.tbl_matching_detail WHERE id_matching = ? AND id_status = ?", [$id_matching, $id_status]), 'hapus detail lama');
+stopOnFail(sqlsrv_query($con,"UPDATE db_laborat.tbl_status_matching SET status = 'hold' WHERE id = ?", [$id_status]), 'update status hold');
 if (isset($_POST['submit'])) {
 
     // define attribute from multipart form appart
@@ -51,6 +63,7 @@ if (isset($_POST['submit'])) {
     // define txt to object array/json.
     $file = new SplFileObject('uploads/' . $fname);
     // wrapping array per line.
+    $parts = [];
     while (!$file->eof()) {
         $line = $file->fgets();
         $parts[] = preg_split('/  +/', $line);
@@ -67,38 +80,29 @@ if (isset($_POST['submit'])) {
                 $dyess = trim($parts[$i][0]);
                 $qty = floatval(substr(trim($parts[$i][1]), 0, -1));
                 $C_uom = substr(trim($parts[$i][1]), -1);
-                $sql = mysqli_query($con,"SELECT `Product_Name` from tbl_dyestuff where `code` = '$dyess' LIMIT 1");
-                $data = mysqli_fetch_array($sql);
+                $sql = sqlsrv_query($con,"SELECT TOP 1 Product_Name from db_laborat.tbl_dyestuff where code = ?", [$dyess]);
+                stopOnFail($sql, "lookup code $dyess");
+                $data = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
                 if ($C_uom == 'F') {
                     $uom = '(%)';
                 } else if ($C_uom == 'G') {
                     $uom = '(Gr/L)';
                 }
-                mysqli_query($con,"INSERT into tbl_matching_detail set 
-                        `id_matching` = '$id_matching',
-                        `id_status` = '$id_status',
-                        `flag` = '$i',
-                        `kode` = '$dyess',
-                        `nama` = '$data[Product_Name] $uom',
-                        `conc1` = '$qty',
-                        `time_1` = now(),
-                        `doby1` = '$_SESSION[userLAB]',
-                        `remark` = 'from Co-power',
-                        `inserted_at` = now(),
-                        `inserted_by` = '$_SESSION[userLAB]'");
+                $ins = sqlsrv_query($con,"INSERT INTO db_laborat.tbl_matching_detail 
+                        (id_matching,id_status,resep,flag,kode,nama,conc1,time_1,doby1,remark,inserted_at,inserted_by)
+                        VALUES (?,?,?,?,?,?,?,GETDATE(),?, 'from Co-power',GETDATE(),?)",
+                        [$id_matching,$id_status,$rcode,$i,$dyess,$data['Product_Name']." ".$uom,$qty,$_SESSION['userLAB'],$_SESSION['userLAB']]);
+                stopOnFail($ins, "insert detail $dyess");
             }
         }
     }
-    $sqlNoResep = mysqli_query($con,"SELECT idm from tbl_status_matching where id = '$id_status'");
-    $NoResep = mysqli_fetch_array($sqlNoResep);
+    $sqlNoResep = sqlsrv_query($con,"SELECT idm from db_laborat.tbl_status_matching where id = ?",[$id_status]);
+    stopOnFail($sqlNoResep, 'ambil no resep');
+    $NoResep = sqlsrv_fetch_array($sqlNoResep, SQLSRV_FETCH_ASSOC);
     $ip_num = $_SERVER['REMOTE_ADDR'];
-    mysqli_query($con,"INSERT INTO log_status_matching SET
-            `ids` = '$NoResep[idm]', 
-            `status` = 'hold', 
-            `info` = 'Import data from $fname', 
-            `do_by` = '$_SESSION[userLAB]', 
-            `do_at` = '$time', 
-            `ip_address` = '$ip_num'");
+    stopOnFail(sqlsrv_query($con,"INSERT INTO db_laborat.log_status_matching (ids,status,info,do_by,do_at,ip_address)
+            VALUES (?, 'hold', ?, ?, ?, ?)",
+            [$NoResep['idm'], "Import data from $fname", $_SESSION['userLAB'], $time, $ip_num]), 'log import');
 
     echo "<script>location.href='index1.php?p=Hold-Handle&idm=" . $id_status . "';</script>";
 }
