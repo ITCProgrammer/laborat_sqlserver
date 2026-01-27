@@ -61,7 +61,13 @@ while ($row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC)) {
     $nestedData[] = $row["order"];
     $nestedData[] = $row["lot"];
     $nestedData[] = $row["jenis_benang"];
-    $nestedData[] = substr($row["created_at"], 0, 10);
+    $created = $row["created_at"];
+    if ($created instanceof DateTimeInterface) {
+        $created = $created->format('Y-m-d');
+    } else {
+        $created = substr((string)$created, 0, 10);
+    }
+    $nestedData[] = $created;
     $data[] = $nestedData;
 }
 sqlsrv_free_stmt($query);
