@@ -43,7 +43,9 @@ if (!$lastCekLog) {
 }
 
 if (!$bolehAkses) {
-    http_response_code(423); // Locked
+    if (!headers_sent()) {
+        http_response_code(423); // Locked
+    }
     $pemegang = htmlspecialchars($lastCekLog['username'] ?? '-', ENT_QUOTES);
     $status   = htmlspecialchars($lastCekLog['status'] ?? '-', ENT_QUOTES);
     $rawWaktu = $lastCekLog['creationdatetime'] ?? '-';
