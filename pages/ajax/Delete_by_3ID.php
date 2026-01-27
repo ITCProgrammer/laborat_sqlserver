@@ -3,54 +3,42 @@ ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
 $time = date('Y-m-d H:i:s');
+
 function get_client_ip()
 {
-    $ipaddress = '';
-    if (isset($_SERVER['HTTP_CLIENT_IP']))
-        $ipaddress = $_SERVER['HTTP_CLIENT_IP'];
-    else if (isset($_SERVER['HTTP_X_FORWARDED_FOR']))
-        $ipaddress = $_SERVER['HTTP_X_FORWARDED_FOR'];
-    else if (isset($_SERVER['HTTP_X_FORWARDED']))
-        $ipaddress = $_SERVER['HTTP_X_FORWARDED'];
-    else if (isset($_SERVER['HTTP_FORWARDED_FOR']))
-        $ipaddress = $_SERVER['HTTP_FORWARDED_FOR'];
-    else if (isset($_SERVER['HTTP_FORWARDED']))
-        $ipaddress = $_SERVER['HTTP_FORWARDED'];
-    else if (isset($_SERVER['REMOTE_ADDR']))
-        $ipaddress = $_SERVER['REMOTE_ADDR'];
-    else
-        $ipaddress = 'UNKNOWN';
-    return $ipaddress;
+    foreach (['HTTP_CLIENT_IP','HTTP_X_FORWARDED_FOR','HTTP_X_FORWARDED','HTTP_FORWARDED_FOR','HTTP_FORWARDED','REMOTE_ADDR'] as $k) {
+        if (!empty($_SERVER[$k])) return $_SERVER[$k];
+    }
+    return 'UNKNOWN';
 }
 $ip = get_client_ip();
-$sql = mysqli_query($con,"SELECT id, no_order, jenis_matching from tbl_matching where no_resep = '$_POST[idm]' LIMIT 1");
-$data = mysqli_fetch_array($sql);
-mysqli_query($con,"INSERT INTO `historical_delete_matching` SET
-`no_matching`= '$_POST[idm]',
-`id_matching`= '$_POST[id_matching]',
-`id_status`= '$_POST[id_status]',
-`jenis_matching` = '$data[jenis_matching]',
-`ip_adress`= '$ip',
-`delete_at`= '$time',
-`delete_by`= '$_SESSION[userLAB]',
-`why_delete`= '$_POST[why_batal]',
-`no_order` = '$_POST[no_order]'");
-mysqli_query($con,"DELETE from `tbl_matching_detail` where `id_matching`='$_POST[id_matching]' and `id_status`='$_POST[id_status]'");
-mysqli_query($con,"DELETE from `tbl_status_matching` where `id`='$_POST[id_status]'");
-mysqli_query($con,"DELETE from `tbl_matching` where `no_resep`='$_POST[idm]'");
+
+$fail = function($ctx){
+    echo json_encode(['session'=>'ERROR','ctx'=>$ctx,'sqlsrv'=>sqlsrv_errors()]);
+    exit;
+};
+
+$stmt = sqlsrv_query($con,"SELECT TOP 1 id, no_order, jenis_matching from db_laborat.tbl_matching where no_resep = ?", [$_POST['idm']]);
+if(!$stmt) $fail('get_matching');
+$data = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+
+if(!sqlsrv_query($con,"INSERT INTO db_laborat.historical_delete_matching
+    (no_matching,id_matching,id_status,jenis_matching,ip_adress,delete_at,delete_by,why_delete,no_order)
+    VALUES (?,?,?,?,?,?,?,?,?)",
+    [$_POST['idm'], $_POST['id_matching'], $_POST['id_status'], $data['jenis_matching'], $ip, $time, $_SESSION['userLAB'], $_POST['why_batal'], $_POST['no_order']])) $fail('insert_history');
+
+if(!sqlsrv_query($con,"DELETE from db_laborat.tbl_matching_detail where id_matching=? and id_status=?", [$_POST['id_matching'], $_POST['id_status']])) $fail('del_detail');
+if(!sqlsrv_query($con,"DELETE from db_laborat.tbl_status_matching where id=?", [$_POST['id_status']])) $fail('del_status');
+if(!sqlsrv_query($con,"DELETE from db_laborat.tbl_matching where no_resep=?", [$_POST['idm']])) $fail('del_matching');
 
 $ip_num = $_SERVER['REMOTE_ADDR'];
-mysqli_query($con,"INSERT INTO log_status_matching SET
-            `ids` = '$_POST[idm]', 
-            `status` = 'deleted', 
-            `info` = '$_POST[why_batal]', 
-            `do_by` = '$_SESSION[userLAB]', 
-            `do_at` = '$time', 
-            `ip_address` = '$ip_num'");
+if(!sqlsrv_query($con,"INSERT INTO db_laborat.log_status_matching (ids,status,info,do_by,do_at,ip_address)
+            VALUES (?,?,?,?,?,?)",
+            [$_POST['idm'], 'deleted', $_POST['why_batal'], $_SESSION['userLAB'], $time, $ip_num])) $fail('insert_log');
 
-$response = array(
+echo json_encode([
     'session' => 'LIB_SUCCSS',
     'exp' => 'updated',
     'ip_address' => $ip
-);
-echo json_encode($response);
+]);
+?>

@@ -3,6 +3,10 @@ ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
 
+$fmtDT = function($v){
+    return ($v instanceof DateTime) ? $v->format('Y-m-d H:i:s') : $v;
+};
+
 ?>
 
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -103,14 +107,19 @@ include "koneksi.php";
                             </thead>
                             <tbody>
                                 <?php
-                                $sql = mysqli_query($con,"SELECT *,  a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
-                                FROM tbl_status_matching a
-                                INNER JOIN tbl_matching b ON a.idm = b.no_resep
+                                $sql = sqlsrv_query($con,"SELECT a.*, b.*, a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
+                                FROM db_laborat.tbl_status_matching a
+                                INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
                                 where a.status in ('selesai', 'batal') and a.approve = 'NONE'
-                                ORDER BY a.id desc;");
-                                while ($r = mysqli_fetch_array($sql)) {
+                                ORDER BY a.id desc");
+                                while ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) {
                                     $no++;
                                     $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
+                                    // normalisasi tanggal agar aman untuk strtotime/echo
+                                    $r['tgl_buat_status'] = $fmtDT($r['tgl_buat_status']);
+                                    $r['tgl_buat']        = $fmtDT($r['tgl_buat']);
+                                    $r['tgl_selesai']     = $fmtDT($r['tgl_selesai']);
+                                    $r['tgl_delivery']    = $fmtDT($r['tgl_delivery']);
                                 ?>
                                     <tr>
                                         <td valign="center" class="details-control">
@@ -213,10 +222,9 @@ include "koneksi.php";
                                         <td class="34"><?php echo $r['ket'] ?></td>
                                         <td class="35">
                                             <?php
-                                            $sqlLamp = mysqli_query($con,"SELECT group_concat(lampu) as lampus
-                                                FROM db_laborat.vpot_lampbuy where buyer='$r[buyer]' group by buyer;");
-                                            $Lamp = mysqli_fetch_array($sqlLamp);
-                                            echo $Lamp['lampus'] . " (" . $r['buyer'] . ")";
+                                            $sqlLamp = sqlsrv_query($con,"SELECT STRING_AGG(lampu, ', ') AS lampus FROM db_laborat.vpot_lampbuy WHERE buyer = ? GROUP BY buyer", [$r['buyer']]);
+                                            $Lamp = $sqlLamp ? sqlsrv_fetch_array($sqlLamp, SQLSRV_FETCH_ASSOC) : null;
+                                            echo ($Lamp['lampus'] ?? '-') . " (" . $r['buyer'] . ")";
                                             ?>
                                         </td>
                                         <td class="36"><?php echo $r['proses'] ?></td>
