@@ -68,10 +68,10 @@ register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$co
         }
     }
 
-    if ($con_nowprd) {
+    if (is_resource($con_nowprd) && get_resource_type($con_nowprd) === 'SQL Server Connection') {
         sqlsrv_close($con_nowprd);
     }
-    if ($con) {
+    if (is_resource($con) && get_resource_type($con) === 'SQL Server Connection') {
         sqlsrv_close($con);
     }
     // $conn1 adalah pconnect DB2, dibiarkan agar tetap persistent.

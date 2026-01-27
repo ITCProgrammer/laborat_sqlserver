@@ -414,10 +414,11 @@ $role = $_SESSION['jabatanLAB']
                                         setting: 'suhu_chamber',
                                         value: value
                                     }, function (response) {
-                                        if (response.trim() === 'OK') {
+                                        const resp = (response || '').toString().trim();
+                                        if (resp === 'OK') {
                                             Swal.fire('Berhasil', 'Suhu Chamber berhasil diperbarui!', 'success');
                                         } else {
-                                            Swal.fire('Gagal', 'Terjadi kesalahan saat memperbarui.', 'error');
+                                            Swal.fire('Gagal', 'Terjadi kesalahan: ' + resp, 'error');
                                         }
                                     });
                                 }
@@ -458,10 +459,11 @@ $role = $_SESSION['jabatanLAB']
                                         setting: 'warna_flourescent',
                                         value: isChecked
                                     }, function (response) {
-                                        if (response.trim() === 'OK') {
+                                        const resp = (response || '').toString().trim();
+                                        if (resp === 'OK') {
                                             Swal.fire('Berhasil', 'Pengaturan Warna Fluorescent berhasil diperbarui!', 'success');
                                         } else {
-                                            Swal.fire('Gagal', 'Terjadi kesalahan saat memperbarui.', 'error');
+                                            Swal.fire('Gagal', 'Terjadi kesalahan: ' + resp, 'error');
                                         }
                                     });
                                 });
@@ -1209,6 +1211,12 @@ $role = $_SESSION['jabatanLAB']
             enableScroll();
             window.location.href = 'index1.php?p=Status-Matching';
         }, 4000);
+    }
+
+    // stop spinner tanpa redirect (untuk error AJAX)
+    function SpinnerStop() {
+        spinner.hide();
+        enableScroll();
     }
 
     $(function() {
@@ -2713,16 +2721,23 @@ $role = $_SESSION['jabatanLAB']
                     second_lr: second_lr
                 },
                 success: function(response) {
+                    if (response.status === 'error') {
+                        SpinnerStop();
+                        toastr.error((response.ctx || 'insert detail error') + ' ' + (response.sqlsrv || ''));
+                        return;
+                    }
                     if (response.session == "LIB_SUCCSS") {
-                        console.log(response)
+                        console.log(response);
                         Insert_dataTableResep_toDB();
                         // SendMessage(idm);
                     } else {
-                        toastr.error("ajax error !")
+                        SpinnerStop();
+                        toastr.error("ajax error !");
                     }
                 },
-                error: function() {
-                    alert("Error");
+                error: function(xhr) {
+                    SpinnerStop();
+                    alert("Error: " + xhr.status + " " + xhr.responseText);
                 }
             });
         }

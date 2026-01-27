@@ -301,9 +301,10 @@ function fmtDT($v){
                           </a>
                         </li>
                         <br>
-                        <?php $sqlWait = mysqli_query($con,"SELECT max(id) as maxid, `info` from log_status_matching where ids = '$r[id_status]'");
-                        $Wait = mysqli_fetch_array($sqlWait);
-                        echo '<span class="badge">' . $Wait['info'] . '</span>';
+                        <?php
+                          $stmtWait = sqlsrv_query($con,"SELECT TOP 1 info FROM db_laborat.log_status_matching where ids = ? ORDER BY id DESC", [$r['id_status']]);
+                          $Wait = $stmtWait ? sqlsrv_fetch_array($stmtWait, SQLSRV_FETCH_ASSOC) : null;
+                          echo '<span class="badge">' . htmlspecialchars($Wait['info'] ?? '-', ENT_QUOTES) . '</span>';
                         ?>
                       </td>
                     <?php } else { ?>

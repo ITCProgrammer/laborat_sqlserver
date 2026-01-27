@@ -2,141 +2,93 @@
 ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
-$time = date('Y-m-d H:i:s');
-if (!empty($_POST['conc'])) {
-    $conc = $_POST['conc'];
-    $dt = $time;
-    $doby = $_SESSION['userLAB'];
-} else {
-    $conc = "";
-    $dt = "";
-    $doby = "";
-}
-if (!empty($_POST['conc1'])) {
-    $conc1 = $_POST['conc1'];
-    $dt1 = $time;
-    $doby1 = $_SESSION['userLAB'];
-} else {
-    $conc1 = "";
-    $dt1 = "";
-    $doby1 = "";
-}
-if (!empty($_POST['conc2'])) {
-    $conc2 = $_POST['conc2'];
-    $dt2 = $time;
-    $doby2 = $_SESSION['userLAB'];
-} else {
-    $conc2 = "";
-    $dt2 = "";
-    $doby2 = "";
-}
-if (!empty($_POST['conc3'])) {
-    $conc3 = $_POST['conc3'];
-    $dt3 = $time;
-    $doby3 = $_SESSION['userLAB'];
-} else {
-    $conc3 = "";
-    $dt3 = "";
-    $doby3 = "";
-}
-if (!empty($_POST['conc4'])) {
-    $conc4 = $_POST['conc4'];
-    $dt4 = $time;
-    $doby4 = $_SESSION['userLAB'];
-} else {
-    $conc4 = "";
-    $dt4 = "";
-    $doby4 = "";
-}
-if (!empty($_POST['conc5'])) {
-    $conc5 = $_POST['conc5'];
-    $dt5 = $time;
-    $doby5 = $_SESSION['userLAB'];
-} else {
-    $conc5 = "";
-    $dt5 = "";
-    $doby5 = "";
-}
-if (!empty($_POST['conc6'])) {
-    $conc6 = $_POST['conc6'];
-    $dt6 = $time;
-    $doby6 = $_SESSION['userLAB'];
-} else {
-    $conc6 = "";
-    $dt6 = "";
-    $doby6 = "";
-}
-if (!empty($_POST['conc7'])) {
-    $conc7 = $_POST['conc7'];
-    $dt7 = $time;
-    $doby7 = $_SESSION['userLAB'];
-} else {
-    $conc7 = "";
-    $dt7 = "";
-    $doby7 = "";
-}
-if (!empty($_POST['conc8'])) {
-    $conc8 = $_POST['conc8'];
-    $dt8 = $time;
-    $doby8 = $_SESSION['userLAB'];
-} else {
-    $conc8 = "";
-    $dt8 = "";
-    $doby8 = "";
-}
-if (!empty($_POST['conc9'])) {
-    $conc9 = $_POST['conc9'];
-    $dt9 = $time;
-    $doby9 = $_SESSION['userLAB'];
-} else {
-    $conc9 = "";
-    $dt9 = "";
-    $doby9 = "";
-}
-$nama = addslashes($_POST['desc_code']);
-mysqli_query($con,"INSERT INTO `tbl_matching_detail` SET
-                                `flag` = '$_POST[flag]',
-                                `id_matching`= '$_POST[id_matching]',
-                                `id_status` = '$_POST[id_status]',
-                                `kode`= '$_POST[code]',
-                                `nama` = '$nama',
-                                `conc1` = '$conc',
-                                `conc2` = '$conc1',
-                                `conc3` = '$conc2',
-                                `conc4` = '$conc3',
-                                `conc5` = '$conc4',
-                                `conc6` = '$conc5',
-                                `conc7` = '$conc6',
-                                `conc8` = '$conc7',
-                                `conc9` = '$conc8',
-                                `conc10` = '$conc9',
-                                `time_1` = '$dt',
-                                `time_2` = '$dt1',
-                                `time_3` = '$dt2',
-                                `time_4` = '$dt3',
-                                `time_5` = '$dt4',
-                                `time_6` = '$dt5',
-                                `time_7` = '$dt6',
-                                `time_8` = '$dt7',
-                                `time_9` = '$dt8',
-                                `time_10` = '$dt9',
-                                `doby1` = '$doby',
-                                `doby2` = '$doby1',
-                                `doby3` = '$doby2',
-                                `doby4` = '$doby3',
-                                `doby5` = '$doby4',
-                                `doby6` = '$doby5',
-                                `doby7` = '$doby6',
-                                `doby8` = '$doby7',
-                                `doby9` = '$doby8',
-                                `doby10` = '$doby9',
-                                `remark` = '$_POST[keterangan]',
-                                `inserted_at` = '$time',
-                                `inserted_by` = '$_SESSION[userLAB]'
-                                ");
 
-$response = array(
+$time = date('Y-m-d H:i:s');
+$user = $_SESSION['userLAB'] ?? 'unknown';
+
+$val = function($key) {
+    return isset($_POST[$key]) && $_POST[$key] !== '' ? $_POST[$key] : null;
+};
+
+$id_status   = $val('id_status');
+$id_matching = $val('id_matching');
+
+// ambil resep (no_resep) berdasarkan id_status
+$resep = null;
+if ($id_status) {
+    $stmtR = sqlsrv_query($con, "SELECT idm FROM db_laborat.tbl_status_matching WHERE id = ?", [$id_status]);
+    if ($stmtR) {
+        $rowR = sqlsrv_fetch_array($stmtR, SQLSRV_FETCH_ASSOC);
+        $resep = $rowR['idm'] ?? null;
+    }
+}
+if (!$resep) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'session' => 'ERROR',
+        'exp' => 'resep_missing',
+        'ctx' => 'Insert_dataTableResep_toDB',
+        'sqlsrv' => sqlsrv_errors()
+    ]);
+    exit;
+}
+
+// siapkan nilai conc/time/doby (10 slot)
+$conc = [];
+$dt   = [];
+$doby = [];
+for ($i = 0; $i <= 9; $i++) {
+    $idx = $i === 0 ? '' : $i; // conc, conc1, conc2...
+    $cKey = $i === 0 ? 'conc' : 'conc'.$i;
+    if ($val($cKey) !== null) {
+        $conc[$i] = $val($cKey);
+        $dt[$i]   = $time;
+        $doby[$i] = $user;
+    } else {
+        $conc[$i] = null;
+        $dt[$i]   = null;
+        $doby[$i] = null;
+    }
+}
+
+$nama = $val('desc_code');
+
+$sql = "INSERT INTO db_laborat.tbl_matching_detail
+            (flag,id_matching,id_status,resep,kode,nama,
+             conc1,conc2,conc3,conc4,conc5,conc6,conc7,conc8,conc9,conc10,
+             time_1,time_2,time_3,time_4,time_5,time_6,time_7,time_8,time_9,time_10,
+             doby1,doby2,doby3,doby4,doby5,doby6,doby7,doby8,doby9,doby10,
+             remark,inserted_at,inserted_by)
+        VALUES (?,?,?,?,?,?,
+                ?,?,?,?,?,?,?,?,?,?,
+                ?,?,?,?,?,?,?,?,?,?,
+                ?,?,?,?,?,?,?,?,?,?,
+                ?,?,?)";
+
+$params = [
+    $val('flag'), $id_matching, $id_status, $resep, $val('code'), $nama,
+    $conc[0], $conc[1], $conc[2], $conc[3], $conc[4], $conc[5], $conc[6], $conc[7], $conc[8], $conc[9],
+    $dt[0], $dt[1], $dt[2], $dt[3], $dt[4], $dt[5], $dt[6], $dt[7], $dt[8], $dt[9],
+    $doby[0], $doby[1], $doby[2], $doby[3], $doby[4], $doby[5], $doby[6], $doby[7], $doby[8], $doby[9],
+    $val('keterangan'), $time, $user
+];
+
+$stmt = sqlsrv_query($con, $sql, $params);
+if (!$stmt) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'session' => 'ERROR',
+        'exp' => 'insert_failed',
+        'ctx' => 'Insert_dataTableResep_toDB',
+        'sqlsrv' => sqlsrv_errors(),
+        'params' => $params
+    ]);
+    exit;
+}
+
+header('Content-Type: application/json');
+echo json_encode([
     'session' => 'LIB_SUCCSS',
     'exp' => 'inserted'
-);
-echo json_encode($response);
+]);
+?>

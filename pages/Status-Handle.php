@@ -356,10 +356,11 @@ $_SESSION['jenis_matching'] = $ldorno;
                                         setting: 'suhu_chamber',
                                         value: value
                                     }, function (response) {
-                                        if (response.trim() === 'OK') {
+                                        const resp = (response || '').toString().trim();
+                                        if (resp === 'OK') {
                                             Swal.fire('Berhasil', 'Suhu Chamber berhasil diperbarui!', 'success');
                                         } else {
-                                            Swal.fire('Gagal', 'Terjadi kesalahan saat memperbarui.', 'error');
+                                            Swal.fire('Gagal', 'Terjadi kesalahan: ' + resp, 'error');
                                         }
                                     });
                                 }
@@ -400,10 +401,11 @@ $_SESSION['jenis_matching'] = $ldorno;
                                         setting: 'warna_flourescent',
                                         value: isChecked
                                     }, function (response) {
-                                        if (response.trim() === 'OK') {
+                                        const resp = (response || '').toString().trim();
+                                        if (resp === 'OK') {
                                             Swal.fire('Berhasil', 'Pengaturan Warna Fluorescent berhasil diperbarui!', 'success');
                                         } else {
-                                            Swal.fire('Gagal', 'Terjadi kesalahan saat memperbarui.', 'error');
+                                            Swal.fire('Gagal', 'Terjadi kesalahan: ' + resp, 'error');
                                         }
                                     });
                                 });
