@@ -135,10 +135,10 @@ include "koneksi.php";
                                         <div class="form-group">
                                             <label for="Product_name" class="col-md-3 control-label">1. Lampu</label>
                                             <div class="col-md-6">
-                                                <?php $sqlLampu = mysqli_query($con,"SELECT nama_lampu from master_lampu"); ?>
+                                                <?php $sqlLampu = sqlsrv_query($con,"SELECT nama_lampu from db_laborat.master_lampu"); ?>
                                                 <select style="width:300px" class="form-control selectLampu" name="lampu1" required>
                                                     <option value="" selected disabled>pilih..</option>
-                                                    <?php while ($lampu = mysqli_fetch_array($sqlLampu)) { ?>
+                                                    <?php while ($lampu = sqlsrv_fetch_array($sqlLampu, SQLSRV_FETCH_ASSOC)) { ?>
                                                         <option value="<?php echo $lampu['nama_lampu'] ?>"><?php echo $lampu['nama_lampu'] ?></option>
                                                     <?php }  ?>
                                                 </select>
@@ -148,10 +148,10 @@ include "koneksi.php";
                                         <div class="form-group">
                                             <label for="Product_name" class="col-md-3 control-label">2. Lampu</label>
                                             <div class="col-md-6">
-                                                <?php $sqlLampu = mysqli_query($con,"SELECT nama_lampu from master_lampu"); ?>
+                                                <?php $sqlLampu = sqlsrv_query($con,"SELECT nama_lampu from db_laborat.master_lampu"); ?>
                                                 <select style="width:300px" class="form-control selectLampu" name="lampu2">
                                                     <option value="" selected disabled>pilih..</option>
-                                                    <?php while ($lampu = mysqli_fetch_array($sqlLampu)) { ?>
+                                                    <?php while ($lampu = sqlsrv_fetch_array($sqlLampu, SQLSRV_FETCH_ASSOC)) { ?>
                                                         <option value="<?php echo $lampu['nama_lampu'] ?>"><?php echo $lampu['nama_lampu'] ?></option>
                                                     <?php }  ?>
                                                 </select>
@@ -161,10 +161,10 @@ include "koneksi.php";
                                         <div class="form-group">
                                             <label for="Product_name" class="col-md-3 control-label">3. Lampu</label>
                                             <div class="col-md-6">
-                                                <?php $sqlLampu = mysqli_query($con,"SELECT nama_lampu from master_lampu"); ?>
+                                                <?php $sqlLampu = sqlsrv_query($con,"SELECT nama_lampu from db_laborat.master_lampu"); ?>
                                                 <select style="width:300px" class="form-control selectLampu" name="lampu3">
                                                     <option value="" selected disabled>pilih..</option>
-                                                    <?php while ($lampu = mysqli_fetch_array($sqlLampu)) { ?>
+                                                    <?php while ($lampu = sqlsrv_fetch_array($sqlLampu, SQLSRV_FETCH_ASSOC)) { ?>
                                                         <option value="<?php echo $lampu['nama_lampu'] ?>"><?php echo $lampu['nama_lampu'] ?></option>
                                                     <?php }  ?>
                                                 </select>
