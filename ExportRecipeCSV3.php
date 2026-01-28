@@ -1,11 +1,29 @@
 <?php
 include "koneksi.php";
+$db2_errors = [];
+$safeDb2 = function(string $sql) use (&$conn1, &$db2_errors) {
+    if (!$conn1) {
+        $msg = "DB2 connection not available for SQL: ".$sql;
+        $db2_errors[] = $msg;
+        error_log($msg);
+        return false;
+    }
+    $stmt = @db2_exec($conn1, $sql);
+    if (!$stmt) {
+        $err = function_exists('db2_stmt_errormsg') ? db2_stmt_errormsg() : 'unknown db2 error';
+        $msg = "DB2 exec failed: ".$err." SQL: ".$sql;
+        $db2_errors[] = $msg;
+        error_log($msg);
+    }
+    return $stmt;
+};
 $idstatus               = $_GET['idm']; // ID_STATUS_MATCHING
 $idmatching             = $_GET['id']; // ID_MATCHING
 $IMPORTAUTOCOUNTER      = $_GET['IMPORTAUTOCOUNTER'];
 $jenis_suffix           = $_GET['suffix'];
 $number_suffix          = $_GET['numbersuffix'];
 $userLogin              = $_GET['userLogin'];
+$insert_recipeComponentBean = true;
 
 // PROSES EXPORT RECIPE (SQL Server)
 $sqlRecipe = "SELECT TOP 1 
@@ -385,6 +403,7 @@ while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
             echo '<script>alert("Terjadi kesalahan. Data yang dimasukkan sudah ada di NOW.");</script>';
             // Kembali ke halaman sebelumnya jika pengguna menekan OK pada alert
             echo '<script>window.history.back();</script>';
+            // echo $queryDataMain;
         } else {
             echo '<script>alert("Terjadi kesalahan. pastikan data sudah benar");</script>';
             // Kembali ke halaman sebelumnya jika pengguna menekan OK pada alert
@@ -411,11 +430,11 @@ if (substr($number_suffix, 0, 1) == 'D') {
 $query_laborat  = "SELECT a.id AS id_matching_detail,
                                             a.id_matching as id_matching,
                                             a.id_status as is_status,
-                                            SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 1), ' ', -1) as recipe_code_1,
-                                            SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 2), ' ', -1) as recipe_code_2,
+                                            PARSENAME(REPLACE(b.recipe_code,' ','.'),2) as recipe_code_1,
+                                            PARSENAME(REPLACE(b.recipe_code,' ','.'),1) as recipe_code_2,
                                             case
-                                                when SUBSTRING(b.no_resep, 1,2) = 'DR' or SUBSTRING(b.no_resep, 1,2) = 'CD' or SUBSTRING(b.no_resep, 1,2) = 'OB' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 3), 'L'), 4)
-                                                when SUBSTRING(b.no_resep, 1,2) = 'D2' or SUBSTRING(b.no_resep, 1,2) = 'R2' or SUBSTRING(b.no_resep, 1,2) = 'A2' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 2), 'L'), 4)
+                                                when SUBSTRING(b.no_resep, 1,2) IN ('DR','CD','OB') then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 3, LEN(b.no_resep)-2), 'L'), 4, 100)
+                                                when SUBSTRING(b.no_resep, 1,2) IN ('D2','R2','A2') then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 2, LEN(b.no_resep)-1), 'L'), 4, 100)
                                             end as no_resep_convert,
                                             case
                                                 when tds.code_new is null then a.kode 
@@ -438,31 +457,38 @@ $query_laborat  = "SELECT a.id AS id_matching_detail,
                                             remark as remark,
 	                                        a.doby1,
                                             b.jenis_matching
-                                        FROM tbl_matching_detail a 
-                                        LEFT JOIN tbl_matching b ON b.id = a.id_matching
-                                        left join tbl_status_matching tsm on tsm.idm = b.no_resep 
-                                        LEFT JOIN tbl_dyestuff tds ON tds.code = a.kode 
+                                        FROM db_laborat.tbl_matching_detail a 
+                                        LEFT JOIN db_laborat.tbl_matching b ON b.id = a.id_matching
+                                        left join db_laborat.tbl_status_matching tsm on tsm.idm = b.no_resep 
+                                        LEFT JOIN db_laborat.tbl_dyestuff tds ON tds.code = a.kode 
                                         WHERE a.id_matching = '$idmatching' AND a.id_status = '$idstatus' $remark $garam order by a.flag ASC";
-$recipe_cmp = mysqli_query($con, $query_laborat);
-$recipe_cmp_utk_scouring = mysqli_query($con, $query_laborat);
+$recipe_cmp = sqlsrv_query($con, $query_laborat);
+$recipe_cmp_utk_scouring = sqlsrv_query($con, $query_laborat);
+if (!$recipe_cmp) {
+    die("Query laborat gagal:\n".print_r(sqlsrv_errors(), true));
+}
+if (!$recipe_cmp_utk_scouring) {
+    die("Query laborat (scouring) gagal:\n".print_r(sqlsrv_errors(), true));
+}
+$ab = isset($_GET['ab']) ? $_GET['ab'] : '0';
 $delimiter = ",";
 $filename = "RC_" . $_GET['rcode'] . ".csv";
 
 //autonumber for IMPORTAUTOCOUNTER
-$q_iac = mysqli_query($con, "SELECT nomor_urut FROM importautocounter");
-$d_IMPORTAUTOCOUNTER = mysqli_fetch_assoc($q_iac);
+$q_iac = sqlsrv_query($con, "SELECT nomor_urut FROM db_laborat.importautocounter");
+$d_IMPORTAUTOCOUNTER = sqlsrv_fetch_array($q_iac, SQLSRV_FETCH_ASSOC);
 
 $SEQUENCE = 1;
 // NGECEK SCOURING di RECIPE 001, KALAU ADA INSERT DULUAN DATA PALING ATAS
-    $suffix = mysqli_fetch_assoc($recipe_cmp_utk_scouring);
-    if($suffix['jenis_matching'] == 'Matching Ulang' OR $suffix['jenis_matching'] == 'Matching Ulang NOW' OR $suffix['jenis_matching'] == 'Matching Development'){
+    $suffix = sqlsrv_fetch_array($recipe_cmp_utk_scouring, SQLSRV_FETCH_ASSOC);
+    if($suffix && ($suffix['jenis_matching'] == 'Matching Ulang' OR $suffix['jenis_matching'] == 'Matching Ulang NOW' OR $suffix['jenis_matching'] == 'Matching Development')){
         $rcode_sc   = substr($_GET['rcode'], 0,11);
-        if($_GET['ab'] == '1'){
+        if($ab == '1'){
             $groupnumber_sc     = '45';
         }else{
             $groupnumber_sc     = '10';
         }
-        $q_scouring         = db2_exec($conn1, "SELECT
+        $q_scouring         = ($conn1) ? db2_exec($conn1, "SELECT
                                                     r2.GROUPNUMBER,
                                                     r2.GROUPTYPECODE,
                                                     r2.LINETYPE,
@@ -478,12 +504,13 @@ $SEQUENCE = 1;
                                                 WHERE 
                                                     r.SUBCODE01 = '$_GET[rcode]'
                                                 AND r.SUFFIXCODE = '001'
-                                                AND r2.SUBCODE01 LIKE '%SC%'");
-        $data_scouring      = db2_fetch_assoc($q_scouring);
+                                                AND r2.SUBCODE01 LIKE '%SC%'") : false;
+        $data_scouring      = $q_scouring ? db2_fetch_assoc($q_scouring) : [];
 
         if(!empty($data_scouring['SUBCODE01'])){
             $no_urut = $d_IMPORTAUTOCOUNTER['nomor_urut']++;
-            $insert_recipeComponentBean = db2_exec($conn1, "INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
+$insert_recipeComponentBean = true;
+$insert_recipeComponentBean = $insert_recipeComponentBean && $safeDb2("INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
                                                                     IMPORTAUTOCOUNTER,
                                                                     OWNEDCOMPONENT,
                                                                     RECIPEITEMTYPECODE,
@@ -567,9 +594,18 @@ $SEQUENCE = 1;
         }
     }
 // NGECEK SCOURING di RECIPE 001, KALAU ADA INSERT DULUAN DATA PALING ATAS
-while ($r_cmp = $recipe_cmp->fetch_assoc()) {
-    $dyestuff = mysqli_query($con, "SELECT * FROM tbl_dyestuff WHERE code = '$r_cmp[kode]'");
-    $r_code = $dyestuff->fetch_assoc();
+while ($r_cmp = sqlsrv_fetch_array($recipe_cmp, SQLSRV_FETCH_ASSOC)) {
+    $concVal = $r_cmp['conc'];
+    if ($concVal !== null) {
+        if (is_numeric($concVal)) {
+            $concVal = rtrim(rtrim(sprintf('%.4f', (float)$concVal), '0'), '.');
+        }
+        if (is_string($concVal) && strlen($concVal) && $concVal[0] === '.') {
+            $concVal = '0' . $concVal;
+        }
+    }
+    $dyestuffStmt = sqlsrv_query($con, "SELECT TOP 1 * FROM db_laborat.tbl_dyestuff WHERE code = ?", [$r_cmp['kode']]);
+    $r_code = $dyestuffStmt ? sqlsrv_fetch_array($dyestuffStmt, SQLSRV_FETCH_ASSOC) : null;
 
     if ($r_code['Product_Unit'] == 1) {
         $CONSUMPTIONTYPE = 2;
@@ -580,7 +616,7 @@ while ($r_cmp = $recipe_cmp->fetch_assoc()) {
     $no_urut = $d_IMPORTAUTOCOUNTER['nomor_urut']++;
     if ($r_cmp['kode'] == 'B-L-C') {
         // TAMBAH UNTUK BLEACHING
-        $insert_recipeComponentBean_comment = db2_exec($conn1, "INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
+        $insert_recipeComponentBean = $insert_recipeComponentBean && $safeDb2("INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
                                                                                                         IMPORTAUTOCOUNTER,
                                                                                                         OWNEDCOMPONENT,
                                                                                                         RECIPEITEMTYPECODE,
@@ -655,7 +691,7 @@ while ($r_cmp = $recipe_cmp->fetch_assoc()) {
         // TAMBAH UNTUK COMMENT DITENGAH-TENGAH RESEP
         $_SEQUENCE = $SEQUENCE++ . '0';
         $commentname = str_replace("'", "`", $r_cmp['nama']);
-        $insert_recipeComponentBean_comment = db2_exec($conn1, "INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
+        $insert_recipeComponentBean = $insert_recipeComponentBean && $safeDb2("INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
                                                                                                     IMPORTAUTOCOUNTER,
                                                                                                     OWNEDCOMPONENT,
                                                                                                     RECIPEITEMTYPECODE,
@@ -738,7 +774,7 @@ while ($r_cmp = $recipe_cmp->fetch_assoc()) {
         $subcode01 = substr($r_code['code'], 0, 1);
         $subcode02 = substr($r_code['code'], 2, 1);
         $subcode03 = substr($r_code['code'], 4);
-        $insert_recipeComponentBean = db2_exec($conn1, "INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
+        $insert_recipeComponentBean = $insert_recipeComponentBean && $safeDb2("INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
                                                                                     IMPORTAUTOCOUNTER,
                                                                                     OWNEDCOMPONENT,
                                                                                     RECIPEITEMTYPECODE,
@@ -804,7 +840,7 @@ while ($r_cmp = $recipe_cmp->fetch_assoc()) {
                         'l', 
                         'g', 
                         '1', 
-                        '$r_cmp[conc]', 
+                        '$concVal', 
                         '1', 
                         '0', 
                         '0', 
@@ -852,76 +888,71 @@ if ($jenis_suffix == "1") {
 }
 
 // EXPORT COMMENT
-$sql_suhu_menit = mysqli_query($con, "SELECT 
-                                                        b.recipe_code as recipe_code,
-                                                        SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 1), ' ', -1) as recipe_code_1,
-                                                        SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 2), ' ', -1) as recipe_code_2,
-                                                        case
-                                                            when SUBSTRING(b.no_resep, 1,2) = 'DR' or SUBSTRING(b.no_resep, 1,2) = 'CD' or SUBSTRING(b.no_resep, 1,2) = 'OB' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 3), 'L'), 4)
-                                                            when SUBSTRING(b.no_resep, 1,2) = 'D2' or SUBSTRING(b.no_resep, 1,2) = 'R2' or SUBSTRING(b.no_resep, 1,2) = 'A2' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 2), 'L'), 4)
-                                                        end as no_resep_convert,
-                                                        $where_suhu
-                                                    from 
-                                                        tbl_status_matching tsm 
-                                                    left join tbl_matching b on b.no_resep = tsm.idm
-                                                    left join tbl_matching_detail a on a.id_matching = b.id
-                                                    where tsm.idm = '$number_suffix'
-                                                    group by tsm.idm
-                                                    union 
-                                                    SELECT
-                                                        b.recipe_code as recipe_code,
-                                                        SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 1), ' ', -1) as recipe_code_1,
-                                                        SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 2), ' ', -1) as recipe_code_2,
-                                                        case
-                                                            when SUBSTRING(b.no_resep, 1,2) = 'DR' or SUBSTRING(b.no_resep, 1,2) = 'CD' or SUBSTRING(b.no_resep, 1,2) = 'OB' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 3), 'L'), 4)
-                                                            when SUBSTRING(b.no_resep, 1,2) = 'D2' or SUBSTRING(b.no_resep, 1,2) = 'R2' or SUBSTRING(b.no_resep, 1,2) = 'A2' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 2), 'L'), 4)
-                                                        end as no_resep_convert,
-                                                        CASE
-                                                            WHEN trim(tsm.soaping_sh) = '80' THEN concat('CUCI PANAS ',trim(tsm.soaping_sh),'`C X ', trim(tsm.soaping_tm), ' MNT')
-                                                            ELSE concat('SOAPING ',trim(tsm.soaping_sh),'`C X ', trim(tsm.soaping_tm), ' MNT')
-                                                        END AS COMMENTLINE
-                                                    from 
-                                                        tbl_status_matching tsm 
-                                                    left join tbl_matching b on b.no_resep = tsm.idm
-                                                    left join tbl_matching_detail a on a.id_matching = b.id
-                                                    where tsm.idm = '$number_suffix' $where_soaping
-                                                    group by b.no_resep
-                                                    union 
-                                                    SELECT
-                                                        b.recipe_code as recipe_code,
-                                                        SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 1), ' ', -1) as recipe_code_1,
-                                                        SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 2), ' ', -1) as recipe_code_2,
-                                                        case
-                                                            when SUBSTRING(b.no_resep, 1,2) = 'DR' or SUBSTRING(b.no_resep, 1,2) = 'CD' or SUBSTRING(b.no_resep, 1,2) = 'OB' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 3), 'L'), 4)
-                                                            when SUBSTRING(b.no_resep, 1,2) = 'D2' or SUBSTRING(b.no_resep, 1,2) = 'R2' or SUBSTRING(b.no_resep, 1,2) = 'A2' then SUBSTRING(CONCAT(SUBSTRING(b.no_resep, 2), 'L'), 4)
-                                                        end as no_resep_convert,
-                                                        concat('RC ',trim(tsm.rc_sh),'`C X ', trim(tsm.rc_tm), ' MNT') as COMMENTLINE
-                                                    from 
-                                                        tbl_status_matching tsm 
-                                                    left join tbl_matching b on b.no_resep = tsm.idm
-                                                    left join tbl_matching_detail a on a.id_matching = b.id
-                                                    where tsm.idm = '$number_suffix' $where_rc
-                                                    group by b.no_resep
-                                                    union 
-                                                    SELECT
-                                                            b.recipe_code as recipe_code,
-                                                            SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 1), ' ', -1) as recipe_code_1,
-                                                            SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 2), ' ', -1) as recipe_code_2,
-                                                            case
-                                                                    when SUBSTRING(b.no_resep, 1,2) = 'DR' or SUBSTRING(b.no_resep, 1,2) = 'CD' or SUBSTRING(b.no_resep, 1,2) = 'OB' then CONCAT(SUBSTRING(b.no_resep, 3), 'L')
-                                                                    when SUBSTRING(b.no_resep, 1,2) = 'D2' or SUBSTRING(b.no_resep, 1,2) = 'R2' or SUBSTRING(b.no_resep, 1,2) = 'A2' then CONCAT(SUBSTRING(b.no_resep, 2), 'L')
-                                                            end as no_resep_convert,
-                                                            concat('BLEACHING ',trim(tsm.bleaching_sh),'`C X ', trim(tsm.bleaching_tm), ' MNT') as COMMENTLINE
-                                                    from 
-                                                            tbl_status_matching tsm 
-                                                    left join tbl_matching b on b.no_resep = tsm.idm
-                                                    left join tbl_matching_detail a on a.id_matching = b.id
-                                                    where tsm.idm = '$number_suffix' $where_bleaching 
-                                                    group by b.no_resep
-                                                    ");
+$sql_suhu_menit = sqlsrv_query($con, "SELECT b.recipe_code,
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2) AS recipe_code_1,
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1) AS recipe_code_2,
+                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
+                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
+                                        END AS no_resep_convert,
+                                        $where_suhu
+                                    FROM db_laborat.tbl_status_matching tsm
+                                    LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
+                                    LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
+                                    WHERE tsm.idm = ?
+                                    GROUP BY tsm.idm, b.recipe_code, b.no_resep, tsm.tside_c, tsm.tside_min, tsm.cside_c, tsm.cside_min
+                                    UNION
+                                    SELECT b.recipe_code,
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2),
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1),
+                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
+                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
+                                        END,
+                                        CONCAT('SOAPING ',LTRIM(RTRIM(tsm.soaping_sh)),'`C X ',LTRIM(RTRIM(tsm.soaping_tm)),' MNT')
+                                    FROM db_laborat.tbl_status_matching tsm
+                                    LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
+                                    LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
+                                    WHERE tsm.idm = ? AND (LEFT(tsm.idm,2)='R2' OR LEFT(tsm.idm,3)='DR2')
+                                    GROUP BY b.no_resep,b.recipe_code,tsm.soaping_sh,tsm.soaping_tm,tsm.idm
+                                    UNION
+                                    SELECT b.recipe_code,
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2),
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1),
+                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
+                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
+                                        END,
+                                        CONCAT('RC ',LTRIM(RTRIM(tsm.rc_sh)),'`C X ',LTRIM(RTRIM(tsm.rc_tm)),' MNT')
+                                    FROM db_laborat.tbl_status_matching tsm
+                                    LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
+                                    LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
+                                    WHERE tsm.idm = ? AND (LEFT(tsm.idm,2) IN ('CD','D2','DR')) AND tsm.rc_tm <> 0
+                                    GROUP BY b.no_resep,b.recipe_code,tsm.rc_sh,tsm.rc_tm,tsm.idm
+                                    UNION
+                                    SELECT b.recipe_code,
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2),
+                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1),
+                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
+                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
+                                        END,
+                                        CONCAT('BLEACHING ',LTRIM(RTRIM(tsm.bleaching_sh)),'`C X ',LTRIM(RTRIM(tsm.bleaching_tm)),' MNT')
+                                    FROM db_laborat.tbl_status_matching tsm
+                                    LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
+                                    LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
+                                    WHERE tsm.idm = ? AND (LEFT(tsm.idm,2) IN ('CD','D2','DR')) AND tsm.bleaching_sh <> 0
+                                    GROUP BY b.no_resep,b.recipe_code,tsm.bleaching_sh,tsm.bleaching_tm,tsm.idm
+                                    ", [$number_suffix,$number_suffix,$number_suffix,$number_suffix]);
+$sql_suhu_menit or die("Query suhu/menit gagal:\n".print_r(sqlsrv_errors(),true));
+
 
 $GROUPNUMBER = 2;
-while ($r_cmp_suhu_bleaching_rc_soaping = $sql_suhu_menit->fetch_assoc()) {
+while ($r_cmp_suhu_bleaching_rc_soaping = sqlsrv_fetch_array($sql_suhu_menit, SQLSRV_FETCH_ASSOC)) {
     $no_urut = $d_IMPORTAUTOCOUNTER['nomor_urut']++;
 
     if ($jenis_suffix == "1") {
@@ -932,7 +963,7 @@ while ($r_cmp_suhu_bleaching_rc_soaping = $sql_suhu_menit->fetch_assoc()) {
     $_GROUPNUMBER = $GROUPNUMBER++ . '0';
 
     if ($r_cmp_suhu_bleaching_rc_soaping['COMMENTLINE'] != '0`C X 0 MNT' or $r_cmp_suhu_bleaching_rc_soaping['COMMENTLINE'] != 'SOAPING 0`C X 0 MNT' or $r_cmp_suhu_bleaching_rc_soaping['COMMENTLINE'] != 'BLEACHING 0`C X 0 MNT') { //kalau suhu dan menitnya kosong maka tidak usah di export
-        $insert_recipeComponentBean_comment = db2_exec($conn1, "INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
+        $insert_recipeComponentBean = $insert_recipeComponentBean && $safeDb2("INSERT INTO RECIPECOMPONENTBEAN(FATHERID,
                                                                                                             IMPORTAUTOCOUNTER,
                                                                                                             OWNEDCOMPONENT,
                                                                                                             RECIPEITEMTYPECODE,
@@ -1008,32 +1039,36 @@ while ($r_cmp_suhu_bleaching_rc_soaping = $sql_suhu_menit->fetch_assoc()) {
 }
 
 $no_urut_terakhir = $no_urut + 1;
-$q_update_no_urut = mysqli_query($con, "UPDATE importautocounter SET nomor_urut = '$no_urut_terakhir' WHERE id = '1'");
+$q_update_no_urut = sqlsrv_query($con, "UPDATE db_laborat.importautocounter SET nomor_urut=? WHERE id=1", [$no_urut_terakhir]);
+
+
 // EXPORT COMMENT
 // PROSES EXPORT RECIPE COMPONENT
 
 // PROSES EXPORT RECIPE ADDITIONAL DATA
-$recipe_add = mysqli_query($con, "SELECT
+$recipe_add = sqlsrv_query($con,"SELECT 
                                         CONCAT(10000, a.id) AS id_matching_detail,
                                         c.approve_at,
-                                        SUBSTR(b.no_warna, 1, 16) AS no_warna_substring,
-                                        left(b.no_item, 3) AS no_item2,
-                                        SUBSTR(b.benang, 1, 250) AS benang_substring,
+                                        SUBSTRING(b.no_warna, 1, 16) AS no_warna_substring,
+                                        LEFT(b.no_item, 3) AS no_item2,
+                                        SUBSTRING(b.benang, 1, 250) AS benang_substring,
                                         b.no_resep,
                                         a.*, b.*, c.*
-                                    FROM
-                                        tbl_matching_detail a
-                                        RIGHT JOIN tbl_matching b ON b.id = a.id_matching
-                                        LEFT JOIN tbl_status_matching c ON c.idm = b.no_resep 
-                                    WHERE
-                                        id_matching = '$idmatching' 
-                                        AND id_status = '$idstatus' 
-                                    LIMIT 1");
-$d_add = mysqli_fetch_assoc($recipe_add);
-$date_approve = date_create($d_add['approve_at']);
-$tgl_approve = date_format($date_approve, 'Y-m-d');
+                                    FROM db_laborat.tbl_matching_detail a
+                                    RIGHT JOIN db_laborat.tbl_matching b ON b.id = a.id_matching
+                                    LEFT JOIN db_laborat.tbl_status_matching c ON c.idm = b.no_resep 
+                                    WHERE a.id_matching = ? AND a.id_status = ?", [$idmatching,$idstatus]);
+$d_add = sqlsrv_fetch_array($recipe_add, SQLSRV_FETCH_ASSOC);
+$tgl_approve = null;
+if ($d_add && isset($d_add['approve_at'])) {
+    if ($d_add['approve_at'] instanceof DateTime) {
+        $tgl_approve = $d_add['approve_at']->format('Y-m-d');
+    } else {
+        $tgl_approve = date('Y-m-d', strtotime((string)$d_add['approve_at']));
+    }
+}
 
-$insert_adstoragebean1 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean1 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1081,7 +1116,7 @@ $insert_adstoragebean1 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                     3,
                                                                     0,
                                                                     0)");
-$insert_adstoragebean2 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean2 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1130,7 +1165,7 @@ $insert_adstoragebean2 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                     0,
                                                                     0)");
 
-$insert_adstoragebean3 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean3 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1179,7 +1214,7 @@ $insert_adstoragebean3 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                     0,
                                                                     0)");
 
-$insert_adstoragebean4 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean4 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1228,7 +1263,7 @@ $insert_adstoragebean4 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                             0,
                                                                             0)");
 
-$insert_adstoragebean5 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean5 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1277,7 +1312,7 @@ $insert_adstoragebean5 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                             0,
                                                                             0)");
 
-$insert_adstoragebean6 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean6 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1326,7 +1361,7 @@ $insert_adstoragebean6 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                             0,
                                                                             0)");
 
-$insert_adstoragebean7 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean7 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1375,7 +1410,7 @@ $insert_adstoragebean7 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                             0,
                                                                             0)");
 
-$insert_adstoragebean8 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean8 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1426,7 +1461,7 @@ $insert_adstoragebean8 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
 
 $benang = addslashes($d_add['benang_substring']);
 $benang2 = db2_escape_string($benang);
-$insert_adstoragebean9 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean9 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1474,7 +1509,7 @@ $insert_adstoragebean9 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                             3,
                                                                             0,
                                                                             0)");
-$insert_adstoragebean10 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
+$insert_adstoragebean10 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
                                                                                 NAMENAME,
@@ -1528,9 +1563,15 @@ $insert_adstoragebean10 = db2_exec($conn1, "INSERT INTO ADSTORAGEBEAN(FATHERID,
 if ($insert_recipeBean && $insert_recipeComponentBean && $insert_adstoragebean1 && $insert_adstoragebean2 && $insert_adstoragebean3 && $insert_adstoragebean4 && $insert_adstoragebean5 && $insert_adstoragebean6 && $insert_adstoragebean7 && $insert_adstoragebean8 && $insert_adstoragebean9) {
     header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=1&available=$warning"); // RECIPE & RECIPE COMPONENT & ADSTORAGE
 } elseif ($insert_recipeBean) {
-    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=2&available=$warning"); // RECIPE
+    echo $insert_recipeComponentBean;
+    // header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=2&available=$warning"); // RECIPE
 } elseif ($insert_recipeComponentBean) {
     header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=3&available=$warning"); // RECIPE COMPONENT
 } else {
-    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=0&available=$warning");
+    // tampilkan alasan gagalnya komponen agar tidak silent failure
+    if (!empty($db2_errors)) {
+        echo "Insert RECIPECOMPONENTBEAN gagal.<br>Detail:<pre>".htmlentities(print_r($db2_errors,true))."</pre>";
+    } else {
+        header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=0&available=$warning");
+    }
 }

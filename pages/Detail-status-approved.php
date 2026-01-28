@@ -3,6 +3,16 @@ ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
 $fmtDT = function($v){ return ($v instanceof DateTime)? $v->format('Y-m-d H:i:s') : $v; };
+$fmtNum = function($v){
+    if ($v === null) return '';
+    if (is_numeric($v)) {
+        $s = rtrim(rtrim(sprintf('%.4f', (float)$v), '0'), '.');
+        if (str_starts_with($s, '.')) $s = '0'.$s;
+        return $s;
+    }
+    if (is_string($v) && strlen($v) && $v[0] === '.') return '0'.$v;
+    return $v;
+};
 // Compat wrappers to keep legacy mysqli-style calls working on SQLSRV connection
 if (!function_exists('mysqli_query')) {
     function mysqli_query($con, $query){ return sqlsrv_query($con, $query); }
@@ -1381,7 +1391,7 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                                         <td><?= $d_frist['flag']; ?></td>
                                         <td><?= $d_frist['kode']; ?></td>
                                         <td><?= $d_frist['nama']; ?></td>
-                                        <td><?= $d_frist['conc']; ?></td>
+                                        <td><?= $fmtNum($d_frist['conc']); ?></td>
                                         <td><?= $d_frist['remark']; ?></td>
                                     </tr>
                                 <?php } ?>
@@ -1580,7 +1590,7 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                                             <td><?= $d_frist['flag']; ?></td>
                                             <td><?= $d_frist['kode']; ?></td>
                                             <td><?= $d_frist['nama']; ?></td>
-                                            <td><?= $d_frist['conc']; ?></td>
+                                            <td><?= $fmtNum($d_frist['conc']); ?></td>
                                             <td><?= $d_frist['remark']; ?></td>
                                         </tr>
                                     <?php } ?>
@@ -1764,7 +1774,7 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                                             <td><?= $d_frist['flag']; ?></td>
                                             <td><?= $d_frist['kode']; ?></td>
                                             <td><?= $d_frist['nama']; ?></td>
-                                            <td><?= $d_frist['conc']; ?></td>
+                                            <td><?= $fmtNum($d_frist['conc']); ?></td>
                                             <td><?= $d_frist['remark']; ?></td>
                                         </tr>
                                     <?php } ?>
