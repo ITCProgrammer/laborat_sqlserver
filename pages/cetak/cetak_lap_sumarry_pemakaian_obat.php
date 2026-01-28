@@ -9,7 +9,7 @@ header("Expires: 0");
 session_start();
 include "./../../koneksi.php";
 
-$ip_num = '10.0.5.55';
+$ip_num = $_SERVER['REMOTE_ADDR'];
 $os = $_SERVER['HTTP_USER_AGENT'];
 
 date_default_timezone_set('Asia/Jakarta');

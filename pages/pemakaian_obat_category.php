@@ -228,39 +228,30 @@ $Bulan = $Thn2 . "-" . $Bln2;
                     </div>                    
                 </form>
                 <?php
-                include 'koneksi.php'; // koneksi ke MySQL
+                include 'koneksi.php';
                 
                 $ipaddress = $_SERVER['REMOTE_ADDR'];
 
                 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
                     if (filter_var($ipaddress, FILTER_VALIDATE_IP)) {
 
-                        // Siapkan statement prepared
-                        $sql2 = "DELETE FROM tb_stock_gd_kimia_kategori WHERE IP_ADDRESS = ?";
-                        $stmt2 = mysqli_prepare($con, $sql2);
+                        $sql2 = "DELETE FROM db_laborat.tb_stock_gd_kimia_kategori WHERE IP_ADDRESS = ?";
+                        $params = [$ipaddress];
 
-                        if ($stmt2) {
-                            // Bind parameter IP address
-                            mysqli_stmt_bind_param($stmt2, "s", $ipaddress);
-                            mysqli_stmt_execute($stmt2);
-                            
-                            // // Eksekusi query
-                            // if (mysqli_stmt_execute($stmt2)) {
-                            //     // echo "<div class='alert alert-success'>Data dengan IP $ipaddress berhasil dihapus.</div>";
-                            // } else {
-                            //     // echo "<div class='alert alert-danger'>Gagal menghapus dari tb_stock_gd_kimia: " . mysqli_error($con) . "</div>";
-                            // }
-
-                            mysqli_stmt_close($stmt2);
-                        } else {
-                            // echo "<div class='alert alert-danger'>Gagal menyiapkan statement: " . mysqli_error($con) . "</div>";
+                        $stmt2 = sqlsrv_query($con, $sql2, $params);
+                        if ($stmt2 === false) {
+                            die(print_r(sqlsrv_errors(), true));
                         }
 
+                        // kalau mau cek jumlah terhapus:
+                        // $deletedRows = sqlsrv_rows_affected($stmt2);
+                
                     } else {
-                        // echo "<div class='alert alert-warning'>IP address tidak valid.</div>";
+                        // IP address tidak valid
                     }
                 }
                 ?>
+
 
             </div>
         </div>
@@ -271,7 +262,7 @@ $Bulan = $Thn2 . "-" . $Bln2;
             <div class="box">                
                 <div class="box-header with-border">
                 <div class="card-header table-card-header">
-                    <h5>LAPORAN PEMAKAIAN OBAT GUDANG KIMIA PERKATEGORI</h5>
+                    <h5>LAPORAN PEMAKAIAN OBAT GUDANG KIMIA PERKATEGORI</h5>                   
                 </div>
                     <div class="col-lg-12 overflow-auto table-responsive" style="overflow-x: auto;">  
                         <div class="card-header mb-3 d-flex justify-content-end">
@@ -484,39 +475,39 @@ $Bulan = $Thn2 . "-" . $Bln2;
                                         SATUAN");
                                     $row_qty_pakai = db2_fetch_assoc($qty_pakai);
 
-                                    $Balance_stock = db2_exec($conn1, "SELECT 
-                                        ITEMTYPECODE,
-                                        DECOSUBCODE01,
-                                        SUM(STOCK_BALANCE) AS STOCK_BALANCE,
-                                        BASEPRIMARYUNITCODE
-                                        FROM
-                                        (SELECT 	TRIM(DECOSUBCODE01) || '-' || TRIM(DECOSUBCODE02) || '-' || TRIM(DECOSUBCODE03) AS KODE_OBAT,
-                                                    b.ITEMTYPECODE,
-                                                    b.DECOSUBCODE01,
-                                                    CASE 
-                                                        WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN b.BASEPRIMARYQUANTITYUNIT*1000
-                                                        WHEN b.BASEPRIMARYUNITCODE = 't' THEN b.BASEPRIMARYQUANTITYUNIT*1000000
-                                                        ELSE b.BASEPRIMARYQUANTITYUNIT
-                                                    END  AS STOCK_BALANCE,
-                                                    CASE 
-                                                        WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN 'g'
-                                                        WHEN b.BASEPRIMARYUNITCODE = 't' THEN 'g'
-                                                        ELSE b.BASEPRIMARYUNITCODE
-                                                    END  AS BASEPRIMARYUNITCODE
-                                                    FROM 
-                                                    BALANCE b 
-                                                    WHERE 
-                                                    ITEMTYPECODE ='DYC'
-                                                    AND LOGICALWAREHOUSECODE $where_warehouse
-                                                    AND DETAILTYPE = 1)
-                                                    WHERE 
-                                                    DECOSUBCODE01 = '$row[DECOSUBCODE01]' 
-                                                    AND NOT KODE_OBAT ='E-1-000' 
-                                                    GROUP BY
-                                                    ITEMTYPECODE,
-                                                    DECOSUBCODE01,
-                                                    BASEPRIMARYUNITCODE ");
-                                    $row_balance = db2_fetch_assoc($Balance_stock);
+                                    // $Balance_stock = db2_exec($conn1, "SELECT 
+                                    //     ITEMTYPECODE,
+                                    //     DECOSUBCODE01,
+                                    //     SUM(STOCK_BALANCE) AS STOCK_BALANCE,
+                                    //     BASEPRIMARYUNITCODE
+                                    //     FROM
+                                    //     (SELECT 	TRIM(DECOSUBCODE01) || '-' || TRIM(DECOSUBCODE02) || '-' || TRIM(DECOSUBCODE03) AS KODE_OBAT,
+                                    //                 b.ITEMTYPECODE,
+                                    //                 b.DECOSUBCODE01,
+                                    //                 CASE 
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN b.BASEPRIMARYQUANTITYUNIT*1000
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 't' THEN b.BASEPRIMARYQUANTITYUNIT*1000000
+                                    //                     ELSE b.BASEPRIMARYQUANTITYUNIT
+                                    //                 END  AS STOCK_BALANCE,
+                                    //                 CASE 
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN 'g'
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 't' THEN 'g'
+                                    //                     ELSE b.BASEPRIMARYUNITCODE
+                                    //                 END  AS BASEPRIMARYUNITCODE
+                                    //                 FROM 
+                                    //                 BALANCE b 
+                                    //                 WHERE 
+                                    //                 ITEMTYPECODE ='DYC'
+                                    //                 AND LOGICALWAREHOUSECODE $where_warehouse
+                                    //                 AND DETAILTYPE = 1)
+                                    //                 WHERE 
+                                    //                 DECOSUBCODE01 = '$row[DECOSUBCODE01]' 
+                                    //                 AND NOT KODE_OBAT ='E-1-000' 
+                                    //                 GROUP BY
+                                    //                 ITEMTYPECODE,
+                                    //                 DECOSUBCODE01,
+                                    //                 BASEPRIMARYUNITCODE ");
+                                    // $row_balance = db2_fetch_assoc($Balance_stock);
 
                                     $stock_minimum = db2_exec($conn1, " SELECT 
                                             i.ITEMTYPECODE,
@@ -596,7 +587,6 @@ $Bulan = $Thn2 . "-" . $Bln2;
                                             BASEPRIMARYUNITCODE");
                                     $row_buka_po = db2_fetch_assoc($buka_po);
 
-                                    $code = $row['DECOSUBCODE01'];
                                     $tgl1 = $_POST['tgl'];
                                     $tgl2 = $_POST['tgl2'];
                                     $warehouse =  $where_warehouse;
@@ -613,56 +603,144 @@ $Bulan = $Thn2 . "-" . $Bln2;
                                     $date->modify('-1 month');
                                     $tahunBulan2 = $date->format('Y-m');
 
-                                    if ($tahunBulan2 == '2025-08') {
-                                        $q_qty_awal = mysqli_query($con, "SELECT
+                                   $subcode01 = $row['DECOSUBCODE01'];
+
+                                if ($tahunBulan2 == '2025-08') {
+                                    $sql_qty_awal = " SELECT
                                             SUBCODE01,
                                             SUM(qty_awal) AS qty_awal
-                                                FROM
-                                                (SELECT * 
-                                            FROM stock_awal_obat_gdkimia_1
-                                            WHERE logicalwarehouse $where_warehouse                                                          
-                                            and not kode_obat = 'E-1-000'                                                              
-                                            ) as T
-                                            WHERE 
-                                            SUBCODE01 = '$row[DECOSUBCODE01]'
-                                            group by 
-                                            SUBCODE01
-                                            ORDER BY SUBCODE01 ASC");
-                                    } else {
-                                        $q_qty_awal = mysqli_query($con, " SELECT tgl_tutup,
-                                                tahun_bulan,
-                                                DECOSUBCODE01,
-                                                SUM(BASEPRIMARYQUANTITYUNIT*1000) AS qty_awal 
-                                                from(
+                                        FROM db_laborat.stock_awal_obat_gdkimia_1
+                                        WHERE logicalwarehousecode $where_warehouse
+                                        AND kode_obat <> 'E-1-000'
+                                        AND SUBCODE01 = ?
+                                        GROUP BY SUBCODE01
+                                        ORDER BY SUBCODE01 ASC
+                                    ";
+
+                                    $params = [$subcode01];
+                                        $stmt_qty_awal = sqlsrv_query($con, $sql_qty_awal, $params);
+                                        if ($stmt_qty_awal === false) {
+                                            die(print_r(sqlsrv_errors(), true));
+                                        }
+                                        $row_qty_awal = sqlsrv_fetch_array($stmt_qty_awal, SQLSRV_FETCH_ASSOC);
+
+                                        // kalau tidak ada data, set default 0
+                                        if (!$row_qty_awal) {
+                                            $row_qty_awal = ['qty_awal' => 0];
+                                        }
+
+                                } else {
+
+                                    $sql_qty_awal = "SELECT
+                                            sub.tgl_tutup,
+                                            sub.tahun_bulan,
+                                            sub.DECOSUBCODE01,
+                                            SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS qty_awal
+                                        FROM
+                                        (
+                                            SELECT DISTINCT
+                                                t.tgl_tutup,
+                                                FORMAT(DATEADD(MONTH, -1, t.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
+                                                t.KODE_OBAT,
+                                                t.LOTCODE,
+                                                t.DECOSUBCODE01,
+                                                t.DECOSUBCODE02,
+                                                t.DECOSUBCODE03,
+                                                t.LONGDESCRIPTION,
+                                                t.WHSLOCATIONWAREHOUSEZONECODE,
+                                                t.BASEPRIMARYQUANTITYUNIT
+                                            FROM db_laborat.tblopname_11 t
+                                            WHERE
+                                                t.DECOSUBCODE01 = ?
+                                                AND t.LOGICALWAREHOUSECODE $where_warehouse
+                                                AND t.KODE_OBAT <> 'E-1-000'
+                                                AND t.tgl_tutup =
+                                                (
+                                                    SELECT MAX(t2.tgl_tutup)
+                                                    FROM db_laborat.tblopname_11 t2
+                                                    WHERE
+                                                        t2.DECOSUBCODE01 = ?
+                                                        AND t2.KODE_OBAT <> 'E-1-000'
+                                                        AND t2.LOGICALWAREHOUSECODE $where_warehouse
+                                                        AND t2.tgl_tutup = ?
+                                                )
+                                        ) AS sub
+                                        GROUP BY
+                                            sub.tgl_tutup,
+                                            sub.tahun_bulan,
+                                            sub.DECOSUBCODE01
+                                    ";
+
+                                    $params = [$subcode01, $subcode01, $tgl1];
+                                        $stmt_qty_awal = sqlsrv_query($con, $sql_qty_awal, $params);
+                                        if ($stmt_qty_awal === false) {
+                                            die(print_r(sqlsrv_errors(), true));
+                                        }
+                                        $row_qty_awal = sqlsrv_fetch_array($stmt_qty_awal, SQLSRV_FETCH_ASSOC);
+
+                                        // kalau tidak ada data, set default 0
+                                        if (!$row_qty_awal) {
+                                            $row_qty_awal = ['qty_awal' => 0];
+                                        }
+                                    }
+                                    // var_dump($row_qty_awal);
+                                    // print_r($row_qty_awal);
+
+                                    $sql = "SELECT
+                                                sub.tgl_tutup,
+                                                sub.tahun_bulan,                                               
+                                                sub.DECOSUBCODE01,
+                                                SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS STOCK_BALANCE
+                                            FROM
+                                            (
                                                 SELECT DISTINCT
-                                                tgl_tutup,
-                                                DATE_FORMAT(DATE_SUB(tgl_tutup, INTERVAL 1 MONTH), '%Y-%m') AS tahun_bulan,
-                                                KODE_OBAT,
-                                                LOTCODE,
-                                                DECOSUBCODE01,
-                                                DECOSUBCODE02,
-                                                DECOSUBCODE03,
-                                                LONGDESCRIPTION,
-                                                WHSLOCATIONWAREHOUSEZONECODE,
-                                                BASEPRIMARYQUANTITYUNIT
-                                            FROM tblopname_11 t
-                                            WHERE 
-                                                DECOSUBCODE01 = '$row[DECOSUBCODE01]'
-                                                AND LOGICALWAREHOUSECODE  $where_warehouse  
-                                                AND tgl_tutup = (
-                                                    SELECT MAX(tgl_tutup)
-                                                    FROM tblopname_11
-                                                    WHERE 
-                                                        DECOSUBCODE01  = '$row[DECOSUBCODE01]'
-                                                        and not KODE_OBAT ='E-1-000'
-                                                        AND LOGICALWAREHOUSECODE $where_warehouse  
-                                                        AND  tgl_tutup = '$tgl_kurang_satu'
-                                                ) and not KODE_OBAT ='E-1-000'
-                                                ) as sub
-                                            GROUP BY tgl_tutup, DECOSUBCODE01");
-                                    }                                
-                                    $row_qty_awal = mysqli_fetch_array($q_qty_awal);                 
+                                                    t.tgl_tutup,
+                                                    FORMAT(DATEADD(MONTH, -1, t.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
+                                                    t.KODE_OBAT,
+                                                    t.LONGDESCRIPTION,
+                                                    t.DECOSUBCODE01,
+                                                    t.DECOSUBCODE02,
+                                                    t.DECOSUBCODE03,
+                                                    t.LOGICALWAREHOUSECODE,
+                                                    t.WAREHOUSELOCATIONCODE,
+                                                    t.WHSLOCATIONWAREHOUSEZONECODE,
+                                                    t.LOTCODE,
+                                                    t.BASEPRIMARYQUANTITYUNIT
+                                                FROM db_laborat.tblopname_11 t
+                                                WHERE
+                                                     t.DECOSUBCODE01 = ?
+                                                    AND t.LOGICALWAREHOUSECODE $where_warehouse
+                                                    AND t.KODE_OBAT <> 'E-1-000'
+                                                    AND t.tgl_tutup =
+                                                    (
+                                                        SELECT MAX(t2.tgl_tutup)
+                                                        FROM db_laborat.tblopname_11 t2
+                                                        WHERE
+                                                           t2.DECOSUBCODE01 = ?
+                                                            AND t2.KODE_OBAT <> 'E-1-000'
+                                                            AND t2.LOGICALWAREHOUSECODE $where_warehouse
+                                                            AND t2.tgl_tutup = ?
+                                                    )
+                                            ) AS sub
+                                            GROUP BY
+                                                sub.tgl_tutup,
+                                                sub.tahun_bulan,
+                                                sub.DECOSUBCODE01
+                                            ";
                                     
+                                    $params2 = [$subcode01, $subcode01, $tgl2];
+
+                                    $Balance_stock = sqlsrv_query($con, $sql, $params2);
+                                    if ($Balance_stock === false) {
+                                        die(print_r(sqlsrv_errors(), true));
+                                    }                                  
+
+                                    $row_balance = sqlsrv_fetch_array($Balance_stock, SQLSRV_FETCH_ASSOC);
+
+                                    if (!$row_balance) {
+                                        $row_balance = ['STOCK_BALANCE' => 0];
+                                    }
+
                                     $qty_masuk = (substr(number_format($row_stock_masuk['QTY_MASUK'], 2), -3) == '.00')
                                         ? number_format($row_stock_masuk['QTY_MASUK'], 0)
                                         : number_format($row_stock_masuk['QTY_MASUK'], 2);
@@ -675,13 +753,18 @@ $Bulan = $Thn2 . "-" . $Bln2;
                                         ? number_format($row_stock_transfer['QTY_TRANSFER'], 0)
                                         : number_format($row_stock_transfer['QTY_TRANSFER'], 2);
 
-                                    $qty_awal = (substr(number_format($row_qty_awal['qty_awal'], 2), -3) == '.00')
-                                        ? number_format($row_qty_awal['qty_awal'], 0)
-                                        : number_format($row_qty_awal['qty_awal'], 2);
+                                    $qty_awal_val = isset($row_qty_awal['qty_awal']) ? (float) $row_qty_awal['qty_awal'] : 0;
 
-                                    $qty_stock_balance = (substr(number_format($row_balance['STOCK_BALANCE'], 2), -3) == '.00')
-                                        ? number_format($row_balance['STOCK_BALANCE'], 0)
-                                        : number_format($row_balance['STOCK_BALANCE'], 2);
+                                    $qty_awal = (substr(number_format($qty_awal_val, 2), -3) == '.00')
+                                        ? number_format($qty_awal_val, 0)
+                                        : number_format($qty_awal_val, 2);
+
+
+                                    $stock_balance_val = isset($row_balance['STOCK_BALANCE']) ? (float) $row_balance['STOCK_BALANCE'] : 0;
+
+                                    $qty_stock_balance = (substr(number_format($stock_balance_val, 2), -3) == '.00')
+                                        ? number_format($stock_balance_val, 0)
+                                        : number_format($stock_balance_val, 2);
 
                                     $qty_stock_minimum = (substr(number_format($row_stock_minimum['SAFETYSTOCK'], 2), -3) == '.00')
                                         ? number_format($row_stock_minimum['SAFETYSTOCK'], 0)
@@ -712,15 +795,18 @@ $Bulan = $Thn2 . "-" . $Bln2;
                                         </td>
                                         <td>
                                             <a width = "100%" href="#" class="btn btn-primary btn-sm btn-fixed open-detail" 
-                                            data-code="<?= $code ?>"
-                                                data-tgl1="<?= $tgl1 ?>" data-tgl2="<?= $tgl2 ?>" data-warehouse="<?= $warehouse ?>" data-toggle="modal"
+                                                data-code="<?= $code ?>"
+                                                data-tgl1="<?= $tgl1 ?>" 
+                                                data-tgl2="<?= $tgl2 ?>" 
+                                                data-warehouse="<?= $warehouse ?>" 
+                                                data-toggle="modal"
                                                 data-target="#detailModal_pakai">
                                                 <?= $qty_Keluar ?>
                                             </a>
                                         </td>
                                         <td>
                                             <a width = "100%" href="#" class="btn btn-primary btn-sm btn-fixed open-detail2" 
-                                            data-code="<?= $code ?>"
+                                                data-code="<?= $code ?>"
                                                 data-tgl1="<?= $tgl1 ?>" 
                                                 data-tgl2="<?= $tgl2 ?>" 
                                                 data-warehouse="<?= $warehouse ?>" 
@@ -731,76 +817,80 @@ $Bulan = $Thn2 . "-" . $Bln2;
                                         </td>    
                                         <td><?= $qty_total_pegeluaran ?></td>
                                         <td><a width = "100%" href="#" class="btn btn-primary btn-sm btn-fixed open-detail3" 
-                                            data-code="<?= $code ?>"
-                                            data-tgl1="<?= $tgl1 ?>" 
-                                            data-tgl2="<?= $tgl2 ?>" 
-                                            data-warehouse="<?= $warehouse ?>" data-toggle="modal"
-                                            data-target="#detailModal_balance">
+                                                data-code="<?= $code ?>"
+                                                data-tgl1="<?= $tgl1 ?>" 
+                                                data-tgl2="<?= $tgl2 ?>" 
+                                                data-warehouse="<?= $warehouse ?>" data-toggle="modal"
+                                                data-target="#detailModal_balance">
                                             <?= $qty_stock_balance ?>
                                         </a>
                                     </td>
                                      
                                     </td>
                                 </tr>                                   
-                                <?php
-                                    $no++;
+                               <?php
+                                        $ipaddress = $_SERVER['REMOTE_ADDR'];
+                                        $today = date('Y-m-d'); 
 
-                                    $ipaddress = $_SERVER['REMOTE_ADDR'];
-                                    $today = date('Y-m-d');
 
-                                    include_once("koneksi.php");
-                                                                
-                                    // Escape semua input untuk mencegah SQL Injection
-                                    $kode_obat = mysqli_real_escape_string($con, $row['DECOSUBCODE01']);
-                                    $nama_obat = mysqli_real_escape_string($con, $row['LONGDESCRIPTION']);
-                                    $qty_awal = floatval(str_replace(',', '', $qty_awal));
-                                    $stock_masuk = floatval(str_replace(',', '', $qty_masuk));
-                                    $stock_transfer = floatval(str_replace(',', '', $QTY_TRANSFER));
-                                    $stock_keluar = floatval(str_replace(',', '', $qty_Keluar));
-                                    $stock_balance = floatval(str_replace(',', '', $qty_stock_balance));
-                                    $ip = mysqli_real_escape_string($con, $ipaddress);
-                                    $warehouse = mysqli_real_escape_string($con, $_POST['warehouse']);
-                                    $stock_minimum = floatval(str_replace(',', '', $qty_stock_minimum));
-                                    $buka_po = floatval(str_replace(',', '', $qty_stock_buka_PO));
-                                    $total_stock_keluar = floatval(str_replace(',', '', $qty_total_pegeluaran));
-                                    $sql = "INSERT INTO tb_stock_gd_kimia_kategori (
-                                                kode_obat,
-                                                nama_obat,
-                                                qty_awal,
-                                                stock_masuk,
-                                                stock_transfer,
-                                                stock_keluar,
-                                                stock_balance,                                               
-                                                tgl_awal,
-                                                tgl_akhir,
-                                                ip_address,
-                                                logicalwarehouse,
-                                                Stock_minimum,
-                                                sisa_po,
-                                                total_stock_keluar
-                                            ) VALUES (
-                                                '$kode_obat',
-                                                '$nama_obat',
-                                                '$qty_awal',
-                                                '$stock_masuk',
-                                                '$stock_transfer',
-                                                '$stock_keluar',
-                                                '$stock_balance',                                                
-                                                '$tgl1',
-                                                '$tgl2',
-                                                '$ip',
-                                                '$warehouse',
-                                                '$stock_minimum',
-                                                '$buka_po',
-                                                '$total_stock_keluar'
-                                            )";
+                                        // ambil data string
+                                        $kode_obat  = (string)$row['DECOSUBCODE01'];
+                                        $nama_obat  = (string)$row['LONGDESCRIPTION'];
+                                        $ip         = (string)$ipaddress;
+                                        $warehouse  = (string)($_POST['warehouse'] ?? '');
 
-                                    $result = mysqli_query($con, $sql);
+                                        // angka
+                                        $qty_awal            = (float) str_replace(',', '', $qty_awal);
+                                        $stock_masuk         = (float) str_replace(',', '', $qty_masuk);
+                                        $stock_transfer      = (float) str_replace(',', '', $QTY_TRANSFER);
+                                        $stock_keluar        = (float) str_replace(',', '', $qty_Keluar);
+                                        $stock_balance       = (float) str_replace(',', '', $qty_stock_balance);
+                                        $stock_minimum       = (float) str_replace(',', '', $qty_stock_minimum);
+                                        $buka_po             = (float) str_replace(',', '', $qty_stock_buka_PO);
+                                        $total_stock_keluar  = (float) str_replace(',', '', $qty_total_pegeluaran);
 
-                                    if (!$result) {
-                                        die("Error executing query: " . mysqli_error($con));
-                                    }
-                                }?>
+                                        // query SQL Server
+                                        $sql = "INSERT INTO db_laborat.tb_stock_gd_kimia_kategori (
+                                                    kode_obat,
+                                                    nama_obat,
+                                                    qty_awal,
+                                                    stock_masuk,
+                                                    stock_transfer,
+                                                    stock_keluar,
+                                                    stock_balance,
+                                                    tgl_awal,
+                                                    tgl_akhir,
+                                                    ip_address,
+                                                    logicalwarehouse,
+                                                    Stock_minimum,
+                                                    sisa_po,
+                                                    total_stock_keluar
+                                                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
+
+                                        $params = [
+                                            $kode_obat,
+                                            $nama_obat,
+                                            $qty_awal,
+                                            $stock_masuk,
+                                            $stock_transfer,
+                                            $stock_keluar,
+                                            $stock_balance,
+                                            $tgl1,
+                                            $tgl2,
+                                            $ip,
+                                            $warehouse,
+                                            $stock_minimum,
+                                            $buka_po,
+                                            $total_stock_keluar
+                                        ];
+
+                                        $result = sqlsrv_query($con, $sql, $params);
+
+                                        if ($result === false) {
+                                            die("Error executing query: " . print_r(sqlsrv_errors(), true));
+                                        }
+                                        ?>
+                            <?php } ?>  
                             </tbody>
                         </table>
                     </div>
