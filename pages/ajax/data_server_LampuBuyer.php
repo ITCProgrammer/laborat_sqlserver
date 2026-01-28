@@ -69,7 +69,11 @@ while ($query && ($row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC))) {
     $nestedData[] = $row["buyer"] . ' <button type="button" class="btn btn-xs btn-warning edit_lampu" attr-data="' . $row["buyer"] . '"><i class="fa fa-edit"></i></button>';
     $nestedData[] = $row["flag"];
     $nestedData[] = $row["lampu"];
-    $nestedData[] = $row["created_at"];
+    $createdAt = $row["created_at"];
+    if ($createdAt instanceof DateTimeInterface) {
+        $createdAt = $createdAt->format('Y-m-d H:i:s');
+    }
+    $nestedData[] = $createdAt;
     $nestedData[] = $row["create_by"];
 
     $data[] = $nestedData;
