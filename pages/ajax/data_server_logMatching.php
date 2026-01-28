@@ -6,31 +6,69 @@ $columns = array(
     0 => 'maxid',
     1 => 'ids'
 );
-$sql = "SELECT MAX(id) as maxid, ids from log_status_matching";
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku");
-$totalData = mysqli_num_rows($query);
-$totalFiltered = $totalData;
-if (!empty($requestData['search']['value'])) {
-    $sql .= " where ids LIKE '%" . $requestData['search']['value'] . "%' ";
+$search = isset($requestData['search']['value']) ? trim($requestData['search']['value']) : '';
+$whereSql = '';
+$params = [];
+
+if ($search !== '') {
+    $whereSql = " WHERE ids LIKE ? ";
+    $params[] = '%' . $search . '%';
 }
-//----------------------------------------------------------------------------------
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku1");
-$totalFiltered = mysqli_num_rows($query);
-$sql .= " GROUP by ids ORDER BY " . $columns[$requestData['order'][0]['column']] . "  " . $requestData['order'][0]['dir'] . "  LIMIT "
-    . $requestData['start'] . " ," . $requestData['length'] . "   ";
+
+$totalData = 0;
+$countAll = sqlsrv_query($con, "SELECT COUNT(DISTINCT ids) AS cnt FROM db_laborat.log_status_matching");
+if ($countAll && ($row = sqlsrv_fetch_array($countAll, SQLSRV_FETCH_ASSOC))) {
+    $totalData = (int) $row['cnt'];
+}
+if ($countAll) {
+    sqlsrv_free_stmt($countAll);
+}
+
+$totalFiltered = $totalData;
+if ($whereSql !== '') {
+    $countFiltered = sqlsrv_query($con, "SELECT COUNT(DISTINCT ids) AS cnt FROM db_laborat.log_status_matching $whereSql", $params);
+    if ($countFiltered && ($row = sqlsrv_fetch_array($countFiltered, SQLSRV_FETCH_ASSOC))) {
+        $totalFiltered = (int) $row['cnt'];
+    }
+    if ($countFiltered) {
+        sqlsrv_free_stmt($countFiltered);
+    }
+}
+
+$orderColIndex = isset($requestData['order'][0]['column']) ? (int) $requestData['order'][0]['column'] : 0;
+$orderCol = isset($columns[$orderColIndex]) ? $columns[$orderColIndex] : 'maxid';
+$orderDir = (isset($requestData['order'][0]['dir']) && strtolower($requestData['order'][0]['dir']) === 'desc') ? 'DESC' : 'ASC';
+$start = isset($requestData['start']) ? (int) $requestData['start'] : 0;
+$length = isset($requestData['length']) ? (int) $requestData['length'] : 10;
+if ($length < 0) {
+    $length = 10;
+}
+
+$sql = "SELECT MAX(id) AS maxid, ids
+        FROM db_laborat.log_status_matching
+        $whereSql
+        GROUP BY ids
+        ORDER BY $orderCol $orderDir
+        OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+$dataParams = $params;
+$dataParams[] = $start;
+$dataParams[] = $length;
 // var_dump(print_r($sql));
 // die;
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku2");
+$query = sqlsrv_query($con, $sql, $dataParams);
 //----------------------------------------------------------------------------------
 $data = array();
 $no = 1;
-while ($row = mysqli_fetch_array($query)) {
+while ($query && ($row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC))) {
     $nestedData = array();
     $nestedData[] = $no++;
     $nestedData[] = $row["ids"];
     $nestedData[] = '<span class="btn btn-xs btn-danger"><i class="fa fa-history"></i></span>';
 
     $data[] = $nestedData;
+}
+if ($query) {
+    sqlsrv_free_stmt($query);
 }
 //----------------------------------------------------------------------------------
 $json_data = array(
