@@ -3,32 +3,36 @@ ini_set("error_reporting", 1);
 session_start();
 include '../../koneksi.php';
 $time = date('Y-m-d H:i:s');
-$id = mysqli_real_escape_string($con,$_POST['id']);
-$Code = mysqli_real_escape_string($con,$_POST['Code']);
-$Ket = mysqli_real_escape_string($con,$_POST['Ket']);
-$Code_New = mysqli_real_escape_string($con,$_POST['code_new']);
-$Product_Name = mysqli_real_escape_string($con,$_POST['Product_Name']);
-$liquid_powder = mysqli_real_escape_string($con,$_POST['liquid_powder']);
-$is_active = mysqli_real_escape_string($con,$_POST['is_active']);
+$id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+$Code = isset($_POST['Code']) ? $_POST['Code'] : '';
+$Ket = isset($_POST['Ket']) ? $_POST['Ket'] : '';
+$Code_New = isset($_POST['code_new']) ? $_POST['code_new'] : '';
+$Product_Name = isset($_POST['Product_Name']) ? $_POST['Product_Name'] : '';
+$liquid_powder = isset($_POST['liquid_powder']) ? $_POST['liquid_powder'] : '';
+$is_active = isset($_POST['is_active']) ? $_POST['is_active'] : '';
+$Product_Unit = isset($_POST['Product_Unit']) ? $_POST['Product_Unit'] : '';
+$userLAB = isset($_SESSION['userLAB']) ? $_SESSION['userLAB'] : '';
+$ip = isset($_SESSION['ip']) ? $_SESSION['ip'] : '';
+$os = isset($_SESSION['os']) ? $_SESSION['os'] : '';
 
-mysqli_query($con,"UPDATE `tbl_dyestuff` SET 
-                `ket`='$Ket',
-                `code`='$Code',
-				`code_new`='$Code_New',
-                `Product_Name`='$Product_Name',
-				`liquid_powder`='$liquid_powder',
-                `is_active`='$is_active',
-                `Product_Unit`='$_POST[Product_Unit]',
-                `last_updated_at`='$time',
-                `last_updated_by`='$_SESSION[userLAB]'
-                WHERE `id`='$id' LIMIT 1");
-mysqli_query($con,"INSERT into tbl_log SET `what` = '$id',
-        `what_do` = 'UPDATE tbl_dyestuff',
-        `do_by` = '$_SESSION[userLAB]',
-        `do_at` = '$time',
-        `ip` = '$_SESSION[ip]',
-        `os` = '$_SESSION[os]',
-        `remark`='$Code'");
+$updateSql = "UPDATE db_laborat.tbl_dyestuff SET 
+                ket = ?,
+                code = ?,
+                code_new = ?,
+                Product_Name = ?,
+                liquid_powder = ?,
+                is_active = ?,
+                Product_Unit = ?,
+                last_updated_at = ?,
+                last_updated_by = ?
+              WHERE id = ?";
+$updateParams = [$Ket, $Code, $Code_New, $Product_Name, $liquid_powder, $is_active, $Product_Unit, $time, $userLAB, $id];
+sqlsrv_query($con, $updateSql, $updateParams);
+
+$logSql = "INSERT INTO db_laborat.tbl_log (what, what_do, do_by, do_at, ip, os, remark)
+           VALUES (?, ?, ?, ?, ?, ?, ?)";
+$logParams = [$id, 'UPDATE tbl_dyestuff', $userLAB, $time, $ip, $os, $Code];
+sqlsrv_query($con, $logSql, $logParams);
 
 $response = "LIB_SUCCSS";
 echo json_encode($response);

@@ -12,27 +12,30 @@ if ($id <= 0) {
     exit;
 }
 
-$query = "UPDATE master_suhu SET status = ? WHERE id = ?";
-$stmt = $con->prepare($query);
+$query = "UPDATE db_laborat.master_suhu SET status = ? WHERE id = ?";
+$params = [$status, $id];
+$stmt = sqlsrv_prepare($con, $query, $params);
 
 if (!$stmt) {
+    $errors = sqlsrv_errors();
     echo json_encode([
         'status' => 'error',
-        'message' => 'Prepare statement gagal: ' . $con->error
+        'message' => 'Prepare statement gagal: ' . ($errors ? $errors[0]['message'] : 'unknown error')
     ]);
     exit;
 }
 
-if ($stmt->bind_param('ii', $status, $id) && $stmt->execute()) {
+if (sqlsrv_execute($stmt)) {
     echo json_encode([
         'status' => 'success',
         'message' => 'Status berhasil diperbarui'
     ]);
 } else {
+    $errors = sqlsrv_errors();
     echo json_encode([
         'status' => 'error',
-        'message' => 'Gagal memperbarui status: ' . $stmt->error
+        'message' => 'Gagal memperbarui status: ' . ($errors ? $errors[0]['message'] : 'unknown error')
     ]);
 }
-$stmt->close();
-$con->close();
+sqlsrv_free_stmt($stmt);
+sqlsrv_close($con);

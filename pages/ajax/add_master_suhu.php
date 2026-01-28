@@ -24,14 +24,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $prefix = "1";
 
             // Cari apakah sudah ada suhu dengan awalan ini
-            $query = mysqli_query($con, "SELECT `group` FROM master_suhu WHERE program='1' AND suhu LIKE '$suhu%' AND dyeing='$dyeing' LIMIT 1");
-            if (mysqli_num_rows($query) > 0) {
-                $row = mysqli_fetch_assoc($query);
+            $query = "SELECT TOP 1 [group] FROM db_laborat.master_suhu WHERE program = ? AND suhu LIKE ? AND dyeing = ?";
+            $params = ['1', $suhu . '%', $dyeing];
+            $result = sqlsrv_query($con, $query, $params);
+            if ($result !== false && ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC))) {
                 $group = $row['group'];
             } else {
                 // Ambil max kode belakang, generate baru
-                $last = mysqli_query($con, "SELECT MAX(SUBSTRING(`group`, 2, 2)) as max_suffix FROM master_suhu WHERE program='1'");
-                $max_suffix = mysqli_fetch_assoc($last)['max_suffix'];
+                $last = sqlsrv_query(
+                    $con,
+                    "SELECT MAX(CAST(SUBSTRING([group], 2, 2) AS int)) as max_suffix FROM db_laborat.master_suhu WHERE program = ?",
+                    ['1']
+                );
+                $max_suffix = 0;
+                if ($last !== false && ($row = sqlsrv_fetch_array($last, SQLSRV_FETCH_ASSOC))) {
+                    $max_suffix = (int) $row['max_suffix'];
+                }
                 $next_suffix = str_pad(((int)$max_suffix) + 1, 2, '0', STR_PAD_LEFT);
                 $group = "1" . $next_suffix;
             }
@@ -40,8 +48,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         } elseif ($program == 'RAISING') {
             // Raising: group selalu naik satu angka
             $prefix = "2";
-            $last = mysqli_query($con, "SELECT MAX(`group`) as max_group FROM master_suhu WHERE program='2'");
-            $last_group = mysqli_fetch_assoc($last)['max_group'];
+            $last = sqlsrv_query(
+                $con,
+                "SELECT MAX(CAST([group] AS int)) as max_group FROM db_laborat.master_suhu WHERE program = ?",
+                ['2']
+            );
+            $last_group = 0;
+            if ($last !== false && ($row = sqlsrv_fetch_array($last, SQLSRV_FETCH_ASSOC))) {
+                $last_group = (int) $row['max_group'];
+            }
             $group = $last_group ? $last_group + 1 : 201;
 
             $code = $suhu . str_pad($durasi, 2, '0', STR_PAD_LEFT) . "2" . $dyeing . $dispensing;
@@ -51,9 +66,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         }
 
         // Simpan ke database
-        $stmt = mysqli_prepare($con, "INSERT INTO master_suhu (`group`, product_name, code, program, dyeing, dispensing, suhu, waktu, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        mysqli_stmt_bind_param($stmt, 'ssssssiii', $group, $product_name, $code, $prefix, $dyeing, $dispensing, $suhu, $durasi, $status);
-        $success = mysqli_stmt_execute($stmt);
+        $stmt = sqlsrv_query(
+            $con,
+            "INSERT INTO db_laborat.master_suhu ([group], product_name, code, program, dyeing, dispensing, suhu, waktu, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [$group, $product_name, $code, $prefix, $dyeing, $dispensing, $suhu, $durasi, $status]
+        );
+        $success = ($stmt !== false);
 
         if ($success) {
             echo json_encode(['status' => 'success', 'message' => 'Data berhasil ditambahkan!']);

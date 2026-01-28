@@ -16,17 +16,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $suhu = $suhu . '°C';
     }
 
-    $stmt = mysqli_prepare($con, "INSERT INTO master_mesin (no_machine, suhu, program, keterangan) VALUES (?, ?, ?, ?)");
-    mysqli_stmt_bind_param($stmt, 'ssss', $no_machine, $suhu, $program, $keterangan);
-    
-    $success = mysqli_stmt_execute($stmt);
+    $query = "INSERT INTO db_laborat.master_mesin (no_machine, suhu, program, keterangan) VALUES (?, ?, ?, ?)";
+    $params = [$no_machine, $suhu, $program, $keterangan];
+    $stmt = sqlsrv_prepare($con, $query, $params);
+
+    if (!$stmt) {
+        $errors = sqlsrv_errors();
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Prepare statement gagal: ' . ($errors ? $errors[0]['message'] : 'unknown error')
+        ]);
+        exit;
+    }
+
+    $success = sqlsrv_execute($stmt);
 
     if ($success) {
         echo json_encode(['status' => 'success', 'message' => 'Data berhasil ditambahkan!']);
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Gagal menyimpan data: ' . mysqli_error($con)]);
+        $errors = sqlsrv_errors();
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Gagal menyimpan data: ' . ($errors ? $errors[0]['message'] : 'unknown error')
+        ]);
     }
 
-    mysqli_stmt_close($stmt);
+    sqlsrv_free_stmt($stmt);
 }
 

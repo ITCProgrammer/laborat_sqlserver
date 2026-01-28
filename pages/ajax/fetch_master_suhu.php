@@ -6,17 +6,17 @@ include '../../koneksi.php';
 // Fetch data from master_suhu table
 $query = "
     SELECT *
-    FROM master_suhu
+    FROM db_laborat.master_suhu
     ORDER BY
       suhu DESC,
       waktu DESC
 ";
 
-$result = mysqli_query($con, $query);
+$result = sqlsrv_query($con, $query);
 
 $data = [];
-if ($result && mysqli_num_rows($result) > 0) {
-    while ($row = mysqli_fetch_assoc($result)) {
+if ($result !== false) {
+    while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
         $data[] = $row;
     }
 }
