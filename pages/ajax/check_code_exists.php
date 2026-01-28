@@ -8,18 +8,15 @@ header('Content-Type: application/json');
 if (isset($_GET['code'])) {
     $code = $_GET['code'];
     
-    $query = "SELECT code FROM master_suhu";
-    $result = mysqli_query($con, $query);
+    $query = "SELECT TOP 1 code FROM db_laborat.master_suhu WHERE code = ?";
+    $params = [$code];
+    $result = sqlsrv_query($con, $query, $params);
 
     $duplicate = false;
 
-    if ($result) {
-        while ($row = mysqli_fetch_assoc($result)) {
-            $dbCode = $row['code']; // ambil angka dari DB
-            if ($dbCode === $code) {
-                $duplicate = true;
-                break;
-            }
+    if ($result !== false) {
+        if (sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
+            $duplicate = true;
         }
 
         if ($duplicate) {
@@ -28,10 +25,8 @@ if (isset($_GET['code'])) {
             echo json_encode(['status' => 'not_exists']);
         }
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Query gagal: ' . mysqli_error($con)]);
+        echo json_encode(['status' => 'error', 'message' => 'Query gagal: ' . print_r(sqlsrv_errors(), true)]);
     }
 } else {
     echo json_encode(['status' => 'error', 'message' => 'Product name tidak valid']);
 }
-
-
