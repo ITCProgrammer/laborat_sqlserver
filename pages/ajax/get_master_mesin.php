@@ -3,19 +3,30 @@ include "../../koneksi.php";
 header('Content-Type: application/json');
 
 if (isset($_GET['id'])) {
-    $id = $_GET['id'];
-    $query = "SELECT * FROM master_mesin WHERE id = ?";
-    $stmt = $con->prepare($query);
-    $stmt->bind_param("i", $id);
-    if ($stmt->execute()) {
-        $result = $stmt->get_result();
-        echo json_encode($result->fetch_assoc());
-    } else {
-        echo json_encode(["error" => "Query gagal dieksekusi"]);
+    $id = (int) $_GET['id'];
+    $query = "SELECT * FROM db_laborat.master_mesin WHERE id = ?";
+    $stmt = sqlsrv_prepare($con, $query, [$id]);
+
+    if (!$stmt) {
+        $errors = sqlsrv_errors();
+        echo json_encode([
+            "error" => $errors ? $errors[0]['message'] : "Query gagal diprepare"
+        ]);
+        exit;
     }
 
-    $stmt->close();
-    $con->close();
+    if (sqlsrv_execute($stmt)) {
+        $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+        echo json_encode($row ? $row : new stdClass());
+    } else {
+        $errors = sqlsrv_errors();
+        echo json_encode([
+            "error" => $errors ? $errors[0]['message'] : "Query gagal dieksekusi"
+        ]);
+    }
+
+    sqlsrv_free_stmt($stmt);
+    sqlsrv_close($con);
 } else {
     echo json_encode(["error" => "ID tidak ditemukan"]);
 }
