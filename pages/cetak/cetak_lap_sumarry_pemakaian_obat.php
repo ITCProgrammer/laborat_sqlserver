@@ -9,7 +9,7 @@ header("Expires: 0");
 session_start();
 include "./../../koneksi.php";
 
-$ip_num = $_SERVER['REMOTE_ADDR'];
+$ip_num = '10.0.5.55';
 $os = $_SERVER['HTTP_USER_AGENT'];
 
 date_default_timezone_set('Asia/Jakarta');
@@ -150,8 +150,14 @@ if (file_exists($logoPath)) {
     <?php
 
     $no = 1;
-    $sql = mysqli_query($con, "SELECT * FROM tb_stock_gd_kimia WHERE ip_address = '$ip_num'");
-    while ($r = mysqli_fetch_array($sql)) {
+    $sql = "SELECT * FROM db_laborat.tb_stock_gd_kimia WHERE ip_address = ?";
+        $stmt = sqlsrv_query($con, $sql, [$ip_num]);
+
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
+        }
+
+        while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC))  {
         $status = $r['status_'];
         $style = '';
 
