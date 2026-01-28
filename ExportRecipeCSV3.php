@@ -1563,8 +1563,12 @@ $insert_adstoragebean10 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
 if ($insert_recipeBean && $insert_recipeComponentBean && $insert_adstoragebean1 && $insert_adstoragebean2 && $insert_adstoragebean3 && $insert_adstoragebean4 && $insert_adstoragebean5 && $insert_adstoragebean6 && $insert_adstoragebean7 && $insert_adstoragebean8 && $insert_adstoragebean9) {
     header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=1&available=$warning"); // RECIPE & RECIPE COMPONENT & ADSTORAGE
 } elseif ($insert_recipeBean) {
-    echo $insert_recipeComponentBean;
-    // header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=2&available=$warning"); // RECIPE
+    // jika RECIPE ok tapi komponen gagal, tampilkan errornya
+    if (!$insert_recipeComponentBean && !empty($db2_errors)) {
+        echo "Insert RECIPECOMPONENTBEAN gagal.<br>Detail:<pre>".htmlentities(print_r($db2_errors,true))."</pre>";
+    } else {
+        header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=2&available=$warning"); // RECIPE
+    }
 } elseif ($insert_recipeComponentBean) {
     header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=3&available=$warning"); // RECIPE COMPONENT
 } else {
