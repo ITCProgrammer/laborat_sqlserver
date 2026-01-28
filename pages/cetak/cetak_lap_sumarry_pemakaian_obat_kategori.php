@@ -148,8 +148,14 @@ if (file_exists($logoPath)) {
         </tr>
         <?php
         $no = 1;
-        $sql = mysqli_query($con, "SELECT * FROM tb_stock_gd_kimia_kategori WHERE ip_address = '$ip_num'");
-        while ($r = mysqli_fetch_array($sql)) {
+        $sql = "SELECT * FROM db_laborat.tb_stock_gd_kimia_kategori WHERE ip_address = ?";
+        $stmt = sqlsrv_query($con, $sql, [$ip_num]);
+
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
+        }
+
+        while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
             echo "<tr>";
             echo "<td class='int' style='text-align:center'>$no</td>";
             echo "<td colspan='1' style='text-align:center'>{$r['kode_obat']}</td>";
