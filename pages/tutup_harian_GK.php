@@ -217,20 +217,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <tbody>
                                 <?php
                                 $no = 1;
-                                $tutup_transaksi = mysqli_query($con, "SELECT DISTINCT ITEMTYPECODE, 
-                                                                                    LOGICALWAREHOUSECODE, 
-                                                                                    tgl_tutup, 
-                                                                                    SUM(BASEPRIMARYQUANTITYUNIT) as total_qty 
-                                                                                    FROM tblopname_11
-                                                                                    where  tgl_tutup = '$_POST[tgl]' 
-                                                                                    and not kode_obat = 'E-1-000'
-                                                                                    GROUP BY LOGICALWAREHOUSECODE, 
-                                                                                    tgl_tutup");
-                                while ($row = mysqli_fetch_array($tutup_transaksi)) {
-                                    $tgl_tutup = $row['tgl_tutup'];
-                                    $warehouse = $row['LOGICALWAREHOUSECODE'];
-                                    $value = (string) $row['total_qty'];
+                                    $sql = "SELECT
+                                            ITEMTYPECODE,
+                                            LOGICALWAREHOUSECODE,
+                                            tgl_tutup,
+                                            SUM(BASEPRIMARYQUANTITYUNIT) AS total_qty
+                                        FROM db_laborat.tblopname_11
+                                        WHERE CAST(tgl_tutup AS date) = ?
+                                        AND KODE_OBAT <> 'E-1-000'
+                                        GROUP BY
+                                            ITEMTYPECODE,
+                                            LOGICALWAREHOUSECODE,
+                                            tgl_tutup";
 
+                                    $params = [$_POST['tgl']];
+
+                                    $stmt = sqlsrv_query($con, $sql, $params);
+                                    if ($stmt === false) {
+                                        die(print_r(sqlsrv_errors(), true));
+                                    }
+
+                                    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+                                        $tgl_tutup = $row['tgl_tutup'];        
+                                        $tgl_tutup_str = ($tgl_tutup instanceof DateTime) ? $tgl_tutup->format('Y-m-d') : (string)$tgl_tutup;        
+                                        $warehouse = $row['LOGICALWAREHOUSECODE'];
+                                        $value     = (string)$row['total_qty'];
+                                    
                                     if (strpos($value, '.') !== false) {
                                         // Hapus nol di belakang desimal, tapi jangan hilangkan titik kalau hasilnya bilangan bulat
                                         $formatted = rtrim(rtrim($value, '0'), '.');
@@ -252,19 +264,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     ?>
                                         <tr>
                                             <td><?= $no++ ?></td>
-                                            <td><a href="pages/cetak/DetailOpnameDetail11Excel.php?tgl=<?= htmlspecialchars($tgl_tutup) ?>&tipe=<?= htmlspecialchars($warehouse) ?>" 
+                                            <td><a href="pages/cetak/DetailOpnameDetail11Excel.php?tgl=<?= htmlspecialchars($tgl_tutup_str) ?>&tipe=<?= htmlspecialchars($warehouse) ?>" 
                                             class="btn btn-danger btn-sm" target="_blank"> <i class="fa fa-excel"></i> Lihat Data</a> || 
-                                            <a href="pages/cetak/DetailOpnameProses11Excel.php?tgl=<?= htmlspecialchars($tgl_tutup) ?>&tipe=<?= htmlspecialchars($warehouse) ?>"
+                                            <a href="pages/cetak/DetailOpnameProses11Excel.php?tgl=<?= htmlspecialchars($tgl_tutup_str) ?>&tipe=<?= htmlspecialchars($warehouse) ?>"
                                             class="btn btn-primary btn-sm" target="_blank"> <i class="fa fa-file-excel"></i> Excel</a></td>
                                             <td>
                                                 <a href="#" class="btn btn-success btn-sm open-detail2"
-                                                    data-tgl_tutup="<?= htmlspecialchars($tgl_tutup) ?>"
+                                                    data-tgl_tutup="<?= htmlspecialchars($tgl_tutup_str) ?>"
                                                     data-warehouse="<?= htmlspecialchars($warehouse) ?>" data-toggle="modal"
                                                     data-target="#detailModal_masuk">
                                                     Lihat Detail
                                                 </a>
                                             </td>
-                                            <td><?= htmlspecialchars($tgl_tutup) ?></td>
+                                            <td><?= htmlspecialchars($tgl_tutup_str) ?></td>
                                             <td><?= htmlspecialchars($warehouse) ?></td>
                                             <td><?= $formatted ?></td>
                                         </tr>

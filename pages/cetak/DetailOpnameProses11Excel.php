@@ -81,21 +81,32 @@ $tahun = $date->format('Y');
 				  <?php				  
    $no=1;   
    $c=0;
-   $sql = mysqli_query($con,"SELECT DISTINCT
-            ITEMTYPECODE,
+   $totqty = 0;
+   $sql = "SELECT ITEMTYPECODE,
             KODE_OBAT,
             LONGDESCRIPTION,
             LOTCODE,
             LOGICALWAREHOUSECODE,
             tgl_tutup,
             SUM(BASEPRIMARYQUANTITYUNIT) AS total_qty,
-            BASEPRIMARYUNITCODE 
-        FROM tblopname_11
-        WHERE 
-            tgl_tutup = '$tgl_tutup'
-            AND LOGICALWAREHOUSECODE = '$warehouse'
-            and not KODE_OBAT ='E-1-000'
-        GROUP BY  
+            BASEPRIMARYUNITCODE
+        FROM
+          (SELECT DISTINCT
+            ITEMTYPECODE,
+            KODE_OBAT,
+            LONGDESCRIPTION,
+            LOTCODE,
+            LOGICALWAREHOUSECODE,
+            WAREHOUSELOCATIONCODE,
+            tgl_tutup,
+            BASEPRIMARYQUANTITYUNIT,
+            BASEPRIMARYUNITCODE
+        FROM db_laborat.tblopname_11
+        WHERE
+            CAST(tgl_tutup AS date) = ?
+            AND LOGICALWAREHOUSECODE = ?
+            AND KODE_OBAT <> 'E-1-000') AS sub
+        GROUP BY
             ITEMTYPECODE,
             KODE_OBAT,
             LONGDESCRIPTION,
@@ -103,28 +114,36 @@ $tahun = $date->format('Y');
             LOGICALWAREHOUSECODE,
             tgl_tutup,
             BASEPRIMARYUNITCODE
-        ORDER BY KODE_OBAT ASC");		  
-    while($r = mysqli_fetch_array($sql)){
-            $value = (string) $r['total_qty'];
+        ORDER BY KODE_OBAT ASC";
 
-            if (strpos($value, '.') !== false) {
-              // Hapus nol di belakang desimal, tapi jangan hilangkan titik kalau hasilnya bilangan bulat
-              $formatted = rtrim(rtrim($value, '0'), '.');
+            $params = [$tgl_tutup, $warehouse];
 
-              // Jika desimalnya habis (misal 50.), tambahkan .00
-              if (strpos($formatted, '.') === false) {
-                $formatted .= '.00';
-              } else {
-                // Kalau desimalnya tinggal 1 digit, tambahkan 0
-                $decimal_part = explode('.', $formatted)[1];
-                if (strlen($decimal_part) === 1) {
-                  $formatted .= '0';
-                }
-              }
-            } else {
-              // Bilangan bulat → tambahkan .00
-              $formatted = $value . '.00';
+            $stmt = sqlsrv_query($con, $sql, $params);
+            if ($stmt === false) {
+              die(print_r(sqlsrv_errors(), true));
             }
+
+            while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+            $qty_num = (float) ($r['total_qty'] ?? 0);
+
+            $value = (string) $qty_num;
+              
+              if (strpos($value, '.') !== false) {
+                $formatted = rtrim(rtrim($value, '0'), '.');
+
+                if (strpos($formatted, '.') === false) {
+                  $formatted .= '.00';
+                } else {
+                  $decimal_part = explode('.', $formatted)[1];
+                  if (strlen($decimal_part) === 1) {
+                    $formatted .= '0';
+                  }
+                }
+              } else {
+                $formatted = $value . '.00';
+              }       
+              
+              
 ?>
 	  <tr>
 	  <td><?php echo $no; ?></td>
@@ -132,11 +151,15 @@ $tahun = $date->format('Y');
       <td ><?php echo $r['LONGDESCRIPTION']; ?></td>
       <td><?php echo $r['LOTCODE']; ?></td>
       <td><?php echo $r['LOGICALWAREHOUSECODE']; ?></td>
-      <td align="center"><?= $formatted ?></td>     
+      <td align="right"><?= $formatted ?></td>     
       </tr>	  				  
-<?php	$no++;
-		$totqty=$totqty+ $formatted;
-	} ?>
+<?php 
+    $totqty += $qty_num;
+    $no++;
+	}
+          $totqty_format = (substr(number_format($totqty, 2), -3) == '.00')
+            ? number_format($totqty, 0) . '.00'
+            : number_format($totqty, 2);?>
 				  </tbody>
 				<tfoot>
 				  <tr>
@@ -154,7 +177,7 @@ $tahun = $date->format('Y');
                     <td>&nbsp;</td>
                     <td>&nbsp;</td>
                     <td><strong>Grand Total</strong></td>
-                    <td align="right"><strong><?php echo $totqty; ?></strong></td>                
+                    <td align="right"><strong><?php echo $totqty_format; ?></strong></td>                
                   <tr>
                     <td style="border-bottom: 0px solid black;border-top: 0px solid black;border-right: 0px solid black; border-left: 0px solid black;">&nbsp;</td>
                     <td style="border-bottom: 0px solid black;border-top: 0px solid black;border-right: 0px solid black; border-left: 0px solid black;">&nbsp;</td>
