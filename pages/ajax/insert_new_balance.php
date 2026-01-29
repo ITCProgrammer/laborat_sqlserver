@@ -47,13 +47,13 @@ try {
     
     $ABSUNIQUEID = 0;
 
-    $getMax = $con->query(" SELECT 
+    $getMax = sqlsrv_query($con, "SELECT 
             MAX(ELEMENTSCODE) AS last_elementcode,
             MAX(NUMBERID) AS last_numberid
-        FROM balance
+        FROM db_laborat.balance
     ");
 
-    $row = $getMax->fetch_assoc();
+    $row = $getMax ? sqlsrv_fetch_array($getMax, SQLSRV_FETCH_ASSOC) : null;
 
     // ELEMENTSCODE
     $lastElement = intval(str_replace(",", "", $row['last_elementcode'] ?? 0));
@@ -68,7 +68,7 @@ try {
         : $lastNumber + 1;
         
     // Query insert
-     $sql = " INSERT INTO balance (
+     $sql = " INSERT INTO db_laborat.balance (
             G_B,
             COMPANYCODE,
             ITEMTYPECOMPANYCODE,
@@ -131,14 +131,11 @@ try {
             ?, ?,
             ?, ?,
             ?,
-            NOW(), NOW(), NOW(), NOW()
+            GETDATE(), GETDATE(), GETDATE(), GETDATE()
         )
     ";
 
-    $stmt = $con->prepare($sql);
-    $stmt->bind_param(
-        "sssssssssssssssssssssiddsdsiis",
-        
+    $params = [
         $g_b,
         $COMPANYCODE,
         $ITEMTYPECOMPANYCODE,
@@ -181,12 +178,13 @@ try {
         $ABSUNIQUEID,
 
         $CREATIONUSER
-    );
+    ];
 
- 
-
-    $stmt->execute();
-    $stmt->close();
+    $stmt = sqlsrv_query($con, $sql, $params);
+    if (!$stmt) {
+        $errors = sqlsrv_errors();
+        throw new Exception($errors ? $errors[0]['message'] : 'Insert failed');
+    }
 
     echo json_encode(["status" => "success"]);
 

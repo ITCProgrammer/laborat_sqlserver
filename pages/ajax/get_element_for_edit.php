@@ -11,7 +11,7 @@ if (!$element_id) {
     exit;
 }
 
-$sql = "SELECT
+$sql = "SELECT TOP 1
     NUMBERID as element_id,
     ELEMENTSCODE as element_code,
     DECOSUBCODE01 as decosub01,
@@ -26,18 +26,22 @@ $sql = "SELECT
     G_B as g_b,
     BASEPRIMARYQUANTITYUNIT as primary_qty,
     BASESECONDARYQUANTITYUNIT as secondary_qty
-    FROM balance WHERE NUMBERID = ? LIMIT 1";
+    FROM db_laborat.balance WHERE NUMBERID = ?";
 
-$stmt = $con->prepare($sql);
+$stmt = sqlsrv_prepare($con, $sql, [$element_id]);
 if (!$stmt) {
-    echo json_encode(['success' => false, 'message' => 'Prepare failed: ' . $con->error]);
+    $errors = sqlsrv_errors();
+    echo json_encode(['success' => false, 'message' => 'Prepare failed: ' . ($errors ? $errors[0]['message'] : 'unknown error')]);
     exit;
 }
 
-$stmt->bind_param('s', $element_id);
-$stmt->execute();
-$res = $stmt->get_result();
-if ($row = $res->fetch_assoc()) {
+if (!sqlsrv_execute($stmt)) {
+    $errors = sqlsrv_errors();
+    echo json_encode(['success' => false, 'message' => 'Execute failed: ' . ($errors ? $errors[0]['message'] : 'unknown error')]);
+    exit;
+}
+
+if ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
     // build a human-friendly item text
     $item_text = trim(($row['decosub01'] ?? '') . ' ' . ($row['decosub02'] ?? '') . ' ' . ($row['decosub03'] ?? '') . ' ' . ($row['decosub04'] ?? ''));
 
@@ -52,7 +56,7 @@ if ($row = $res->fetch_assoc()) {
     $response['message'] = 'Not found';
 }
 
-$stmt->close();
+sqlsrv_free_stmt($stmt);
 echo json_encode($response);
 exit;
 

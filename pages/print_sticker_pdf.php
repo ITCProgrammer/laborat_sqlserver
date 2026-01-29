@@ -60,23 +60,21 @@ $data = [
 ];
 
 if ($element_id !== '') {
-  $sql = "SELECT ELEMENTSCODE AS element_code,
+  $sql = "SELECT TOP 1 ELEMENTSCODE AS element_code,
         CONCAT(
-            COALESCE(TRIM(DECOSUBCODE01),'') ,'-',
-            COALESCE(TRIM(DECOSUBCODE02),'') ,'',
-            COALESCE(TRIM(DECOSUBCODE03),'') ,'-',
-            COALESCE(TRIM(DECOSUBCODE04),'')
+            LTRIM(RTRIM(ISNULL(DECOSUBCODE01,''))) ,'-',
+            LTRIM(RTRIM(ISNULL(DECOSUBCODE02,''))) ,'',
+            LTRIM(RTRIM(ISNULL(DECOSUBCODE03,''))) ,'-',
+            LTRIM(RTRIM(ISNULL(DECOSUBCODE04,'')))
         ) AS item_code,
         LOTCODE AS lot_code, 
         PROJECTCODE AS project_code,
         WAREHOUSELOCATIONCODE AS loc_code, 
         BASEPRIMARYQUANTITYUNIT AS qty
-        FROM balance WHERE NUMBERID = ? LIMIT 1";
-  if ($stmt = $con->prepare($sql)) {
-    $stmt->bind_param('s', $element_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-    if ($res && $row = $res->fetch_assoc()) {
+        FROM db_laborat.balance WHERE NUMBERID = ?";
+  $stmt = sqlsrv_prepare($con, $sql, [$element_id]);
+  if ($stmt && sqlsrv_execute($stmt)) {
+    if ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
       $data['element_code'] = $row['element_code'] ?? '';
       $data['item_code'] = $row['item_code'] ?? '';
       $data['lot_code'] = $row['lot_code'] ?? '';
@@ -85,7 +83,7 @@ if ($element_id !== '') {
       $data['qty'] = floatval($row['qty']) ?: 0;
       $data['created_at'] = date('d M Y H:i');
     }
-    $stmt->close();
+    sqlsrv_free_stmt($stmt);
   }
 }
 

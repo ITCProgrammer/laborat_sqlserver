@@ -17,26 +17,36 @@ if (!$element_id) {
 // Query grouped by no_resep with conditional aggregates for Preliminary and Waste
 $sql = "SELECT qty,
             created_at
-    FROM balance_transactions
+    FROM db_laborat.balance_transactions
     WHERE element_id = ? AND action = 'Waste'
     ORDER BY created_at DESC";
 
-$stmt = $con->prepare($sql);
+$stmt = sqlsrv_prepare($con, $sql, [$element_id]);
 if (!$stmt) {
-    echo json_encode(['data' => [], 'message' => 'Prepare failed: ' . $con->error]);
+    $errors = sqlsrv_errors();
+    echo json_encode(['data' => [], 'message' => 'Prepare failed: ' . ($errors ? $errors[0]['message'] : 'unknown error')]);
     exit;
 }
 
-$stmt->bind_param('s', $element_id);
-$stmt->execute();
-$res = $stmt->get_result();
+if (!sqlsrv_execute($stmt)) {
+    $errors = sqlsrv_errors();
+    echo json_encode(['data' => [], 'message' => 'Execute failed: ' . ($errors ? $errors[0]['message'] : 'unknown error')]);
+    exit;
+}
 $data = [];
-while ($row = $res->fetch_assoc()) {
+$res = $stmt;
+while ($row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) {
+    $createdAt = $row['created_at'];
+    if ($createdAt instanceof DateTimeInterface) {
+        $createdAt = $createdAt->format('Y-m-d H:i:s');
+    } elseif ($createdAt === null) {
+        $createdAt = '';
+    }
     $data[] = [
         'qty' => floatval($row['qty']),
-        'created_at' => $row['created_at'],
+        'created_at' => $createdAt,
     ];
 }
-$stmt->close();
+sqlsrv_free_stmt($stmt);
 echo json_encode(['data' => $data]);
 exit;
