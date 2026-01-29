@@ -18,20 +18,19 @@
 	<?php
 	ini_set("error_reporting", 1);
 	session_start();
-	// require_once "../koneksi.php";
-	$con=mysqli_connect("10.0.0.10","dit","4dm1n","db_laborat");
+	include "koneksi.php";
 	function nourut($str)
 	{
-		// require_once "../koneksi.php";
-		$con=mysqli_connect("10.0.0.10","dit","4dm1n","db_laborat");
-
 		date_default_timezone_set('Asia/Jakarta');
 		$bln = date("ym");
 		$today = date("ymd");
-		$sqlnotes = mysqli_query($con, "SELECT no_counter FROM tbl_test_qc WHERE substr(no_counter,1,6) like '%" . $bln . "%' ORDER BY no_counter DESC LIMIT 1") or die(mysqli_error());
-		$dt = mysqli_num_rows($sqlnotes);
-		if ($dt > 0) {
-			$rd = mysqli_fetch_array($sqlnotes);
+		$sqlnotes = sqlsrv_query(
+			$GLOBALS['con'],
+			"SELECT TOP 1 no_counter FROM db_laborat.tbl_test_qc WHERE no_counter LIKE ? ORDER BY no_counter DESC",
+			['%' . $bln . '%']
+		);
+		$dt = 0;
+		if ($sqlnotes && ($rd = sqlsrv_fetch_array($sqlnotes, SQLSRV_FETCH_ASSOC))) {
 			$dt = $rd['no_counter'];
 			$strd = substr($dt, 6, 4);
 			$Urutd = (int)$strd;
@@ -49,17 +48,33 @@
 		return $no2;
 	}
 
-	$sqlNoCounter = mysqli_query($con, "SELECT no_counter FROM tbl_test_qc where id = (select max(id) from tbl_test_qc) LIMIT 1");
-	$noCounter = mysqli_fetch_array($sqlNoCounter);
-	$nourut = nourut($noCounter['no_counter']);
-	$idR	= $_GET["idk"];
-	$sqlMatching = mysqli_query($con, "SELECT * FROM tbl_matching WHERE no_resep='$idR' LIMIT 1");
-	$dt	= mysqli_fetch_array($sqlMatching);
-	$buyerTest = trim($dt['buyer']) . " " . trim($dt['no_item']);
-	$conQC = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_qc");
-	$qMB = mysqli_query($conQC, "SELECT * FROM tbl_masterbuyer_test WHERE buyer='$buyerTest'");
-	$dMB = mysqli_fetch_array($qMB);
-	$detail2 = explode(",", $dMB['colorfastness']);
+	$sqlNoCounter = sqlsrv_query($con, "SELECT TOP 1 no_counter FROM db_laborat.tbl_test_qc ORDER BY id DESC");
+	$noCounter = $sqlNoCounter ? sqlsrv_fetch_array($sqlNoCounter, SQLSRV_FETCH_ASSOC) : null;
+	$nourut = nourut($noCounter ? $noCounter['no_counter'] : '');
+	$idR	= isset($_GET["idk"]) ? $_GET["idk"] : '';
+	$sqlMatching = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_matching WHERE no_resep = ?", [$idR]);
+	$dt	= $sqlMatching ? sqlsrv_fetch_array($sqlMatching, SQLSRV_FETCH_ASSOC) : null;
+	$dt = $dt ?: [];
+	$buyerTest = trim($dt['buyer'] ?? '') . " " . trim($dt['no_item'] ?? '');
+	$hostSVR221 = "10.0.0.221";
+	$usernameSVR221 = "sa";
+	$passwordSVR221 = "Ind@taichen2024";
+	$qc = "db_qc";
+	$conQC = sqlsrv_connect($hostSVR221, [
+		"Database" => $qc,
+		"UID" => $usernameSVR221,
+		"PWD" => $passwordSVR221,
+		"CharacterSet" => "UTF-8"
+	]);
+	if (! $conQC) {
+		exit("SQLSVR19 db_qc Connection failed");
+	}
+
+	$qMB = sqlsrv_query($conQC, "SELECT * FROM db_qc.tbl_masterbuyer_test WHERE buyer = ?", [$buyerTest]);
+	$dMB = $qMB ? sqlsrv_fetch_array($qMB, SQLSRV_FETCH_ASSOC) : null;
+	$detail2 = ($dMB && isset($dMB['colorfastness'])) ? explode(",", $dMB['colorfastness']) : [];
+	$cek1 = $cek1 ?? 0;
+	$r1 = $r1 ?? [];
 
 	?>
 	<?php
@@ -87,23 +102,22 @@
 
 		$ip_num = get_client_ip();
 
-		$warna = mysqli_real_escape_string($con, $_POST['warna']);
-		$nowarna = mysqli_real_escape_string($con, $_POST['nowarna']);
-		$buyer = mysqli_real_escape_string($con, $_POST['buyer']);
-		$kain = mysqli_real_escape_string($con, $_POST['jenis_kain']);
-		$item = mysqli_real_escape_string($con, $_POST['noitem']);
-		$nama = mysqli_real_escape_string($con, $_POST['nama']);
-		$cck_warna = mysqli_real_escape_string($con, $_POST['cck_warna']);
-		$note_lab = mysqli_real_escape_string($con, $_POST['note_lab']);
+		$warna = $_POST['warna'];
+		$nowarna = $_POST['nowarna'];
+		$buyer = $_POST['buyer'];
+		$kain = $_POST['jenis_kain'];
+		$item = $_POST['noitem'];
+		$nama = $_POST['nama'];
+		$cck_warna = $_POST['cck_warna'];
+		$note_lab = $_POST['note_lab'];
+		$userLAB = $_SESSION['userLAB'] ?? '';
 
-
-		$checkbox1 = $_POST['colorfastness'];
-
-		foreach ($checkbox1 as $chk1) {
-			$chkc .= $chk1 . ",";
+		$chkc = '';
+		if (!empty($_POST['colorfastness']) && is_array($_POST['colorfastness'])) {
+			$chkc = implode(',', $_POST['colorfastness']);
 		}
 
-		mysqli_begin_transaction($con);
+		sqlsrv_begin_transaction($con);
 
 		$success = true;
 
@@ -111,14 +125,34 @@
 			$notrt = 1;
 
 			foreach ($_POST['jen_matching'] as $index => $subject1) {
-				$ktjen = mysqli_real_escape_string($con, $subject1);
-				$nocount = mysqli_real_escape_string($con, $_POST['no_resep'] . "-" . $notrt);
+				$ktjen = $subject1;
+				$nocount = $_POST['no_resep'] . "-" . $notrt;
 
 				// $qry = mysqli_query($con, "INSERT INTO tbl_test_qc (no_counter, treatment, jenis_testing, suffix, buyer, no_warna, warna, jenis_kain, no_item, permintaan_testing, nama_personil_test, tgl_buat, tgl_update, sts_laborat, sts_qc, sts, created_by)
 	            //     VALUES ('$nocount', '$ktjen', '$_POST[Dyestuff]', '$_POST[suffix]', '$buyer', '$nowarna', '$warna', '$kain', '$item', '$chkc', '$nama', NOW(), NOW(), 'Open', 'Belum Terima Kain', '$_POST[sts]', '$_SESSION[userLAB]')");
 	
-				$qry = mysqli_query($con, "INSERT INTO tbl_test_qc (no_counter, treatment, jenis_testing, suffix, buyer, no_warna, warna, jenis_kain, cocok_warna, no_item, permintaan_testing, nama_personil_test, tgl_buat, tgl_update, sts_laborat, sts_qc, sts,note_laborat, created_by)
-	                VALUES ('$nocount', '$ktjen', '$_POST[Dyestuff]', '$_POST[suffix]', '$buyer', '$nowarna', '$warna', '$kain', '$cck_warna', '$item', '$chkc', '$nama', NOW(), NOW(), 'Open', 'Belum Terima Kain', '$_POST[sts]', '$note_lab', '$_SESSION[userLAB]')");
+				$qry = sqlsrv_query(
+					$con,
+					"INSERT INTO db_laborat.tbl_test_qc (no_counter, treatment, jenis_testing, suffix, buyer, no_warna, warna, jenis_kain, cocok_warna, no_item, permintaan_testing, nama_personil_test, tgl_buat, tgl_update, sts_laborat, sts_qc, sts, note_laborat, created_by)
+	                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), GETDATE(), 'Open', 'Belum Terima Kain', ?, ?, ?)",
+					[
+						$nocount,
+						$ktjen,
+						$_POST['Dyestuff'],
+						$_POST['suffix'],
+						$buyer,
+						$nowarna,
+						$warna,
+						$kain,
+						$cck_warna,
+						$item,
+						$chkc,
+						$nama,
+						$_POST['sts'],
+						$note_lab,
+						$userLAB
+					]
+				);
 
 
 				if (!$qry) {
@@ -127,8 +161,12 @@
 				}
 
 				// Jika query berhasil, tambahkan juga ke log_qc_test
-				$qry2 = mysqli_query($con, "INSERT INTO log_qc_test (no_counter, `status`, info, do_by, do_at, ip_address)
-	                VALUES ('$nocount', 'Open', 'Kain diserahkan dari laborat', '$_SESSION[userLAB]', NOW(), '$ip_num')");
+				$qry2 = sqlsrv_query(
+					$con,
+					"INSERT INTO db_laborat.log_qc_test (no_counter, status, info, do_by, do_at, ip_address)
+	                 VALUES (?, 'Open', 'Kain diserahkan dari laborat', ?, GETDATE(), ?)",
+					[$nocount, $userLAB, $ip_num]
+				);
 
 				if (!$qry2) {
 					$success = false;
@@ -141,10 +179,10 @@
 
 		// Commit transaksi jika semua operasi berhasil, rollback jika ada yang gagal
 		if ($success) {
-			mysqli_commit($con);
+			sqlsrv_commit($con);
 			echo "<script>alert('Data Tersimpan');window.location.href='?p=TestQCFinal';</script>";
 		} else {
-			mysqli_rollback($con);
+			sqlsrv_rollback($con);
 			echo "<script>alert('Gagal menyimpan data. Silakan coba lagi.');window.location.href='?p=Form-Testing';</script>";
 		}
 	}
@@ -244,12 +282,12 @@
 										...
 									</button>
 									<div class="col-sm-2">
-										<select value="<?php echo $_GET['Dystf'] ?>" type="text" class="form-control select2" id="Dyestuff" name="Dyestuff" required>
+											<select value="<?php echo isset($_GET['Dystf']) ? $_GET['Dystf'] : '' ?>" type="text" class="form-control select2" id="Dyestuff" name="Dyestuff" required>
 											<option value="" selected disabled>Pilih Jenis Testing</option>
 											<?php
-											$sqlmstrcd = mysqli_query($con, "SELECT kode, `value` FROM tbl_mstrjnstesting ORDER BY kode ASC;");
-											while ($li = mysqli_fetch_array($sqlmstrcd)) { ?>
-												<option value="<?php echo $li['value'] ?>" <?php if ($li['value'] == $_GET['Dystf']) {
+											$sqlmstrcd = sqlsrv_query($con, "SELECT kode, value FROM db_laborat.tbl_mstrjnstesting ORDER BY kode ASC;");
+											while ($sqlmstrcd && ($li = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC))) { ?>
+												<option value="<?php echo $li['value'] ?>" <?php if (isset($_GET['Dystf']) && $li['value'] == $_GET['Dystf']) {
 																								echo 'selected';
 																							} ?>><?php echo $li['kode'] ?></option>
 											<?php } ?>
@@ -266,7 +304,7 @@
 								<div class="form-group">
 									<label for="suffix" class="col-sm-2 control-label">Suffix</label>
 									<div class="col-sm-4">
-										<input name="suffix" placeholder="Suffix ..." type="text" onkeyup="this.value = this.value.toUpperCase();" class="form-control suffixcuy" id="order" onchange="window.location='?p=Form-Testing&idk='+this.value+'&Dystf='+document.getElementById(`Dyestuff`).value" value="<?php if ($_GET['idk'] != "") {
+										<input name="suffix" placeholder="Suffix ..." type="text" onkeyup="this.value = this.value.toUpperCase();" class="form-control suffixcuy" id="order" onchange="window.location='?p=Form-Testing&idk='+this.value+'&Dystf='+document.getElementById(`Dyestuff`).value" value="<?php if (isset($_GET['idk']) && $_GET['idk'] != "") {
 																																																																															echo $_GET['idk'];
 																																																																														} ?>" required>
 									</div>
@@ -276,34 +314,34 @@
 									<div class="col-sm-3">
 										<select class="form-control select2" multiple="multiple" id="jen_matching" name="jen_matching[]" data-placeholder="Pilih Jenis Treatment" required>
 											<!--<option selected disabled>Pilih...</option>-->
-											<option <?php if ($_GET['jn_mcng'] == "non sublimasi / FIN") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "non sublimasi / FIN") {
 														echo "selected";
 													} ?> value="non sublimasi / FIN">non sublimasi / FIN</option>
-											<option <?php if ($_GET['jn_mcng'] == "sublimasi 110C") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "sublimasi 110C") {
 														echo "selected";
 													} ?> value="sublimasi 110C">sublimasi 110'C</option>
-											<option <?php if ($_GET['jn_mcng'] == "sublimasi 120C") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "sublimasi 120C") {
 														echo "selected";
 													} ?> value="sublimasi 120C">sublimasi 120'C</option>
-											<option <?php if ($_GET['jn_mcng'] == "sublimasi 130C") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "sublimasi 130C") {
 														echo "selected";
 													} ?> value="sublimasi 130C">sublimasi 130'C</option>
-											<option <?php if ($_GET['jn_mcng'] == "sublimasi 140C") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "sublimasi 140C") {
 														echo "selected";
 													} ?> value="sublimasi 140C">sublimasi 140'C</option>
-											<option <?php if ($_GET['jn_mcng'] == "FINISHING (cotton/ CVC)") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "FINISHING (cotton/ CVC)") {
 														echo "selected";
 													} ?> value="FINISHING (cotton/ CVC)">FINISHING (cotton/ CVC)</option>
-											<option <?php if ($_GET['jn_mcng'] == "non WR") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "non WR") {
 														echo "selected";
 													} ?> value="non WR">non WR</option>
-											<option <?php if ($_GET['jn_mcng'] == "WR") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "WR") {
 														echo "selected";
 													} ?> value="WR">WR</option>
-											<option <?php if ($_GET['jn_mcng'] == "non protx2") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "non protx2") {
 														echo "selected";
 													} ?> value="non protx2">non protx2</option>
-											<option <?php if ($_GET['jn_mcng'] == "protx2") {
+											<option <?php if (isset($_GET['jn_mcng']) && $_GET['jn_mcng'] == "protx2") {
 														echo "selected";
 													} ?> value="protx2">protx2</option>
 										</select>
@@ -351,8 +389,8 @@
 						<tbody>
 							<?php
 							$i = 1;
-							$sqlmstrcd = mysqli_query($con, "SELECT kode, keterangan from tbl_mstrjnstesting;");
-							while ($title = mysqli_fetch_array($sqlmstrcd)) {
+							$sqlmstrcd = sqlsrv_query($con, "SELECT kode, keterangan FROM db_laborat.tbl_mstrjnstesting;");
+							while ($sqlmstrcd && ($title = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC))) {
 								echo '<tr><td>' . $i++ . '.</td>
 									<td>' . $title['kode'] . '</td>
 									<td>' . $title['keterangan'] . '</td></tr>';
@@ -378,16 +416,16 @@
 	<div class="form-group">
 		<label for="buyer" class="col-sm-2 control-label">Buyer</label>
 		<div class="col-sm-8">
-			<input name="buyer" type="text" class="form-control" id="buyer" placeholder="buyer" value="<?= $dt['langganan'];  ?>">
+			<input name="buyer" type="text" class="form-control" id="buyer" placeholder="buyer" value="<?= isset($dt['langganan']) ? $dt['langganan'] : ''; ?>">
 		</div>
 	</div>
 	<div class="form-group">
 		<label for="nowarna" class="col-sm-2 control-label">No Warna</label>
 		<div class="col-sm-6">
 			<input name="nowarna" type="text" class="form-control" id="nowarna" placeholder="No Warna" value="<?php if ($cek1 > 0) {
-																													echo $r1['color'];
+																													echo $r1['color'] ?? '';
 																												} else {
-																													echo $dt['no_warna'];
+																													echo $dt['no_warna'] ?? '';
 																												} ?>">
 		</div>
 	</div>
@@ -395,9 +433,9 @@
 		<label for="warna" class="col-sm-2 control-label">Nama Warna</label>
 		<div class="col-sm-6">
 			<input name="warna" type="text" class="form-control" id="warna" placeholder="Nama Warna" value="<?php if ($cek1 > 0) {
-																												echo $r1['color'];
+																												echo $r1['color'] ?? '';
 																											} else {
-																												echo $dt['warna'];
+																												echo $dt['warna'] ?? '';
 																											} ?>">
 		</div>
 	</div>
@@ -405,9 +443,9 @@
 		<label for="noitem" class="col-sm-2 control-label">Item</label>
 		<div class="col-sm-6">
 			<input name="noitem" type="text" class="form-control" id="noitem" placeholder="No Item" value="<?php if ($cek1 > 0) {
-																												echo $r1['colorno'];
+																												echo $r1['colorno'] ?? '';
 																											} else {
-																												echo $dt['no_item'];
+																												echo $dt['no_item'] ?? '';
 																											} ?>">
 		</div>
 	</div>
@@ -415,9 +453,9 @@
 		<label for="jenis_kain" class="col-sm-2 control-label">Jenis Kain</label>
 		<div class="col-sm-8">
 			<input name="jenis_kain" type="text" class="form-control" id="jenis_kain" placeholder="Jenis Kain" value="<?php if ($cek1 > 0) {
-																															echo htmlentities($r1['description'], ENT_QUOTES);
+																															echo htmlentities($r1['description'] ?? '', ENT_QUOTES);
 																														} else {
-																															echo $dt['jenis_kain'];
+																															echo $dt['jenis_kain'] ?? '';
 																														} ?>">
 		</div>
 	</div>
@@ -425,7 +463,7 @@
 	<div class="form-group">
 		<label for="warna" class="col-sm-2 control-label">Cocok Warna</label>
 		<div class="col-sm-6">
-			<input name="cck_warna" type="text" class="form-control" id="cck_warna" placeholder="Cocok Warna" value="<?= $dt['cocok_warna']; ?>">
+			<input name="cck_warna" type="text" class="form-control" id="cck_warna" placeholder="Cocok Warna" value="<?= isset($dt['cocok_warna']) ? $dt['cocok_warna'] : ''; ?>">
 		</div>
 	</div>
 

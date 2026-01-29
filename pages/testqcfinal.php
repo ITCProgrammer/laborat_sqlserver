@@ -13,7 +13,7 @@ $JnsTesting    = isset($_POST['jns_testing']) ? $_POST['jns_testing'] : '';
 $Warna        = isset($_POST['warna']) ? $_POST['warna'] : '';
 
 
-$role = $_SESSION['jabatanLAB']
+$role = $_SESSION['jabatanLAB'];
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -137,12 +137,23 @@ $role = $_SESSION['jabatanLAB']
                                 <tbody>
                                     <?php
                                     $no = 1;
-                                    if ($Nowarna != "" or $Item != "" or $Suffix != "" or $JnsTesting != "" or $Warna != "" or $CounterNo != "") {
-                                        $sql = mysqli_query($con, "SELECT * FROM tbl_test_qc WHERE sts_laborat <> 'Approved Full' AND suffix LIKE '%$Suffix%' AND jenis_testing LIKE '%$JnsTesting%' AND no_warna LIKE '%$Nowarna%' AND warna LIKE '%$Warna%' AND no_item LIKE '%$Item%' AND no_counter LIKE '%$CounterNo%' AND (deleted_at IS NULL OR deleted_at = '') ORDER BY id ASC");
-                                    } else {
-                                        $sql = mysqli_query($con, "SELECT * FROM tbl_test_qc WHERE sts_laborat <> 'Approved Full' AND (deleted_at IS NULL OR deleted_at = '')  ORDER BY id ASC");
+                                    $baseSql = "SELECT * FROM db_laborat.tbl_test_qc WHERE sts_laborat <> 'Approved Full' AND (deleted_at IS NULL OR deleted_at = '')";
+                                    $params = [];
+
+                                    if ($Nowarna != "" || $Item != "" || $Suffix != "" || $JnsTesting != "" || $Warna != "" || $CounterNo != "") {
+                                        $baseSql .= " AND suffix LIKE ? AND jenis_testing LIKE ? AND no_warna LIKE ? AND warna LIKE ? AND no_item LIKE ? AND no_counter LIKE ?";
+                                        $params[] = '%' . $Suffix . '%';
+                                        $params[] = '%' . $JnsTesting . '%';
+                                        $params[] = '%' . $Nowarna . '%';
+                                        $params[] = '%' . $Warna . '%';
+                                        $params[] = '%' . $Item . '%';
+                                        $params[] = '%' . $CounterNo . '%';
                                     }
-                                    while ($r = mysqli_fetch_array($sql)) {
+
+                                    $baseSql .= " ORDER BY id ASC";
+                                    $sql = sqlsrv_query($con, $baseSql, $params);
+
+                                    while ($sql && ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC))) {
                                         $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
                                         $detail2 = explode(",", $r['permintaan_testing']);
 
@@ -150,6 +161,16 @@ $role = $_SESSION['jabatanLAB']
                                         $tgl_buat =  $r['tgl_buat'];
                                         $tgl_terima = $r['tgl_terimakain'];
                                         $tgl_approve_qc = $r['tgl_approve_qc'];
+
+                                        if ($tgl_buat instanceof DateTimeInterface) {
+                                            $tgl_buat = $tgl_buat->format('Y-m-d H:i:s');
+                                        }
+                                        if ($tgl_terima instanceof DateTimeInterface) {
+                                            $tgl_terima = $tgl_terima->format('Y-m-d H:i:s');
+                                        }
+                                        if ($tgl_approve_qc instanceof DateTimeInterface) {
+                                            $tgl_approve_qc = $tgl_approve_qc->format('Y-m-d H:i:s');
+                                        }
 
                                         $now = new DateTime();
 

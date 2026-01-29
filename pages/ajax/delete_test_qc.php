@@ -27,11 +27,15 @@ $ip_num = get_client_ip();
 
 $success = true;
 
-mysqli_begin_transaction($con);
+sqlsrv_begin_transaction($con);
 
 
-$query_delete = "UPDATE `tbl_test_qc` SET `deleted_at` = NOW() WHERE `id` = '$_POST[id]'";
-$result_delete = mysqli_query($con, $query_delete);
+$id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+$no_counter = isset($_POST['no_counter']) ? $_POST['no_counter'] : '';
+$userLAB = isset($_SESSION['userLAB']) ? $_SESSION['userLAB'] : '';
+
+$query_delete = "UPDATE db_laborat.tbl_test_qc SET deleted_at = GETDATE() WHERE id = ?";
+$result_delete = sqlsrv_query($con, $query_delete, [$id]);
 
 
 if (!$result_delete) {
@@ -39,13 +43,12 @@ if (!$result_delete) {
 }
 
 
-$no_counter = $_POST['no_counter'];
 $log_info = "Menghapus test $no_counter";
 
 
-$query_log = "INSERT INTO log_qc_test (no_counter, `status`, info, do_by, do_at, ip_address)
-                  VALUES ('$no_counter', 'Open', '$log_info', '$_SESSION[userLAB]', NOW(), '$ip_num')";
-$result_log = mysqli_query($con, $query_log);
+$query_log = "INSERT INTO db_laborat.log_qc_test (no_counter, status, info, do_by, do_at, ip_address)
+                  VALUES (?, 'Open', ?, ?, GETDATE(), ?)";
+$result_log = sqlsrv_query($con, $query_log, [$no_counter, $log_info, $userLAB, $ip_num]);
 
 
 if (!$result_log) {
@@ -53,7 +56,7 @@ if (!$result_log) {
 }
 
 if ($success) {
-    mysqli_commit($con);
+    sqlsrv_commit($con);
 
     $response = array(
         'session' => 'LIB_SUCCSS',
@@ -61,7 +64,7 @@ if ($success) {
     );
     echo json_encode($response);
 } else {
-    mysqli_rollback($con);
+    sqlsrv_rollback($con);
     $response = array(
         'session' => 'LIB_FAILED',
         'exp' => 'updated',

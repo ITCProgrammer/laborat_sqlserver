@@ -3,15 +3,28 @@ ini_set("error_reporting", 1);
 session_start();
 include "../../koneksi.php";
 
-$id_list = implode(', ', $_POST['cek']);
-$sql = mysqli_query($con, "SELECT * FROM tbl_test_qc WHERE sts_laborat <> 'Approved Full' AND id IN ($id_list) ORDER BY id ASC");
+$ids = isset($_POST['cek']) && is_array($_POST['cek']) ? $_POST['cek'] : [];
+$id_list = array_values(array_filter(array_map('intval', $ids)));
+$rows = [];
 
-if (!$sql) {
-	echo 'Error executing query: ' . mysqli_error($con);
-	exit;
+if (!empty($id_list)) {
+	$placeholders = implode(', ', array_fill(0, count($id_list), '?'));
+	$sql = "SELECT * FROM db_laborat.tbl_test_qc
+	        WHERE sts_laborat <> 'Approved Full' AND id IN ($placeholders)
+	        ORDER BY id ASC";
+	$stmt = sqlsrv_query($con, $sql, $id_list);
+
+	if (!$stmt) {
+		$errors = sqlsrv_errors();
+		echo 'Error executing query: ' . ($errors ? $errors[0]['message'] : 'unknown error');
+		exit;
+	}
+
+	while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+		$rows[] = $row;
+	}
+	sqlsrv_free_stmt($stmt);
 }
-
-$rows = mysqli_fetch_all($sql, MYSQLI_ASSOC);
 
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -68,7 +81,13 @@ $rows = mysqli_fetch_all($sql, MYSQLI_ASSOC);
 							</tr>
 							<tr>
 								<td colspan="3" style="border-top:0px #000000 solid; border-bottom:0px #000000 solid; border-left:0px #000000 solid; border-right:0px #000000 solid;">
-									<div style="font-size: 8px;">COCOK WARNA : <?php echo isset($rows[$i]['sts']) ? strtoupper($rows[$i]['cocok_warna']) : ''; ?>
+									<div style="font-size: 8px;">COCOK WARNA : <?php
+									$cocokWarna = isset($rows[$i]['cocok_warna']) ? $rows[$i]['cocok_warna'] : '';
+									if ($cocokWarna === null) {
+										$cocokWarna = '';
+									}
+									echo strtoupper($cocokWarna);
+									?>
 									</div>
 								</td>
 							</tr>
@@ -80,7 +99,15 @@ $rows = mysqli_fetch_all($sql, MYSQLI_ASSOC);
 							</tr>
 							<tr>
 								<td colspan="3" style="border-top:0px #000000 solid; border-bottom:0px #000000 solid; border-left:0px #000000 solid; border-right:0px #000000 solid;">
-									<div style="font-size: 8px;">TANGGAL : <?php echo isset($rows[$i]['tgl_update']) && $rows[$i]['tgl_update'] != "" ? date('d-m-Y H:i', strtotime(substr($rows[$i]['tgl_update'], 0, 18))) : ''; ?></div>
+									<div style="font-size: 8px;">TANGGAL : <?php
+									$tglUpdate = isset($rows[$i]['tgl_update']) ? $rows[$i]['tgl_update'] : '';
+									if ($tglUpdate instanceof DateTimeInterface) {
+										$tglUpdate = $tglUpdate->format('Y-m-d H:i:s');
+									} elseif ($tglUpdate === null) {
+										$tglUpdate = '';
+									}
+									echo $tglUpdate !== '' ? date('d-m-Y H:i', strtotime(substr($tglUpdate, 0, 18))) : '';
+									?></div>
 								</td>
 							</tr>
 							<tr>

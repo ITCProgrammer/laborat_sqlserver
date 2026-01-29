@@ -37,50 +37,66 @@
 
         $ip_num = get_client_ip();
 
-        $id = mysqli_real_escape_string($con, $_GET['id']);
-        $no_counter = mysqli_real_escape_string($con, $_POST['no_resep']);
-        $buyer = mysqli_real_escape_string($con, $_POST['buyer']);
-        $nowarna = mysqli_real_escape_string($con, $_POST['nowarna']);
-        $warna = mysqli_real_escape_string($con, $_POST['warna']);
-        $item = mysqli_real_escape_string($con, $_POST['noitem']);
-        $kain = mysqli_real_escape_string($con, $_POST['jenis_kain']);
-        $nama = mysqli_real_escape_string($con, $_POST['nama']);
-        $sts = mysqli_real_escape_string($con, $_POST['sts']);
-        $cck_warna = mysqli_real_escape_string($con, $_POST['cck_warna']);
-        $note_lab = mysqli_real_escape_string($con, $_POST['note_lab']);
+        $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+        $no_counter = $_POST['no_resep'];
+        $buyer = $_POST['buyer'];
+        $nowarna = $_POST['nowarna'];
+        $warna = $_POST['warna'];
+        $item = $_POST['noitem'];
+        $kain = $_POST['jenis_kain'];
+        $nama = $_POST['nama'];
+        $sts = $_POST['sts'];
+        $cck_warna = $_POST['cck_warna'];
+        $note_lab = $_POST['note_lab'];
+        $userLAB = $_SESSION['userLAB'] ?? '';
 
-        $checkbox1 = $_POST['colorfastness'];
-
-        foreach ($checkbox1 as $chk1) {
-            $chkc .= $chk1 . ",";
+        $chkc = '';
+        if (!empty($_POST['colorfastness']) && is_array($_POST['colorfastness'])) {
+            $chkc = implode(',', $_POST['colorfastness']);
         }
 
-        mysqli_begin_transaction($con);
+        sqlsrv_begin_transaction($con);
 
         $success = true;
 
-        $query = "UPDATE tbl_test_qc SET 
-              buyer = '$buyer',
-              no_warna = '$nowarna',
-              warna = '$warna',
-              no_item = '$item',
-              jenis_kain = '$kain',
-              nama_personil_test = '$nama',
-              sts = '$sts',
-              cocok_warna = 'cck_warna',
-              note_laborat = '$note_lab',
-              permintaan_testing ='$chkc'
-              WHERE id = '$id'";
+        $query = "UPDATE db_laborat.tbl_test_qc SET 
+              buyer = ?,
+              no_warna = ?,
+              warna = ?,
+              no_item = ?,
+              jenis_kain = ?,
+              nama_personil_test = ?,
+              sts = ?,
+              cocok_warna = ?,
+              note_laborat = ?,
+              permintaan_testing = ?
+              WHERE id = ?";
 
-        $qry_update = mysqli_query($con, $query);
+        $qry_update = sqlsrv_query($con, $query, [
+            $buyer,
+            $nowarna,
+            $warna,
+            $item,
+            $kain,
+            $nama,
+            $sts,
+            $cck_warna,
+            $note_lab,
+            $chkc,
+            $id
+        ]);
 
         if (!$qry_update) {
             $success = false;
         }
 
 
-        $qry_log = mysqli_query($con, "INSERT INTO log_qc_test (no_counter, `status`, info, do_by, do_at, ip_address)
-                                   VALUES ('$no_counter', 'Open', 'Perubahan data untuk $no_counter', '$_SESSION[userLAB]', NOW(), '$ip_num')");
+        $qry_log = sqlsrv_query(
+            $con,
+            "INSERT INTO db_laborat.log_qc_test (no_counter, status, info, do_by, do_at, ip_address)
+             VALUES (?, 'Open', ?, ?, GETDATE(), ?)",
+            [$no_counter, "Perubahan data untuk $no_counter", $userLAB, $ip_num]
+        );
 
         if (!$qry_log) {
             $success = false;
@@ -88,7 +104,7 @@
 
 
         if ($success) {
-            mysqli_commit($con);
+            sqlsrv_commit($con);
 
             echo "<script>Swal.fire({
             title: 'Sukses',
@@ -100,7 +116,7 @@
             }
             });</script>";
         } else {
-            mysqli_rollback($con);
+            sqlsrv_rollback($con);
 
             echo "<script>Swal.fire({
             title: 'Gagal',
@@ -127,11 +143,11 @@
                 <div class="tab-content">
                     <div class="tab-pane active" id="tab_1">
                         <?php
-                        $id = mysqli_real_escape_string($con, $_GET['id']);
+                        $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
-                        $sql = mysqli_query($con, "SELECT * FROM tbl_test_qc WHERE id = '$id'");
-                        if (mysqli_num_rows($sql) > 0) {
-                            $data = mysqli_fetch_array($sql);
+                        $sql = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_test_qc WHERE id = ?", [$id]);
+                        $data = $sql ? sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC) : null;
+                        if ($data) {
 
                             $jenis_testing = $data['jenis_testing'];
                             $no_counter = $data['no_counter'];
@@ -161,8 +177,8 @@
                                         <div class="col-sm-2">
                                             <select disabled value="<?php echo $jenis_testing; ?>" type="text" class="form-control select2" id="Dyestuff" name="Dyestuff" required>
                                                 <?php
-                                                $sqlmstrcd = mysqli_query($con, "SELECT kode, `value` FROM tbl_mstrjnstesting ORDER BY kode ASC;");
-                                                while ($li = mysqli_fetch_array($sqlmstrcd)) { ?>
+                                                $sqlmstrcd = sqlsrv_query($con, "SELECT kode, value FROM db_laborat.tbl_mstrjnstesting ORDER BY kode ASC;");
+                                                while ($sqlmstrcd && ($li = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC))) { ?>
                                                     <option value="<?php echo $li['value'] ?>" <?php if ($li['value'] == $jenis_testing) {
                                                                                                     echo 'selected';
                                                                                                 } ?>><?php echo $li['kode'] ?></option>
@@ -319,9 +335,9 @@
                                         <label for="sts" class="col-sm-2 control-label">Status</label>
                                         <div class="col-sm-6">
                                             <select class="form-control select2" id="sts" name="sts" required>
-                                                <option value="normal" <?php ($sts == 'normal') ? 'selected' : '' ?>>Normal</option>
-                                                <option value="urgent" <?php ($sts == 'urgent') ? 'selected' : '' ?>>Urgent</option>
-                                                <option value="request" <?php ($sts == 'request') ? 'selected' : '' ?>>Request</option>
+                                                <option value="normal" <?php echo ($sts == 'normal') ? 'selected' : ''; ?>>Normal</option>
+                                                <option value="urgent" <?php echo ($sts == 'urgent') ? 'selected' : ''; ?>>Urgent</option>
+                                                <option value="request" <?php echo ($sts == 'request') ? 'selected' : ''; ?>>Request</option>
                                             </select>
                                         </div>
                                     </div>
@@ -378,8 +394,8 @@
                         <tbody>
                             <?php
                             $i = 1;
-                            $sqlmstrcd = mysqli_query($con, "SELECT kode, keterangan from tbl_mstrjnstesting;");
-                            while ($title = mysqli_fetch_array($sqlmstrcd)) {
+                            $sqlmstrcd = sqlsrv_query($con, "SELECT kode, keterangan FROM db_laborat.tbl_mstrjnstesting;");
+                            while ($sqlmstrcd && ($title = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC))) {
                                 echo '<tr><td>' . $i++ . '.</td>
 									<td>' . $title['kode'] . '</td>
 									<td>' . $title['keterangan'] . '</td></tr>';
