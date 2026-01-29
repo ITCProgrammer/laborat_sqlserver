@@ -43,61 +43,67 @@ $tgl = date("Y-m-d");
     <?php
     if(trim($warehouse," ")=="M101"){
         $queryOLD = "SELECT *
-            FROM tbl_stock_opname_gk 
+            FROM db_laborat.tbl_stock_opname_gk 
             WHERE 
-                tgl_tutup = '$tgl_tutup'
-                AND LOGICALWAREHOUSECODE = '$warehouse'
+                CAST(tgl_tutup AS date) = CONVERT(date, ?, 23)
+                AND LOGICALWAREHOUSECODE = ?
             ORDER BY KODE_OBAT ASC";
-        $query = "SELECT o.*,d.total_qty as total_o11
-        FROM tbl_stock_opname_gk o
-        left join 
-        (
-   			SELECT 
-	            ITEMTYPECODE,
-	            KODE_OBAT,
-	            LONGDESCRIPTION,
-	            LOTCODE,
-	            LOGICALWAREHOUSECODE,
-	            tgl_tutup,
-	            SUM(BASEPRIMARYQUANTITYUNIT) AS total_qty,
-	            BASEPRIMARYUNITCODE,
-	            '0'
-	        FROM (
-		        SELECT DISTINCT
-		            ITEMTYPECODE,
-		            KODE_OBAT,
-		            LONGDESCRIPTION,
-		            LOTCODE,
-		            LOGICALWAREHOUSECODE,
-		            tgl_tutup,
-                    WHSLOCATIONWAREHOUSEZONECODE,
-		            BASEPRIMARYQUANTITYUNIT,
-		            BASEPRIMARYUNITCODE
-		        FROM tblopname_11
-		        where tgl_tutup ='$tgl_tutup'
-		        AND LOGICALWAREHOUSECODE = '$warehouse'
-	        ) DST
-	        GROUP BY  
-	            ITEMTYPECODE,
-	            KODE_OBAT,
-	            LONGDESCRIPTION,
-	            LOTCODE,
-	            LOGICALWAREHOUSECODE,
-	            tgl_tutup,
-	            BASEPRIMARYUNITCODE
-	    	) d
-        on o.KODE_OBAT=d.KODE_OBAT and d.LOTCODE = o.LOTCODE  and d.tgl_tutup = o.tgl_tutup and d.LOGICALWAREHOUSECODE = o.LOGICALWAREHOUSECODE
-        WHERE 
-            o.tgl_tutup = '$tgl_tutup'
-            AND o.LOGICALWAREHOUSECODE = '$warehouse'
-        ORDER BY o.KODE_OBAT ASC";
-            $stmt = mysqli_query($con, $query);
-        if (!$stmt) {
-            echo "<p class='text-danger'>Query gagal: " . mysqli_error($con) . "</p>";
-            exit;
+
+        $query = "SELECT o.*, d.total_qty as total_o11
+            FROM db_laborat.tbl_stock_opname_gk o
+            LEFT JOIN 
+            (
+                SELECT 
+                    ITEMTYPECODE,
+                    KODE_OBAT,
+                    LONGDESCRIPTION,
+                    LOTCODE,
+                    LOGICALWAREHOUSECODE,
+                    tgl_tutup,
+                    SUM(BASEPRIMARYQUANTITYUNIT) AS total_qty,
+                    BASEPRIMARYUNITCODE,
+                    '0'AS dummy
+                FROM (
+                    SELECT DISTINCT
+                        ITEMTYPECODE,
+                        KODE_OBAT,
+                        LONGDESCRIPTION,
+                        LOTCODE,
+                        LOGICALWAREHOUSECODE,
+                        tgl_tutup,
+                        WHSLOCATIONWAREHOUSEZONECODE,
+                        BASEPRIMARYQUANTITYUNIT,
+                        BASEPRIMARYUNITCODE
+                    FROM db_laborat.tblopname_11
+                    WHERE CAST(tgl_tutup AS date) = CONVERT(date, ?, 23)
+                    AND LOGICALWAREHOUSECODE = ?
+                ) DST
+                GROUP BY  
+                    ITEMTYPECODE,
+                    KODE_OBAT,
+                    LONGDESCRIPTION,
+                    LOTCODE,
+                    LOGICALWAREHOUSECODE,
+                    tgl_tutup,
+                    BASEPRIMARYUNITCODE
+            ) d
+            ON  o.KODE_OBAT = d.KODE_OBAT
+            AND o.LOTCODE = d.LOTCODE
+            AND o.LOGICALWAREHOUSECODE = d.LOGICALWAREHOUSECODE
+            AND CAST(o.tgl_tutup AS date) = CAST(d.tgl_tutup AS date)
+            WHERE 
+                CAST(o.tgl_tutup AS date) = CONVERT(date, ?, 23)
+                AND o.LOGICALWAREHOUSECODE = ?
+            ORDER BY o.KODE_OBAT ASC";
+
+        $params = [$tgl_tutup, $warehouse, $tgl_tutup, $warehouse, $tgl_tutup, $warehouse];
+
+        $stmt = sqlsrv_query($con, $query, $params);
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
         }
 
-        if (mysqli_num_rows($stmt) > 0) {
+        if (sqlsrv_has_rows($stmt)) {
             $no = 1;
             echo "<table class='table table-bordered table-striped' id='detailmasukTable'>";
             echo "<thead>
@@ -115,13 +121,13 @@ $tgl = date("Y-m-d");
                 </thead>";
             echo "<tbody>";
 
-            while ($row = mysqli_fetch_assoc($stmt)) {
-                echo "<tr >
+            while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+                echo "<tr>
                         <td align='center'>{$no}</td>
                         <td>".htmlspecialchars($row['KODE_OBAT'])."</td>
                         <td>".htmlspecialchars($row['LONGDESCRIPTION'])."</td>
                         <td>".htmlspecialchars($row['LOTCODE'])."</td>
-                        <td align='center'>".htmlspecialchars($row['LOGICALWAREHOUSECODE']) . "</td>
+                        <td align='center'>".htmlspecialchars($row['LOGICALWAREHOUSECODE'])."</td>
                         <td class='number'>".($row['total_o11']*1000)."</td>
                         <td class='number'>".$row['qty_dus']."</td>
                         <td class='number'>".doubleval($row['pakingan_standar'])."</td>
@@ -131,102 +137,108 @@ $tgl = date("Y-m-d");
             }
 
             echo "</tbody></table>";
-        }else{
+        } else {
             echo "Data Tutup Buku Tidak Tersedia";
         }
-    }
-    else if(trim($warehouse," ")=="M510"){
+    } else if (trim($warehouse, " ") == "M510") {
         $queryOLD = "SELECT *
-            FROM tbl_stock_opname_gk 
-            WHERE 
-                tgl_tutup = '$tgl_tutup'
-                AND LOGICALWAREHOUSECODE = '$warehouse'
-            ORDER BY KODE_OBAT ASC";
-        $query = "SELECT o.*,d.total_qty as total_o11
-        FROM tbl_stock_opname_gk o
-        left join 
-        (
-   			SELECT 
-	            ITEMTYPECODE,
-	            KODE_OBAT,
-	            LONGDESCRIPTION,
-	            LOTCODE,
-	            LOGICALWAREHOUSECODE,
-	            tgl_tutup,
-	            SUM(BASEPRIMARYQUANTITYUNIT) AS total_qty,
-	            BASEPRIMARYUNITCODE,
-	            '0'
-	        FROM (
-		        SELECT DISTINCT
-		            ITEMTYPECODE,
-		            KODE_OBAT,
-		            LONGDESCRIPTION,
-		            LOTCODE,
-		            LOGICALWAREHOUSECODE,
-		            tgl_tutup,
-                    WHSLOCATIONWAREHOUSEZONECODE,
-		            BASEPRIMARYQUANTITYUNIT,
-		            BASEPRIMARYUNITCODE
-		        FROM tblopname_11
-		        where tgl_tutup ='$tgl_tutup'
-		        AND LOGICALWAREHOUSECODE = '$warehouse'
-	        ) DST
-	        GROUP BY  
-	            ITEMTYPECODE,
-	            KODE_OBAT,
-	            LONGDESCRIPTION,
-	            LOTCODE,
-	            LOGICALWAREHOUSECODE,
-	            tgl_tutup,
-	            BASEPRIMARYUNITCODE
-	    	) d
-        on o.KODE_OBAT=d.KODE_OBAT and d.LOTCODE = o.LOTCODE  and d.tgl_tutup = o.tgl_tutup and d.LOGICALWAREHOUSECODE = o.LOGICALWAREHOUSECODE
+        FROM db_laborat.tbl_stock_opname_gk 
         WHERE 
-            o.tgl_tutup = '$tgl_tutup'
-            AND o.LOGICALWAREHOUSECODE = '$warehouse'
+            CAST(tgl_tutup AS date) = CONVERT(date, ?, 23)
+            AND LOGICALWAREHOUSECODE = ?
+        ORDER BY KODE_OBAT ASC";
+
+        $query = "SELECT o.*, d.total_qty as total_o11
+        FROM db_laborat.tbl_stock_opname_gk o
+        LEFT JOIN 
+        (
+            SELECT 
+                ITEMTYPECODE,
+                KODE_OBAT,
+                LONGDESCRIPTION,
+                LOTCODE,
+                LOGICALWAREHOUSECODE,
+                tgl_tutup,
+                SUM(BASEPRIMARYQUANTITYUNIT) AS total_qty,
+                BASEPRIMARYUNITCODE,
+                '0' AS dummy
+            FROM (
+                SELECT DISTINCT
+                    ITEMTYPECODE,
+                    KODE_OBAT,
+                    LONGDESCRIPTION,
+                    LOTCODE,
+                    LOGICALWAREHOUSECODE,
+                    tgl_tutup,
+                    WHSLOCATIONWAREHOUSEZONECODE,
+                    BASEPRIMARYQUANTITYUNIT,
+                    BASEPRIMARYUNITCODE
+                FROM db_laborat.tblopname_11
+                WHERE CAST(tgl_tutup AS date) = CONVERT(date, ?, 23)
+                AND LOGICALWAREHOUSECODE = ?
+            ) DST
+            GROUP BY  
+                ITEMTYPECODE,
+                KODE_OBAT,
+                LONGDESCRIPTION,
+                LOTCODE,
+                LOGICALWAREHOUSECODE,
+                tgl_tutup,
+                BASEPRIMARYUNITCODE
+        ) d
+        ON  o.KODE_OBAT = d.KODE_OBAT
+        AND o.LOTCODE = d.LOTCODE
+        AND o.LOGICALWAREHOUSECODE = d.LOGICALWAREHOUSECODE
+        AND CAST(o.tgl_tutup AS date) = CAST(d.tgl_tutup AS date)
+        WHERE 
+            CAST(o.tgl_tutup AS date) = CONVERT(date, ?, 23)
+            AND o.LOGICALWAREHOUSECODE = ?
         ORDER BY o.KODE_OBAT ASC";
-            $stmt = mysqli_query($con, $query);
-        if (!$stmt) {
-            echo "<p class='text-danger'>Query gagal: " . mysqli_error($con) . "</p>";
-            exit;
+
+        $params = [$tgl_tutup, $warehouse, $tgl_tutup, $warehouse, $tgl_tutup, $warehouse];
+
+        $stmt = sqlsrv_query($con, $query, $params);
+        if ($stmt === false) {
+            die(print_r(sqlsrv_errors(), true));
         }
-        if (mysqli_num_rows($stmt) > 0) {
+
+        if (sqlsrv_has_rows($stmt)) {
             $no = 1;
             echo "<table class='table table-bordered table-striped' id='detailmasukTable'>";
             echo "<thead>
-                    <tr>
-                        <th align='center'>No</th>
-                        <th align='center'>Kode Obat</th>
-                        <th align='center'>Nama Obat</th>
-                        <th align='center'>Lot</th>
-                        <th align='center'>Logical Warehouse</th>
-                        <th align='center'>Qty (Ending Balance) GR</th>
-                        <th align='center'>Kategori</th>
-                        <th align='center'>QTY Scan</th>
-                        <th align='center'>Standar</th>
-                        <th align='center'>Total Stock</th>
-                    </tr>
-                </thead>";
+                <tr>
+                    <th align='center'>No</th>
+                    <th align='center'>Kode Obat</th>
+                    <th align='center'>Nama Obat</th>
+                    <th align='center'>Lot</th>
+                    <th align='center'>Logical Warehouse</th>
+                    <th align='center'>Qty (Ending Balance) GR</th>
+                    <th align='center'>Kategori</th>
+                    <th align='center'>QTY Scan</th>
+                    <th align='center'>Standar</th>
+                    <th align='center'>Total Stock</th>
+                </tr>
+              </thead>";
             echo "<tbody>";
 
-            while ($row = mysqli_fetch_assoc($stmt)) {
-                echo "<tr >
-                        <td align='center'>{$no}</td>
-                        <td>".htmlspecialchars($row['KODE_OBAT'])."</td>
-                        <td>".htmlspecialchars($row['LONGDESCRIPTION'])."</td>
-                        <td>".htmlspecialchars($row['LOTCODE'])."</td>
-                        <td align='center'>".htmlspecialchars($row['LOGICALWAREHOUSECODE']) . "</td>
-                        <td class='number'>".($row['total_o11']*1000)."</td>
-                        <td align='center'>".ucfirst($row['kategori'])."</td>
-                        <td class='number'>".$row['qty_dus']."</td>
-                        <td class='number'>".doubleval($row['pakingan_standar'])."</td>
-                        <td class='number'>".$row['total_stock']."</td>
-                    </tr>";
+            while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
+                echo "<tr>
+                    <td align='center'>{$no}</td>
+                    <td>" . htmlspecialchars($row['KODE_OBAT']) . "</td>
+                    <td>" . htmlspecialchars($row['LONGDESCRIPTION']) . "</td>
+                    <td>" . htmlspecialchars($row['LOTCODE']) . "</td>
+                    <td align='center'>" . htmlspecialchars($row['LOGICALWAREHOUSECODE']) . "</td>
+                    <td class='number'>" . ($row['total_o11'] * 1000) . "</td>
+                    <td align='center'>" . ucfirst($row['kategori']) . "</td>
+                    <td class='number'>" . $row['qty_dus'] . "</td>
+                    <td class='number'>" . doubleval($row['pakingan_standar']) . "</td>
+                    <td class='number'>" . $row['total_stock'] . "</td>
+                  </tr>";
                 $no++;
             }
 
             echo "</tbody></table>";
-        }else{
+        } else {
             echo "Data Tutup Buku Tidak Tersedia";
         }
     }
