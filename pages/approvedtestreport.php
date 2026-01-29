@@ -76,10 +76,10 @@ include "koneksi.php";
                             <tbody>
                                 <?php
                                 $no = 1;
-                                $sql = mysqli_query($con, "SELECT * FROM tbl_test_qc WHERE sts_laborat='Waiting Approval Parsial' OR sts_laborat='Waiting Approval Full' ");
-                                while ($r = mysqli_fetch_array($sql)) {
-                                    $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
-                                    $detail2 = explode(",", $r['permintaan_testing']);
+    $sql = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_test_qc WHERE sts_laborat = 'Waiting Approval Parsial' OR sts_laborat = 'Waiting Approval Full'");
+    while ($sql && ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC))) {
+        $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
+        $detail2 = explode(",", $r['permintaan_testing']);
                                 ?>
                                     <tr>
                                         <td valign="center">
@@ -101,9 +101,9 @@ include "koneksi.php";
                                         <td valign="center" align="left"><?php echo $r['permintaan_testing'] == '' ? 'Full Test' : $r['permintaan_testing']; ?></td>
                                         <?php
 
-                                        if ($r['id'] != null or  $r['id'] != '') {
-                                            $id_nokk = mysqli_real_escape_string($con, $r['id']);
-                                            $query = "SELECT
+        if ($r['id'] != null or  $r['id'] != '') {
+            $id_nokk = (int) $r['id'];
+            $query = "SELECT
                                                 *,
                                                 CONCAT_WS(', ',
                                                     CASE WHEN COALESCE(wash_temp, '') <> '' OR COALESCE(wash_colorchange, '') <> '' OR COALESCE(wash_acetate, '') <> '' OR COALESCE(wash_cotton, '') <> '' OR COALESCE(wash_nylon, '') <> ''  OR COALESCE(wash_poly, '') <> ''  OR COALESCE(wash_acrylic, '') <> '' OR COALESCE(wash_wool, '') <> '' OR COALESCE(wash_staining, '') <> '' THEN 'Washing' ELSE NULL END,
@@ -121,15 +121,15 @@ include "koneksi.php";
                                                     CASE WHEN COALESCE(chlorin, '') <> '' OR COALESCE(nchlorin1, '') <> '' OR COALESCE(nchlorin2, '') <> '' THEN 'Chlorin' ELSE NULL END,
                                                     CASE WHEN COALESCE(dye_tf_cstaining, '') <> '' OR COALESCE(dye_tf_acetate, '') <> '' OR COALESCE(dye_tf_cotton, '') <> '' OR COALESCE(dye_tf_nylon, '') <> '' OR COALESCE(dye_tf_poly, '') <> '' OR COALESCE(dye_tf_acrylic, '') <> '' OR COALESCE(dye_tf_wool, '') <> '' OR COALESCE(dye_tf_sstaining, '') <> '' THEN 'Dye Transfer' ELSE NULL END
                                                 ) AS test_done
-                                            FROM tbl_tq_test
-                                            WHERE id_nokk = '$id_nokk'";
+                                            FROM db_laborat.tbl_tq_test
+                                            WHERE id_nokk = ?";
 
-                                            $test = mysqli_query($con, $query);
+                                            $test = sqlsrv_query($con, $query, [$id_nokk]);
 
-                                            $row = mysqli_fetch_assoc($test);
+                                            $row = $test ? sqlsrv_fetch_array($test, SQLSRV_FETCH_ASSOC) : null;
 
-                                            $test_done = $row['test_done'];
-                                        }
+                                            $test_done = $row['test_done'] ?? '';
+        }
                                         ?>
                                         <td valign="center" align="left"><?php echo ($r['id'] != null or  $r['id'] != '') ? $test_done : '-'; ?></td>
                                         <td valign="center" class="13"><?php if ($r['sts_laborat'] == "Waiting Approval Full") { ?>

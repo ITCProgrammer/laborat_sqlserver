@@ -8,19 +8,37 @@ include "../../koneksi.php";
 //$noitem=$_GET['noitem'];
 //$nohanger=$_GET['nohanger'];
 //--
-$idkk = $_REQUEST['idkk'];
-$noitem = $_REQUEST['noitem'];
-$nohanger = $_REQUEST['nohanger'];
-$act = $_GET['g'];
-$data = mysqli_query($con, "SELECT *,
-    CONCAT_WS(' ',fc_note,ph_note, abr_note, bas_note, dry_note, fla_note, fwe_note, fwi_note, burs_note,repp_note,wick_note,absor_note,apper_note,fiber_note,pillb_note,pillm_note,pillr_note,thick_note,growth_note,recover_note,stretch_note,sns_note,snab_note,snam_note,snap_note,wash_note,water_note,acid_note,alkaline_note,crock_note,phenolic_note,cm_printing_note,cm_dye_note,light_note,light_pers_note,saliva_note,h_shrinkage_note,fibre_note,pilll_note,soil_note,apperss_note,bleeding_note,chlorin_note,dye_tf_note,humidity_note,odour_note) AS note_g FROM tbl_tq_test WHERE id_nokk='$idkk' ORDER BY id DESC LIMIT 1");
-$rcek1 = mysqli_fetch_array($data);
-$sqlCekR = mysqli_query($con, "SELECT *,
-    CONCAT_WS(' ',rfc_note,rph_note, rabr_note, rbas_note, rdry_note, rfla_note, rfwe_note, rfwi_note, rburs_note,rrepp_note,rwick_note,rabsor_note,rapper_note,rfiber_note,rpillb_note,rpillm_note,rpillr_note,rthick_note,rgrowth_note,rrecover_note,rstretch_note,rsns_note,rsnab_note,rsnam_note,rsnap_note,rwash_note,rwater_note,racid_note,ralkaline_note,rcrock_note,rphenolic_note,rcm_printing_note,rcm_dye_note,rlight_note,rlight_pers_note,rsaliva_note,rh_shrinkage_note,rfibre_note,rpilll_note,rsoil_note,rapperss_note,rbleeding_note,rchlorin_note,rdye_tf_note,rhumidity_note,rodour_note) AS rnote_g FROM tbl_tq_randomtest WHERE no_item='$noitem' OR no_hanger='$nohanger'");
-$rcekR = mysqli_fetch_array($sqlCekR);
-$sqlCekD = mysqli_query($con, "SELECT *,
-    CONCAT_WS(' ',dfc_note,dph_note, dabr_note, dbas_note, ddry_note, dfla_note, dfwe_note, dfwi_note, dburs_note,drepp_note,dwick_note,dabsor_note,dapper_note,dfiber_note,dpillb_note,dpillm_note,dpillr_note,dthick_note,dgrowth_note,drecover_note,dstretch_note,dsns_note,dsnab_note,dsnam_note,dsnap_note,dwash_note,dwater_note,dacid_note,dalkaline_note,dcrock_note,dphenolic_note,dcm_printing_note,dcm_dye_note,dlight_note,dlight_pers_note,dsaliva_note,dh_shrinkage_note,dfibre_note,dpilll_note,dsoil_note,dapperss_note,dbleeding_note,dchlorin_note,ddye_tf_note,dhumidity_note,dodour_note) AS dnote_g FROM tbl_tq_disptest WHERE id_nokk='$idkk' ORDER BY id DESC LIMIT 1");
-$rcekD = mysqli_fetch_array($sqlCekD);
+$idkk = isset($_REQUEST['idkk']) ? (int) $_REQUEST['idkk'] : 0;
+$noitem = isset($_REQUEST['noitem']) ? $_REQUEST['noitem'] : '';
+$nohanger = isset($_REQUEST['nohanger']) ? $_REQUEST['nohanger'] : '';
+$act = isset($_GET['g']) ? $_GET['g'] : '';
+
+$data = sqlsrv_query(
+    $con,
+    "SELECT *,
+    CONCAT_WS(' ',fc_note,ph_note, abr_note, bas_note, dry_note, fla_note, fwe_note, fwi_note, burs_note,repp_note,wick_note,absor_note,apper_note,fiber_note,pillb_note,pillm_note,pillr_note,thick_note,growth_note,recover_note,stretch_note,sns_note,snab_note,snam_note,snap_note,wash_note,water_note,acid_note,alkaline_note,crock_note,phenolic_note,cm_printing_note,cm_dye_note,light_note,light_pers_note,saliva_note,h_shrinkage_note,fibre_note,pilll_note,soil_note,apperss_note,bleeding_note,chlorin_note,dye_tf_note,humidity_note,odour_note) AS note_g FROM db_laborat.tbl_tq_test WHERE id_nokk = ? ORDER BY id DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY",
+    [$idkk]
+);
+$rcek1 = $data ? sqlsrv_fetch_array($data, SQLSRV_FETCH_ASSOC) : null;
+$rcek1 = $rcek1 ?: [];
+
+$sqlCekR = sqlsrv_query(
+    $con,
+    "SELECT *,
+    CONCAT_WS(' ',rfc_note,rph_note, rabr_note, rbas_note, rdry_note, rfla_note, rfwe_note, rfwi_note, rburs_note,rrepp_note,rwick_note,rabsor_note,rapper_note,rfiber_note,rpillb_note,rpillm_note,rpillr_note,rthick_note,rgrowth_note,rrecover_note,rstretch_note,rsns_note,rsnab_note,rsnam_note,rsnap_note,rwash_note,rwater_note,racid_note,ralkaline_note,rcrock_note,rphenolic_note,rcm_printing_note,rcm_dye_note,rlight_note,rlight_pers_note,rsaliva_note,rh_shrinkage_note,rfibre_note,rpilll_note,rsoil_note,rapperss_note,rbleeding_note,rchlorin_note,rdye_tf_note,rhumidity_note,rodour_note) AS rnote_g FROM db_laborat.tbl_tq_randomtest WHERE no_item = ? OR no_hanger = ?",
+    [$noitem, $nohanger]
+);
+$rcekR = $sqlCekR ? sqlsrv_fetch_array($sqlCekR, SQLSRV_FETCH_ASSOC) : null;
+$rcekR = $rcekR ?: [];
+
+$sqlCekD = sqlsrv_query(
+    $con,
+    "SELECT *,
+    CONCAT_WS(' ',dfc_note,dph_note, dabr_note, dbas_note, ddry_note, dfla_note, dfwe_note, dfwi_note, dburs_note,drepp_note,dwick_note,dabsor_note,dapper_note,dfiber_note,dpillb_note,dpillm_note,dpillr_note,dthick_note,dgrowth_note,drecover_note,dstretch_note,dsns_note,dsnab_note,dsnam_note,dsnap_note,dwash_note,dwater_note,dacid_note,dalkaline_note,dcrock_note,dphenolic_note,dcm_printing_note,dcm_dye_note,dlight_note,dlight_pers_note,dsaliva_note,dh_shrinkage_note,dfibre_note,dpilll_note,dsoil_note,dapperss_note,dbleeding_note,dchlorin_note,ddye_tf_note,dhumidity_note,dodour_note) AS dnote_g FROM db_laborat.tbl_tq_disptest WHERE id_nokk = ? ORDER BY id DESC OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY",
+    [$idkk]
+);
+$rcekD = $sqlCekD ? sqlsrv_fetch_array($sqlCekD, SQLSRV_FETCH_ASSOC) : null;
+$rcekD = $rcekD ?: [];
 // $data1 = mysqli_query($con, "SELECT nodemand,nokk FROM tbl_tq_nokk WHERE id='$idkk'");
 // $rd = mysqli_fetch_array($data1);
 ?>
@@ -675,7 +693,9 @@ $rcekD = mysqli_fetch_array($sqlCekD);
             echo trim($rcek1['note_g']);
           } else {
             // ketika ss_cmt tidak di checklist maka hilanhkan apperss_note
-            echo str_replace($rcek1['apperss_note'], "", $rcek1['note_g']);
+            $apperssNote = $rcek1['apperss_note'] ?? '';
+            $noteG = $rcek1['note_g'] ?? '';
+            echo str_replace($apperssNote, "", $noteG);
           }
           ?>
         </td>

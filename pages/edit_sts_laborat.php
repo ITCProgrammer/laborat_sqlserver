@@ -28,13 +28,14 @@ if ($_POST) {
 	$ip_num = get_client_ip();
 
 	extract($_POST);
-	$id = mysqli_real_escape_string($con, $_POST['id']);
-	$sts_laborat = mysqli_real_escape_string($con, $_POST['sts_laborat']);
-	$no_counter = mysqli_real_escape_string($con, $_POST['no_counter']);
+	$id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+	$sts_laborat = isset($_POST['sts_laborat']) ? $_POST['sts_laborat'] : '';
+	$no_counter = isset($_POST['no_counter']) ? $_POST['no_counter'] : '';
+	$userLAB = isset($_SESSION['userLAB']) ? $_SESSION['userLAB'] : '';
 
 	$success = true;
 
-	mysqli_begin_transaction($con);
+	sqlsrv_begin_transaction($con);
 
 	if ($sts_laborat == "Waiting Approval Full") {
 		$stsqc = "Kain OK";
@@ -44,31 +45,31 @@ if ($_POST) {
 		$stslaborat = "Approved Parsial";
 	}
 
-	$query_update = "UPDATE `tbl_test_qc` SET 
-                `sts_laborat`='$stslaborat',
-                `sts_qc`='$stsqc'
-                WHERE `id`='$id' LIMIT 1";
+	$query_update = "UPDATE db_laborat.tbl_test_qc SET 
+                sts_laborat = ?,
+                sts_qc = ?
+                WHERE id = ?";
 
-	$result_update = mysqli_query($con, $query_update);
+	$result_update = sqlsrv_query($con, $query_update, [$stslaborat, $stsqc, $id]);
 
 	if (!$result_update) {
 		$success = false;
 	}
 
-	$query_log = "INSERT INTO log_qc_test (no_counter, `status`, info, do_by, do_at, ip_address)
-                   VALUES ('$no_counter', '$stslaborat', 'Sudah approve dari laborat', '$_SESSION[userLAB]', NOW(), '$ip_num')";
+	$query_log = "INSERT INTO db_laborat.log_qc_test (no_counter, status, info, do_by, do_at, ip_address)
+                   VALUES (?, ?, 'Sudah approve dari laborat', ?, GETDATE(), ?)";
 
-	$result_log = mysqli_query($con, $query_log);
+	$result_log = sqlsrv_query($con, $query_log, [$no_counter, $stslaborat, $userLAB, $ip_num]);
 
 	if (!$result_log) {
 		$success = false;
 	}
 
 	if ($success) {
-		mysqli_commit($con);
+		sqlsrv_commit($con);
 		echo "<script>window.location='?p=ApprovedTestReport';</script>";
 	} else {
-		mysqli_rollback($con);
+		sqlsrv_rollback($con);
 		echo "<script>window.location='?p=ApprovedTestReport';</script>";
 	}
 }
