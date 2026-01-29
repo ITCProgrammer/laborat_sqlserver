@@ -60,7 +60,7 @@ include "koneksi.php";
     }
 </style>
 <?php
-$TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';	
+$TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
 ?>
 <body>
 <div class="row">
@@ -97,9 +97,16 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
                     <div class="col-lg-12 overflow-auto table-responsive" style="overflow-x: auto;">
                         <?php
                         
-                        $sql = mysqli_query($con,"SELECT *
-                                            FROM tbl_listsch_11 WHERE tgl_tutup ='".date("Y-m-d", strtotime($TglTutup))."'
-                                            ORDER BY id DESC");
+                        $tglTutupSql = '';
+                        if ($TglTutup !== '') {
+                            $parsed = strtotime($TglTutup);
+                            $tglTutupSql = $parsed ? date("Y-m-d", $parsed) : '';
+                        }
+                        $sql = sqlsrv_query(
+                            $con,
+                            "SELECT * FROM db_laborat.tbl_listsch_11 WHERE tgl_tutup = ? ORDER BY id DESC",
+                            [$tglTutupSql]
+                        );
                         ?>
                         <table id="Table-sm" class="table table-sm display compact" style="width: 100%;">
                             <thead>
@@ -119,7 +126,7 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php while ($li = mysqli_fetch_array($sql)) { ?>
+                                <?php while ($sql && ($li = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC))) { ?>
                                     <tr>
                                         <td>
                                             <?php if ($li['status'] == null or $li['status'] == "") { ?>
@@ -153,8 +160,24 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
                                         <td><?php echo $li['langganan'] ?></td>
                                         <td><?php echo $li['no_item'] ?></td>
                                         <td width="150"><?php echo $li['ket'] ?></td>
-                                        <td><?php echo $li['tgl_update'] ?></td>
-                                        <td><?php echo $li['tgl_tutup'] ?></td>
+                                        <td><?php
+                                        $tglUpdate = $li['tgl_update'];
+                                        if ($tglUpdate instanceof DateTimeInterface) {
+                                            $tglUpdate = $tglUpdate->format('Y-m-d H:i:s');
+                                        } elseif ($tglUpdate === null) {
+                                            $tglUpdate = '';
+                                        }
+                                        echo $tglUpdate;
+                                        ?></td>
+                                        <td><?php
+                                        $tglTutupVal = $li['tgl_tutup'];
+                                        if ($tglTutupVal instanceof DateTimeInterface) {
+                                            $tglTutupVal = $tglTutupVal->format('Y-m-d H:i:s');
+                                        } elseif ($tglTutupVal === null) {
+                                            $tglTutupVal = '';
+                                        }
+                                        echo $tglTutupVal;
+                                        ?></td>
                                     </tr>
                                 <?php } ?>
                             </tbody>
