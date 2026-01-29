@@ -14,7 +14,7 @@ include "koneksi.php";
 
 <body>
     <?php
-    $datauser = mysqli_query($con,"SELECT id, nama, is_active FROM tbl_colorist ORDER BY nama ASC");
+    $datauser = sqlsrv_query($con, "SELECT id, nama, is_active FROM db_laborat.tbl_colorist ORDER BY nama ASC");
     $no = 1;
     $n = 1;
     $c = 0;
@@ -38,7 +38,7 @@ include "koneksi.php";
                         <tbody>
                             <?php
                             $col = 0;
-                            while ($rowd = mysqli_fetch_array($datauser)) {
+                            while ($datauser && ($rowd = sqlsrv_fetch_array($datauser, SQLSRV_FETCH_ASSOC))) {
                                 $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
                             ?>
                                 <tr bgcolor="<?php echo $bgcolor; ?>">
