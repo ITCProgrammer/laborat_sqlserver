@@ -5,22 +5,20 @@ include("../koneksi.php");
 $date = date('Y-m-d H:i:s');
 if ($_POST) {
     extract($_POST);
-    $id = mysqli_real_escape_string($con,$_POST['id']);
-    $nama = mysqli_real_escape_string($con,$_POST['nama']);
-    $sts = mysqli_real_escape_string($con,$_POST['sts']);
-    $sqlupdate = mysqli_query($con,"INSERT INTO `tbl_user_resep` SET
-				`nama`='$nama',
-				`is_active`='$sts',
-                `created_at` =  '$date',
-                `created_by` = '$_SESSION[userLAB]'
-        ");
+    $nama = isset($_POST['nama']) ? $_POST['nama'] : '';
+    $sts = isset($_POST['sts']) ? $_POST['sts'] : '';
+    $userLAB = isset($_SESSION['userLAB']) ? $_SESSION['userLAB'] : '';
+    $ip = isset($_SESSION['ip']) ? $_SESSION['ip'] : '';
+    $os = isset($_SESSION['os']) ? $_SESSION['os'] : '';
 
-    mysqli_query($con,"INSERT into tbl_log SET `what` = '$nama',
-                        `what_do` = 'INSERT INTO tbl_user_resep',
-                        `do_by` = '$_SESSION[userLAB]',
-                        `do_at` = '$time',
-                        `ip` = '$_SESSION[ip]',
-                        `os` = '$_SESSION[os]',
-                        `remark`='Insert new user_resep $nama'");
+    $insertSql = "INSERT INTO db_laborat.tbl_user_resep (nama, is_active, created_at, created_by)
+                  VALUES (?, ?, ?, ?)";
+    $insertParams = [$nama, $sts, $date, $userLAB];
+    sqlsrv_query($con, $insertSql, $insertParams);
+
+    $logSql = "INSERT INTO db_laborat.tbl_log (what, what_do, do_by, do_at, ip, os, remark)
+               VALUES (?, ?, ?, ?, ?, ?, ?)";
+    $logParams = [$nama, 'INSERT INTO tbl_user_resep', $userLAB, $date, $ip, $os, "Insert new user_resep $nama"];
+    sqlsrv_query($con, $logSql, $logParams);
     echo " <script>window.location='?p=UserResep';</script>";
 }

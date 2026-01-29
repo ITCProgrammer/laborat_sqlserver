@@ -14,7 +14,7 @@ include "koneksi.php";
 
 <body>
     <?php
-    $datauser = mysqli_query($con,"SELECT id, nama, is_active FROM tbl_user_resep ORDER BY nama ASC");
+    $datauser = sqlsrv_query($con, "SELECT id, nama, is_active FROM db_laborat.tbl_user_resep ORDER BY nama ASC");
     $no = 1;
     $n = 1;
     $c = 0;
@@ -38,7 +38,7 @@ include "koneksi.php";
                         <tbody>
                             <?php
                             $col = 0;
-                            while ($rowd = mysqli_fetch_array($datauser)) {
+                            while ($datauser && ($rowd = sqlsrv_fetch_array($datauser, SQLSRV_FETCH_ASSOC))) {
                                 $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
                             ?>
                                 <tr bgcolor="<?php echo $bgcolor; ?>">
@@ -51,14 +51,14 @@ include "koneksi.php";
                                                         } ?></td>
                                     <td align="center"><button data-toggle="modal" data-target="#EditUserResep<?php echo $rowd['id'] ?>" class="btn btn-sm btn-warning"><i class="fa fa-pencil"></i></button></td>
                                 </tr>
-                                <div class="modal fade modal-super-scaled" id="EditColorist<?php echo $rowd['id'] ?>">
+                                <div class="modal fade modal-super-scaled" id="EditUserResep<?php echo $rowd['id'] ?>">
                                     <div class="modal-dialog ">
                                         <div class="modal-content">
-                                            <form class="form-horizontal" name="modal_popup" data-toggle="validator" method="post" action="?p=POSTedit_colorist">
+                                            <form class="form-horizontal" name="modal_popup" data-toggle="validator" method="post" action="?p=POSTedit_userresep">
                                                 <div class="modal-header">
                                                     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                                                         <span aria-hidden="true">&times;</span></button>
-                                                    <h4 class="modal-title">EDIT Data Colorist</h4>
+                                                    <h4 class="modal-title">EDIT Data User Resep</h4>
                                                 </div>
                                                 <div class="modal-body">
                                                     <input type="hidden" id="id" name="id" value="<?php echo $rowd['id'] ?>
