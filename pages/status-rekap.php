@@ -135,14 +135,38 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
               </thead>
               <tbody>
                 <?php
-				$sql = mysqli_query($con,"SELECT *
-                                    FROM tbl_sts_matching_11
-									WHERE tgl_tutup='".date("Y-m-d", strtotime($TglTutup))."'
-                                    group by idm, no_resep
-                                    ORDER BY id asc");  
-                while ($r = mysqli_fetch_array($sql)) {
+                $no = 0;
+                $col = 0;
+                $tglTutupSql = '';
+                if ($TglTutup !== '') {
+                  $parsed = strtotime($TglTutup);
+                  $tglTutupSql = $parsed ? date("Y-m-d", $parsed) : '';
+                }
+				$sql = sqlsrv_query(
+                  $con,
+                  "SELECT *
+                   FROM db_laborat.tbl_sts_matching_11
+                   WHERE tgl_tutup = ?
+                   GROUP BY idm, no_resep, id, status, kt_status, grp, matcher, no_order, langganan, warna, no_warna, jenis_kain, no_item, tgl_buat_status, tgl_buat, created_by, status_created_by, tgl_selesai, jenis_matching, no_po, benang, lebar, gramasi, lebar_aktual, gramasi_aktual, cek_warna, cek_dye, koreksi_resep, cocok_warna, qty_order, tgl_delivery, tgl_in, tgl_out, ket, ck_d65, ck_f02, ck_f11, ck_u35, ck_a, ck_rlight, ck_tl83, ck_greige, ck_bleaching, ck_bleaching_dye, ck_preset, ck_npreset, ck_nh2o2, ck_tarik, id_status, approve, status_bagi, tgl_mulai
+                   ORDER BY id asc",
+                  [$tglTutupSql]
+                );
+                while ($sql && ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC))) {
                   $no++;
                   $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
+                  $fmtDate = function ($value) {
+                    if ($value instanceof DateTimeInterface) {
+                      return $value->format('Y-m-d H:i:s');
+                    }
+                    return $value === null ? '' : $value;
+                  };
+                  $tglBuat = $fmtDate($r['tgl_buat']);
+                  $tglBuatStatus = $fmtDate($r['tgl_buat_status']);
+                  $tglSelesai = $fmtDate($r['tgl_selesai']);
+                  $tglDelivery = $fmtDate($r['tgl_delivery']);
+                  $tglIn = $fmtDate($r['tgl_in']);
+                  $tglOut = $fmtDate($r['tgl_out']);
+                  $tglTutupVal = $fmtDate($r['tgl_tutup']);
                 ?>
                   <tr>
                     <td valign="center" class="details-control">
@@ -209,7 +233,7 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
                     </td>
                     <td valign="center" align="center">
                       <?php
-                      $awal  = strtotime($r['tgl_buat_status']);
+                      $awal  = strtotime($tglBuatStatus);
                       $akhir = strtotime(date('Y-m-d H:i:s'));
                       $diff  = $akhir - $awal;
 
@@ -221,11 +245,11 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
                       ?>
 
                     </td>
-                    <td valign="center" class="13"><?php echo $r['tgl_buat'] ?></td>
-                    <td class="14"><?php echo $r['tgl_buat_status'] ?></td>
+                    <td valign="center" class="13"><?php echo $tglBuat ?></td>
+                    <td class="14"><?php echo $tglBuatStatus ?></td>
                     <td class="15"><?php echo $r['created_by'] ?></td>
                     <td class="16"><?php echo $r['status_created_by'] ?></td>
-                    <td class="17"><?php echo $r['tgl_selesai'] ?></td>
+                    <td class="17"><?php echo $tglSelesai ?></td>
                     <td class="18"><?php echo $r['jenis_matching'] ?></td>
                     <td class="19"><?php echo $r['no_po'] ?></td>
                     <td class="20"><?php echo $r['jenis_kain'] ?></td>
@@ -239,9 +263,9 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
                     <td class="28"><?php echo $r['koreksi_resep'] ?></td>
                     <td class="29"><?php echo $r['cocok_warna'] ?></td>
                     <td class="30"><?php echo $r['qty_order'] ?></td>
-                    <td class="31"><?php echo $r['tgl_delivery'] ?></td>
-                    <td class="32"><?php echo $r['tgl_in'] ?></td>
-                    <td class="33"><?php echo $r['tgl_out'] ?></td>
+                    <td class="31"><?php echo $tglDelivery ?></td>
+                    <td class="32"><?php echo $tglIn ?></td>
+                    <td class="33"><?php echo $tglOut ?></td>
                     <td class="34"><?php echo $r['ket'] ?></td>
                     <td class="35"><?php
                                     if ($r['ck_d65'] == 1) {
@@ -294,10 +318,10 @@ $TglTutup	    = isset($_POST['tgl_tutup']) ? $_POST['tgl_tutup'] : '';
                     <?php if ($r['status'] == 'batal') { ?>
                       <td class="38"><span class="btn bg-black btn-sm blink_me"><i class="fa fa-ban"></i>BATAL</span></td>
                     <?php } else if ($r['status'] == 'tunggu') { ?>
-                        <?php echo $r['tgl_tutup']; ?>
+                        <?php echo $tglTutupVal; ?>
                     <?php } else { ?>
                       <td class="38">
-                        <?php echo $r['tgl_tutup']; ?>
+                        <?php echo $tglTutupVal; ?>
                       </td>
                     <?php } ?>
 
