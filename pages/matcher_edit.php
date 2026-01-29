@@ -2,9 +2,9 @@
 ini_set("error_reporting", 1);
 session_start();
 include("../koneksi.php");
-$modal_id = $_GET['id'];
-$modal = mysqli_query($con,"SELECT * FROM `tbl_matcher` WHERE id='$modal_id' ");
-while ($r = mysqli_fetch_array($modal)) {
+$modal_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$modal = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_matcher WHERE id = ?", [$modal_id]);
+while ($modal && ($r = sqlsrv_fetch_array($modal, SQLSRV_FETCH_ASSOC))) {
 ?>
   <div class="modal-dialog ">
     <div class="modal-content">
