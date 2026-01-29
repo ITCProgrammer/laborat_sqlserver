@@ -2,9 +2,9 @@
 ini_set("error_reporting", 1);
 session_start();
 include("../koneksi.php");
-$modal_id = $_GET['id'];
-$modal = mysqli_query($con, "SELECT * FROM `tbl_user` WHERE id='$modal_id' ");
-while ($r = mysqli_fetch_array($modal)) {
+$modal_id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+$modal = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_user WHERE id = ?", [$modal_id]);
+while ($modal && ($r = sqlsrv_fetch_array($modal, SQLSRV_FETCH_ASSOC))) {
 ?>
   <div class="modal-dialog ">
     <div class="modal-content">
@@ -54,8 +54,8 @@ while ($r = mysqli_fetch_array($modal)) {
             <label for="jabatan" class="col-md-3 control-label">Jabatan</label>
             <div class="col-md-6">
               <select name="jabatan" class="form-control" id="jabatan" required>
-                <?php $sql_role = mysqli_query($con, "SELECT `role` FROM master_role");
-                while ($role = mysqli_fetch_array($sql_role)) { ?>
+                <?php $sql_role = sqlsrv_query($con, "SELECT role FROM db_laborat.master_role");
+                while ($sql_role && ($role = sqlsrv_fetch_array($sql_role, SQLSRV_FETCH_ASSOC))) { ?>
                   <option <?php if ($r['jabatan'] == $role['role']) echo 'Selected'; ?> value="<?php echo $role['role'] ?>"><?php echo $role['role'] ?></option>
                 <?php } ?>
               </select>
@@ -109,12 +109,12 @@ while ($r = mysqli_fetch_array($modal)) {
             <div class="col-md-6">
               <?php
               // Ambil semua role dari master_menu_cycletime
-              $dataRoleCycletime = mysqli_query($con, "SELECT * FROM master_menu_cycletime ORDER BY id ASC");
+              $dataRoleCycletime = sqlsrv_query($con, "SELECT * FROM db_laborat.master_menu_cycletime ORDER BY id ASC");
 
               // Ubah data pic_cycletime user menjadi array
               $selected_roles = explode(';', $r['pic_cycletime']);
 
-              while ($role = mysqli_fetch_array($dataRoleCycletime)) {
+              while ($dataRoleCycletime && ($role = sqlsrv_fetch_array($dataRoleCycletime, SQLSRV_FETCH_ASSOC))) {
                 $checked = in_array($role['id'], $selected_roles) ? 'checked' : '';
               ?>
                 <div class="checkbox">

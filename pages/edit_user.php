@@ -4,13 +4,16 @@ session_start();
 include("../koneksi.php");
 if ($_POST) {
 	extract($_POST);
-	$id = mysqli_real_escape_string($con, $_POST['id']);
-	$user = mysqli_real_escape_string($con, $_POST['username']);
-	$level = mysqli_real_escape_string($con, $_POST['level']);
-	$status = mysqli_real_escape_string($con, $_POST['status']);
-	$thn = mysqli_real_escape_string($con, $_POST['thn']);
-	$jabatan = mysqli_real_escape_string($con, $_POST['jabatan']);
+	$id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+	$user = isset($_POST['username']) ? $_POST['username'] : '';
+	$level = isset($_POST['level']) ? $_POST['level'] : '';
+	$status = isset($_POST['status']) ? $_POST['status'] : '';
+	$thn = isset($_POST['thn']) ? $_POST['thn'] : '';
+	$jabatan = isset($_POST['jabatan']) ? $_POST['jabatan'] : '';
 	$roles = isset($_POST['roles']) ? implode(';', $_POST['roles']) : '';
+	$userLAB = isset($_SESSION['userLAB']) ? $_SESSION['userLAB'] : '';
+	$ip = isset($_SESSION['ip']) ? $_SESSION['ip'] : '';
+	$os = isset($_SESSION['os']) ? $_SESSION['os'] : '';
 
 	if (empty($user)) {
 		echo "<script>alert('Username tidak boleh kosong!');window.location='?p=user';</script>";
@@ -19,34 +22,35 @@ if ($_POST) {
 
 	// Jika password diisi, cek konfirmasi dan update password
 	if (!empty($_POST['password'])) {
-		$pass = mysqli_real_escape_string($con, $_POST['password']);
-		$repass = mysqli_real_escape_string($con, $_POST['re_password']);
+		$pass = $_POST['password'];
+		$repass = $_POST['re_password'];
 		if ($pass != $repass) {
 			echo "<script>alert('Not Match Re-New Password!!');window.location='?p=user';</script>";
 			exit;
 		}
-		$updatePassword = ", `password`='$pass'";
+		$updatePassword = ", password = ?";
+		$updatePasswordParams = [$pass];
 	} else {
 		$updatePassword = "";
+		$updatePasswordParams = [];
 	}
 
-	$sqlupdate = mysqli_query($con, "UPDATE `tbl_user` SET 
-			`username`='$user'
+	$updateSql = "UPDATE db_laborat.tbl_user SET 
+			username = ?
 			$updatePassword,
-			`level`='$level',
-			`status`='$status',
-			`mamber`='$thn',
-			`jabatan`='$jabatan',
-			`pic_cycletime`='$roles'
-			WHERE `id`='$id' LIMIT 1");
+			level = ?,
+			status = ?,
+			mamber = ?,
+			jabatan = ?,
+			pic_cycletime = ?
+			WHERE id = ?";
+	$updateParams = array_merge([$user], $updatePasswordParams, [$level, $status, $thn, $jabatan, $roles, $id]);
+	sqlsrv_query($con, $updateSql, $updateParams);
 
 	$time = date('Y-m-d H:i:s');
-	mysqli_query($con, "INSERT into tbl_log SET `what` = '$id',
-				`what_do` = 'UPDATE table tbl_user',
-				`do_by` = '{$_SESSION['userLAB']}',
-				`do_at` = '$time',
-				`ip` = '{$_SESSION['ip']}',
-				`os` = '{$_SESSION['os']}',
-				`remark`='edit user'");
+	$logSql = "INSERT INTO db_laborat.tbl_log (what, what_do, do_by, do_at, ip, os, remark)
+	           VALUES (?, ?, ?, ?, ?, ?, ?)";
+	$logParams = [$id, 'UPDATE table tbl_user', $userLAB, $time, $ip, $os, 'edit user'];
+	sqlsrv_query($con, $logSql, $logParams);
 	echo "<script>window.location='?p=user';</script>";
 }

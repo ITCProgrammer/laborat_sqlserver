@@ -4,39 +4,40 @@ session_start();
 include("../koneksi.php");
 if ($_POST) {
 	extract($_POST);
-	$id = mysqli_real_escape_string($con,$_POST['id']);
-	$user = mysqli_real_escape_string($con,$_POST['username']);
-	$pass = mysqli_real_escape_string($con,$_POST['password']);
-	$repass = mysqli_real_escape_string($con,$_POST['re_password']);
-	$level = mysqli_real_escape_string($con,$_POST['level']);
-	$status = mysqli_real_escape_string($con,$_POST['status']);
+	$time = date('Y-m-d H:i:s');
+	$id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+	$user = isset($_POST['username']) ? $_POST['username'] : '';
+	$pass = isset($_POST['password']) ? $_POST['password'] : '';
+	$repass = isset($_POST['re_password']) ? $_POST['re_password'] : '';
+	$level = isset($_POST['level']) ? $_POST['level'] : '';
+	$status = isset($_POST['status']) ? $_POST['status'] : '';
+	$jabatan = isset($_POST['jabatan']) ? $_POST['jabatan'] : '';
+	$thn = isset($_POST['thn']) ? $_POST['thn'] : '';
 	$roles = isset($_POST['roles']) ? implode(';', $_POST['roles']) : '';
+	$userLAB = isset($_SESSION['userLAB']) ? $_SESSION['userLAB'] : '';
+	$ip = isset($_SESSION['ip']) ? $_SESSION['ip'] : '';
+	$os = isset($_SESSION['os']) ? $_SESSION['os'] : '';
 
-	$datauser = mysqli_query($con,"SELECT count(*) as jml FROM tbl_user WHERE `username`='$user' LIMIT 1");
-	$row = mysqli_fetch_array($datauser);
-	if ($row['jml'] > 0) {
+	$datauser = sqlsrv_query($con, "SELECT COUNT(*) AS jml FROM db_laborat.tbl_user WHERE username = ?", [$user]);
+	$row = $datauser ? sqlsrv_fetch_array($datauser, SQLSRV_FETCH_ASSOC) : null;
+	if ($datauser) {
+		sqlsrv_free_stmt($datauser);
+	}
+	if ($row && (int) $row['jml'] > 0) {
 		echo " <script>alert('Someone already has this username!');window.location='?p=user';</script>";
 	} else if ($pass != $repass) {
 		echo " <script>alert('Not Match Re-New Password!');window.location='?p=user';</script>";
 	} else {
-		$sqlupdate = mysqli_query($con,"INSERT INTO `tbl_user` SET 
-				`username`='$user', 
-				`password`='$pass',
-				`level`='$level',
-				`status`='$status',
-				`foto`='avatar.png',
-				`jabatan`='$_POST[jabatan]',
-				`mamber`='$_POST[thn]',
-				`pic_cycletime`='$roles'
-				");
+		$insertSql = "INSERT INTO db_laborat.tbl_user
+			(username, password, level, status, foto, jabatan, mamber, pic_cycletime)
+			VALUES (?, ?, ?, ?, 'avatar.png', ?, ?, ?)";
+		$insertParams = [$user, $pass, $level, $status, $jabatan, $thn, $roles];
+		sqlsrv_query($con, $insertSql, $insertParams);
 
-		mysqli_query($con,"INSERT into tbl_log SET `what` = '$user',
-					`what_do` = 'INSERT INTO tbl_user',
-					`do_by` = '$_SESSION[userLAB]',
-					`do_at` = '$time',
-					`ip` = '$_SESSION[ip]',
-					`os` = '$_SESSION[os]',
-					`remark`='New user'");
+		$logSql = "INSERT INTO db_laborat.tbl_log (what, what_do, do_by, do_at, ip, os, remark)
+		           VALUES (?, ?, ?, ?, ?, ?, ?)";
+		$logParams = [$user, 'INSERT INTO tbl_user', $userLAB, $time, $ip, $os, 'New user'];
+		sqlsrv_query($con, $logSql, $logParams);
 		echo " <script>window.location='?p=user';</script>";
 	}
 }

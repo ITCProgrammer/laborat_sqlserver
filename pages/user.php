@@ -14,18 +14,19 @@ include "koneksi.php";
 
 <body>
   <?php
-  $datauser = mysqli_query($con, "SELECT
-                                    a.*,
-                                    GROUP_CONCAT(b.name_menu ORDER BY b.id SEPARATOR ', ') AS roles
-                                  FROM
-                                    tbl_user a
-                                  LEFT JOIN master_menu_cycletime b ON FIND_IN_SET(b.id, REPLACE(a.pic_cycletime, ';', ',')) > 0
-                                  GROUP BY
-                                    a.username, a.pic_cycletime
-                                  ORDER BY
-                                    a.username ASC");
+  $datauser = sqlsrv_query(
+    $con,
+    "SELECT a.*, r.roles
+     FROM db_laborat.tbl_user a
+     OUTER APPLY (
+        SELECT STRING_AGG(b.name_menu, ', ') WITHIN GROUP (ORDER BY b.id) AS roles
+        FROM db_laborat.master_menu_cycletime b
+        WHERE CHARINDEX(',' + CAST(b.id AS varchar(10)) + ',', ',' + REPLACE(a.pic_cycletime, ';', ',') + ',') > 0
+     ) r
+     ORDER BY a.username ASC"
+  );
 
-  $dataRoleCycletime = mysqli_query($con, "SELECT * FROM master_menu_cycletime b ORDER BY b.id ASC");
+  $dataRoleCycletime = sqlsrv_query($con, "SELECT * FROM db_laborat.master_menu_cycletime b ORDER BY b.id ASC");
   $no = 1;
   $n = 1;
   $c = 0;
@@ -51,7 +52,7 @@ include "koneksi.php";
             <tbody>
               <?php
               $col = 0;
-              while ($rowd = mysqli_fetch_array($datauser)) {
+              while ($datauser && ($rowd = sqlsrv_fetch_array($datauser, SQLSRV_FETCH_ASSOC))) {
                 $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
               ?>
                 <tr bgcolor="<?php echo $bgcolor; ?>">
@@ -104,8 +105,8 @@ include "koneksi.php";
                       <label for="jabatan" class="col-md-3 control-label">Jabatan</label>
                       <div class="col-md-6">
                         <select name="jabatan" class="form-control" id="jabatan" required>
-                          <?php $sql_role = mysqli_query($con, "SELECT `role` FROM master_role");
-                          while ($role = mysqli_fetch_array($sql_role)) { ?>
+                          <?php $sql_role = sqlsrv_query($con, "SELECT role FROM db_laborat.master_role");
+                          while ($sql_role && ($role = sqlsrv_fetch_array($sql_role, SQLSRV_FETCH_ASSOC))) { ?>
                             <option value="<?php echo $role['role'] ?>"><?php echo $role['role'] ?></option>
                           <?php } ?>
                           <option selected disabled>-Pilih-</option>
@@ -149,7 +150,7 @@ include "koneksi.php";
                     <div class="form-group">
                       <label for="roles" class="col-md-3 control-label">Role CycleTime</label>
                       <div class="col-md-6">
-                        <?php while ($role = mysqli_fetch_array($dataRoleCycletime)) { ?>
+                        <?php while ($dataRoleCycletime && ($role = sqlsrv_fetch_array($dataRoleCycletime, SQLSRV_FETCH_ASSOC))) { ?>
                           <div class="checkbox">
                             <label>
                               <input type="checkbox" name="roles[]" value="<?php echo $role['id']; ?>"> 
