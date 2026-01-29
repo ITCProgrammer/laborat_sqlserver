@@ -2,8 +2,8 @@
 ini_set("error_reporting", 1);
 session_start();
 include("../koneksi.php");
-$sql = mysqli_query($con,"SELECT * FROM `announcement`");
-$announ = mysqli_fetch_array($sql);
+$sql = sqlsrv_query($con, "SELECT * FROM db_laborat.announcement");
+$announ = $sql ? sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC) : null;
 ?>
 <div class="tab-content">
     <div class="tab-pane active" id="tab_1">
@@ -35,12 +35,14 @@ $announ = mysqli_fetch_array($sql);
 </div>
 
 <?php
-if ($_POST['submit']) {
-    $ann = mysqli_real_escape_string($con,$_POST['announcement']);
-    mysqli_query($con,"UPDATE `announcement` SET 
-    `is_active` = '$_POST[is_active]', 
-    `ann` = '$ann' 
-    where id = 1");
+if (isset($_POST['submit'])) {
+    $ann = isset($_POST['announcement']) ? $_POST['announcement'] : '';
+    $isActive = isset($_POST['is_active']) ? $_POST['is_active'] : '0';
+    sqlsrv_query(
+        $con,
+        "UPDATE db_laborat.announcement SET is_active = ?, ann = ? WHERE id = 1",
+        [$isActive, $ann]
+    );
     echo '<script>window.location="index1.php?p=announcement"</script>';
 }
 ?>
