@@ -12,9 +12,9 @@
     $conn1 = db2_connect($conn_string, '', '');
     ini_set("error_reporting", 1);
 
-    $id_barang = $_GET['id_barang'];
-    $date1     = $_GET['tanggal_awal'];
-    $date2     = $_GET['tanggal_akhir'];
+    $id_barang = isset($_GET['id_barang']) ? $_GET['id_barang'] : '';
+    $date1     = isset($_GET['tanggal_awal']) ? $_GET['tanggal_awal'] : '';
+    $date2     = isset($_GET['tanggal_akhir']) ? $_GET['tanggal_akhir'] : '';
 
 ?>
 <!DOCTYPE html>
@@ -86,7 +86,7 @@
         </tr>
         <?php
 
-            $query_barang = mysqli_query($con, "SELECT *,
+            $query_barang = sqlsrv_query($con, "SELECT *,
                 CONCAT_WS('-',
                     TRIM(s.DECOSUBCODE01),
                     TRIM(s.DECOSUBCODE02),
@@ -102,12 +102,12 @@
                 END AS KATEGORI,
                 s.UNITOFMEASURE  AS UNIT,
                 s.id AS ID_BARANG
-            FROM tbl_master_barang  s
+            FROM db_laborat.tbl_master_barang  s
             ORDER BY KATEGORI ASC, NAMA_BARANG ASC");
         ?>
 <?php
     $no = 1;
-    while ($row_barang = mysqli_fetch_assoc($query_barang)):
+    while ($query_barang && ($row_barang = sqlsrv_fetch_array($query_barang, SQLSRV_FETCH_ASSOC))):
         $ITEMTYPECODE  = $row_barang['ITEMTYPECODE'];
         $DECOSUBCODE01 = $row_barang['DECOSUBCODE01'];
         $DECOSUBCODE02 = $row_barang['DECOSUBCODE02'];
@@ -133,12 +133,12 @@
 																							            <td style="text-align: center;">
 																							                <?php
                                                                                                                     $id_barang        = $row_barang['ID_BARANG'];
-                                                                                                                    $query_stok_awal  = "SELECT * FROM tbl_master_barang where id='$id_barang' LIMIT 1";
-                                                                                                                    $result_stok_awal = mysqli_query($con, $query_stok_awal);
+                                                                                                                    $query_stok_awal  = "SELECT TOP 1 * FROM db_laborat.tbl_master_barang where id = ?";
+                                                                                                                    $result_stok_awal = sqlsrv_query($con, $query_stok_awal, [$id_barang]);
 
-                                                                                                                    $data_stok_awal = mysqli_fetch_assoc($result_stok_awal);
+                                                                                                                    $data_stok_awal = $result_stok_awal ? sqlsrv_fetch_array($result_stok_awal, SQLSRV_FETCH_ASSOC) : null;
 
-                                                                                                                    if ($data_stok_awal['STOCK']) {
+                                                                                                                    if ($data_stok_awal && $data_stok_awal['STOCK']) {
                                                                                                                         $stok_awal = $data_stok_awal['STOCK'];
                                                                                                                     } else {
                                                                                                                         $stok_awal = 0;

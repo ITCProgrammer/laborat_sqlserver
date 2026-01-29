@@ -21,25 +21,25 @@
     ini_set("error_reporting", 1);
 
     // Data Dari POST
-    $tglawal   = $_GET['tanggal_awal'];
-    $tglakhir  = $_GET['tanggal_akhir'];
-    $id_barang = $_GET['id_barang'];
+    $tglawal   = isset($_GET['tanggal_awal']) ? $_GET['tanggal_awal'] : '';
+    $tglakhir  = isset($_GET['tanggal_akhir']) ? $_GET['tanggal_akhir'] : '';
+    $id_barang = isset($_GET['id_barang']) ? $_GET['id_barang'] : '';
 
-    $query_barang  = "SELECT * FROM tbl_master_barang where id='$id_barang' LIMIT 1";
-    $result_barang = mysqli_query($con, $query_barang);
+    $query_barang  = "SELECT TOP 1 * FROM db_laborat.tbl_master_barang where id = ?";
+    $result_barang = sqlsrv_query($con, $query_barang, [$id_barang]);
 
-    $data_barang = mysqli_fetch_assoc($result_barang);
+    $data_barang = $result_barang ? sqlsrv_fetch_array($result_barang, SQLSRV_FETCH_ASSOC) : null;
     // print_r($data_barang);
 
-    $DESCRIPTION   = $data_barang['DESCRIPTION'];
-    $ITEMTYPECODE  = $data_barang['ITEMTYPECODE'];
-    $DECOSUBCODE01 = $data_barang['DECOSUBCODE01'];
-    $DECOSUBCODE02 = $data_barang['DECOSUBCODE02'];
-    $DECOSUBCODE03 = $data_barang['DECOSUBCODE03'];
-    $DECOSUBCODE04 = $data_barang['DECOSUBCODE04'];
-    $DECOSUBCODE05 = $data_barang['DECOSUBCODE05'];
-    $DECOSUBCODE06 = $data_barang['DECOSUBCODE06'];
-    $UNIOFMEASURE  = $data_barang['UNITOFMEASURE'];
+    $DESCRIPTION   = $data_barang['DESCRIPTION'] ?? '';
+    $ITEMTYPECODE  = $data_barang['ITEMTYPECODE'] ?? '';
+    $DECOSUBCODE01 = $data_barang['DECOSUBCODE01'] ?? '';
+    $DECOSUBCODE02 = $data_barang['DECOSUBCODE02'] ?? '';
+    $DECOSUBCODE03 = $data_barang['DECOSUBCODE03'] ?? '';
+    $DECOSUBCODE04 = $data_barang['DECOSUBCODE04'] ?? '';
+    $DECOSUBCODE05 = $data_barang['DECOSUBCODE05'] ?? '';
+    $DECOSUBCODE06 = $data_barang['DECOSUBCODE06'] ?? '';
+    $UNIOFMEASURE  = $data_barang['UNITOFMEASURE'] ?? '';
 
     // Deklarasi Awal
     $stock_awal    = 0;
@@ -50,7 +50,7 @@
 
     $data = [];
 
-    if ($data_barang) {
+    if ($data_barang && isset($data_barang['STOCK'])) {
         $stock_awal_db = $data_barang['STOCK'];
     }
 

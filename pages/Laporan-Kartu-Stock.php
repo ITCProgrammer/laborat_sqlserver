@@ -51,10 +51,10 @@
                     <select class="form-control select2" id="nama_barang" style="width: 100%;">
                         <option value="all">All</option>
                         <?php
-                            $query  = "SELECT id, description FROM tbl_master_barang";
-                            $result = mysqli_query($con, $query);
+                            $query  = "SELECT id, description FROM db_laborat.tbl_master_barang";
+                            $result = sqlsrv_query($con, $query);
 
-                            while ($row = mysqli_fetch_assoc($result)) {
+                            while ($result && ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC))) {
                                 echo "<option value='" . $row['id'] . "'>" . $row['description'] . "</option>";
                             }
                         ?>
