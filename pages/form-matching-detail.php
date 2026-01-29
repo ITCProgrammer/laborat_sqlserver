@@ -3,19 +3,17 @@ ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
 // Ambil id matching
+$noResep = isset($_GET['noresep']) ? $_GET['noresep'] : '';
 $r1 = sqlsrv_fetch_array(
 	sqlsrv_query(
 		$con,
 		"SELECT TOP 1 id FROM db_laborat.tbl_matching WHERE no_resep = ?",
-		[$_GET['noresep']]
+		[$noResep]
 	),
 	SQLSRV_FETCH_ASSOC
 );
-if ($_GET['id'] != "") {
-	$id = $_GET['id'];
-} else {
-	$id = $r1['id'];
-}
+
+$id = isset($_GET['id']) && $_GET['id'] !== '' ? $_GET['id'] : ($r1['id'] ?? '');
 if (isset($_POST['save'])) {
 	$kode = $_POST['kode'];
 	$jns = $_POST['jenis'];

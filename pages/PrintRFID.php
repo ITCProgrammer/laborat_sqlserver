@@ -1,9 +1,11 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 include "koneksi.php";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['no_resep'])) {
-    $no_resep = mysqli_real_escape_string($con, $_POST['no_resep']);
+    $no_resep = $_POST['no_resep'];
     $ip_num = $_SERVER['REMOTE_ADDR'];
 
     // === PANGGIL API PRINT ===
@@ -33,14 +35,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['no_resep'])) {
         $logSuccess = isset($result['success']) && $result['success'] ? 1 : 0;
     }
 
-    mysqli_query($con, "INSERT INTO log_printing SET
-        no_resep = '$no_resep',
-        ip_address = '$ip_num',
-        success = '$logSuccess',
-        message = '$logMessage',
-        response_raw = '" . addslashes($response) . "',
-        created_at = NOW(),
-        created_by = '$_SESSION[userLAB]'");
+    $createdBy = $_SESSION['userLAB'] ?? '';
+    $insertSql = "INSERT INTO db_laborat.log_printing
+        (no_resep, ip_address, success, message, response_raw, created_at, created_by)
+        VALUES (?, ?, ?, ?, ?, GETDATE(), ?)";
+    $insertParams = [$no_resep, $ip_num, $logSuccess, $logMessage, $response, $createdBy];
+    sqlsrv_query($con, $insertSql, $insertParams);
 
     // === FEEDBACK KE USER ===
     if ($logSuccess) {
@@ -84,16 +84,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['no_resep'])) {
         </thead>
         <tbody>
             <?php
-            $q = mysqli_query($con, "SELECT * FROM log_printing ORDER BY created_at DESC LIMIT 100");
+            $q = sqlsrv_query($con, "SELECT TOP 100 * FROM db_laborat.log_printing ORDER BY created_at DESC");
             $no = 1;
-            while ($row = mysqli_fetch_assoc($q)) {
+            while ($q && ($row = sqlsrv_fetch_array($q, SQLSRV_FETCH_ASSOC))) {
                 echo "<tr>";
                 echo "<td>" . $no++ . "</td>";
                 echo "<td>" . htmlspecialchars($row['no_resep']) . "</td>";
                 echo "<td>" . htmlspecialchars($row['ip_address']) . "</td>";
                 echo "<td>" . ($row['success'] ? 'Yes' : 'No') . "</td>";
                 echo "<td>" . htmlspecialchars($row['message']) . "</td>";
-                echo "<td>" . htmlspecialchars($row['created_at']) . "</td>";
+                $createdAt = $row['created_at'];
+                if ($createdAt instanceof DateTimeInterface) {
+                    $createdAt = $createdAt->format('Y-m-d H:i:s');
+                }
+                echo "<td>" . htmlspecialchars($createdAt) . "</td>";
                 echo "<td>" . htmlspecialchars($row['created_by']) . "</td>";
                 echo "</tr>";
             }
