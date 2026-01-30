@@ -123,15 +123,32 @@ try {
         $approvalrmpdatetime
     ];
 
+    // Insert header + ambil id langsung (hindari SCOPE_IDENTITY null)
+    $sql = "
+        INSERT INTO db_laborat.approval_bon_order
+            (code, customer, tgl_approve_rmp, tgl_approve_lab, tgl_rejected_lab, pic_lab, status, is_revision,
+             revisic, revisi2, revisi3, revisi4, revisi5,
+             revisin, drevisi2, drevisi3, drevisi4, drevisi5,
+             revisi1date, revisi2date, revisi3date, revisi4date, revisi5date, approvalrmpdatetime)
+        OUTPUT INSERTED.id
+        VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?)
+    ";
+
     $stmt = sqlsrv_query($con, $sql, $params);
     if (!$stmt) {
         $errors = sqlsrv_errors();
         throw new Exception("Gagal simpan header: " . ($errors ? $errors[0]['message'] : 'unknown error'));
     }
 
-    $idRes = sqlsrv_query($con, "SELECT SCOPE_IDENTITY() AS id");
-    $idRow = $idRes ? sqlsrv_fetch_array($idRes, SQLSRV_FETCH_ASSOC) : null;
+    $idRow = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
     $approval_id = $idRow ? (int) $idRow['id'] : 0;
+    if ($approval_id <= 0) {
+        throw new Exception("Gagal mengambil ID header (approval_id kosong).");
+    }
 
     // Jika ada data line -> insert batch ke line_revision
     if (!empty($lines)) {

@@ -10,6 +10,37 @@ if (!function_exists('first_non_empty')) {
     }
 }
 
+function sqlsrv_value_to_string($value) {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    if (is_resource($value)) {
+        $v = stream_get_contents($value);
+        return $v === false ? '' : $v;
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function normalize_sqlsrv_row(array $row) {
+    foreach ($row as $k => $v) {
+        $row[$k] = sqlsrv_value_to_string($v);
+    }
+    return $row;
+}
+
+function fmt_date_val($value, $format = 'Y-m-d') {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format($format);
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function h($value) {
+    return htmlspecialchars(sqlsrv_value_to_string($value), ENT_QUOTES);
+}
+
 /* ---------------------------
    Helper: ambil detail line DB2 per CODE (untuk hitung pending)
    --------------------------- */
@@ -154,28 +185,33 @@ function get_db2_lines($conn1, $codeUpper) {
    --------------------------- */
 $sqlSnap = "
 SELECT a.*
-FROM approval_bon_order a
+FROM db_laborat.approval_bon_order a
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
 WHERE a.is_revision = 1
 ";
-$resSnap = mysqli_query($con, $sqlSnap);
+$resSnap = sqlsrv_query($con, $sqlSnap);
 $lastMySQLByCode = [];
-if ($resSnap) while ($r = mysqli_fetch_assoc($resSnap)) $lastMySQLByCode[strtoupper(trim($r['code']))] = $r;
+if ($resSnap) {
+    while ($r = sqlsrv_fetch_array($resSnap, SQLSRV_FETCH_ASSOC)) {
+        $r = normalize_sqlsrv_row($r);
+        $lastMySQLByCode[strtoupper(trim($r['code']))] = $r;
+    }
+}
 
 // line snapshot
 $lastLinesByCode = [];
-$qLines = mysqli_query($con, "
+$qLines = sqlsrv_query($con, "
 SELECT lr.*
-FROM line_revision lr
-JOIN approval_bon_order a ON a.id = lr.approval_id
+FROM db_laborat.line_revision lr
+JOIN db_laborat.approval_bon_order a ON a.id = lr.approval_id
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
@@ -183,7 +219,8 @@ WHERE a.is_revision = 1
 ORDER BY lr.code, lr.orderline
 ");
 if ($qLines) {
-    while ($r = mysqli_fetch_assoc($qLines)) {
+    while ($r = sqlsrv_fetch_array($qLines, SQLSRV_FETCH_ASSOC)) {
+        $r = normalize_sqlsrv_row($r);
         $codeKey = strtoupper(trim($r['code']));
         if (!isset($lastLinesByCode[$codeKey])) $lastLinesByCode[$codeKey] = [];
         $lastLinesByCode[$codeKey][] = $r;
@@ -413,17 +450,22 @@ while ($r = db2_fetch_assoc($res)) {
    Ambil baris riwayat: hanya 1 terbaru per code, exclude pending
    --------------------------- */
 $whereExclude = '';
+ $excludeParams = [];
 if (!empty($pendingCodes)) {
-    $in = implode(',', array_map(function($c) use ($con){ return "'" . mysqli_real_escape_string($con,$c) . "'"; }, array_keys($pendingCodes)));
-    $whereExclude = " AND UPPER(a.code) NOT IN ($in) ";
+    $placeholders = [];
+    foreach (array_keys($pendingCodes) as $c) {
+        $placeholders[] = '?';
+        $excludeParams[] = $c;
+    }
+    $whereExclude = " AND UPPER(a.code) NOT IN (" . implode(',', $placeholders) . ") ";
 }
 
 $sqlApproved = "
 SELECT a.*
-FROM approval_bon_order a
+FROM db_laborat.approval_bon_order a
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
@@ -431,17 +473,17 @@ WHERE a.is_revision = 1
 {$whereExclude}
 ORDER BY a.id DESC
 ";
-$resultApproved = mysqli_query($con, $sqlApproved);
+$resultApproved = sqlsrv_query($con, $sqlApproved, $excludeParams);
 
 // Persiapkan snapshot line per code untuk modal (riwayat)
 $lastLinesByCode = [];
-$qLines2 = mysqli_query($con, "
+$qLines2 = sqlsrv_query($con, "
 SELECT lr.*
-FROM line_revision lr
-JOIN approval_bon_order a ON a.id = lr.approval_id
+FROM db_laborat.line_revision lr
+JOIN db_laborat.approval_bon_order a ON a.id = lr.approval_id
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
@@ -449,7 +491,8 @@ WHERE a.is_revision = 1
 ORDER BY lr.code, lr.orderline
 ");
 if ($qLines2) {
-    while ($r = mysqli_fetch_assoc($qLines2)) {
+    while ($r = sqlsrv_fetch_array($qLines2, SQLSRV_FETCH_ASSOC)) {
+        $r = normalize_sqlsrv_row($r);
         $codeKey = strtoupper(trim($r['code']));
         if (!isset($lastLinesByCode[$codeKey])) $lastLinesByCode[$codeKey] = [];
         $lastLinesByCode[$codeKey][] = $r;
@@ -457,7 +500,8 @@ if ($qLines2) {
 }
 
 // Cetak <tr> untuk riwayat
-while ($row = mysqli_fetch_assoc($resultApproved)) {
+while ($row = sqlsrv_fetch_array($resultApproved, SQLSRV_FETCH_ASSOC)) {
+    $row = normalize_sqlsrv_row($row);
     $codeApp = strtoupper(trim($row['code']));
     $reviN_last = first_non_empty([$row['drevisi5'],$row['drevisi4'],$row['drevisi3'],$row['drevisi2'],$row['revisin']]);
     $reviC_last = first_non_empty([$row['revisi5'],$row['revisi4'],$row['revisi3'],$row['revisi2'],$row['revisic']]);
@@ -467,49 +511,47 @@ while ($row = mysqli_fetch_assoc($resultApproved)) {
     <tr>
       <td style="display:none;"><?= (int)$row['id'] ?></td>
       <td>
-        <div style="margin-bottom:2px; word-break:break-word;"><?= htmlspecialchars($row['customer']) ?></div>
+        <div style="margin-bottom:2px; word-break:break-word;"><?= h($row['customer'] ?? '') ?></div>
         <div style="display:flex; align-items:center; font-weight:700;">
           <span style="flex:1 1 auto; min-width:0; word-break:break-word;">
-            <?= htmlspecialchars($reviN_last ?? '', ENT_QUOTES, 'UTF-8') ?>
+            <?= h($reviN_last ?? '') ?>
           </span>
           <span style="flex:0 0 auto; margin-left:auto;">
-            <?= htmlspecialchars($reviC_last ?? '', ENT_QUOTES, 'UTF-8') ?>
+            <?= h($reviC_last ?? '') ?>
           </span>
       </div>
       </td>
       <td>
         <a href="#"
           class="btn btn-primary btn-sm open-detail"
-          data-code="<?= htmlspecialchars($row['code']) ?>"
+          data-code="<?= h($row['code'] ?? '') ?>"
           data-toggle="modal" data-target="#detailModal">
-          <?= htmlspecialchars($row['code']) ?>
+          <?= h($row['code'] ?? '') ?>
         </a>
       </td>
-      <td>
-        <?= !empty($row['approvalrmpdatetime']) ? htmlspecialchars(date('Y-m-d', strtotime($row['approvalrmpdatetime'])), ENT_QUOTES, 'UTF-8') : '' ?>
-      </td>
-      <td><?= htmlspecialchars((string)($row['tgl_approve_lab']  ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
-      <td><?= htmlspecialchars((string)($row['pic_lab'] ?? ''), ENT_QUOTES, 'UTF-8') ?></td>
+      <td><?= h(fmt_date_val($row['tgl_approve_rmp'] ?? null)) ?></td>
+      <td><?= h(fmt_date_val($row['tgl_approve_lab'] ?? null)) ?></td>
+      <td><?= h($row['pic_lab'] ?? '') ?></td>
       <td>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-          <strong class="<?= ($row['status']==='Approved'?'text-success':'text-danger') ?>"><?= htmlspecialchars($row['status']) ?></strong>
+          <strong class="<?= ($row['status']==='Approved'?'text-success':'text-danger') ?>"><?= h($row['status'] ?? '') ?></strong>
           <button class="btn btn-outline-purple btn-sm revisi-btn"
             data-code="<?= $codeApp ?>"
-            data-revisic="<?= htmlspecialchars($row['revisic']  ?? '', ENT_QUOTES) ?>"
-            data-revisi2="<?= htmlspecialchars($row['revisi2']  ?? '', ENT_QUOTES) ?>"
-            data-revisi3="<?= htmlspecialchars($row['revisi3']  ?? '', ENT_QUOTES) ?>"
-            data-revisi4="<?= htmlspecialchars($row['revisi4']  ?? '', ENT_QUOTES) ?>"
-            data-revisi5="<?= htmlspecialchars($row['revisi5']  ?? '', ENT_QUOTES) ?>"
-            data-revisin="<?= htmlspecialchars($row['revisin']  ?? '', ENT_QUOTES) ?>"
-            data-drevisi2="<?= htmlspecialchars($row['drevisi2'] ?? '', ENT_QUOTES) ?>"
-            data-drevisi3="<?= htmlspecialchars($row['drevisi3'] ?? '', ENT_QUOTES) ?>"
-            data-drevisi4="<?= htmlspecialchars($row['drevisi4'] ?? '', ENT_QUOTES) ?>"
-            data-drevisi5="<?= htmlspecialchars($row['drevisi5'] ?? '', ENT_QUOTES) ?>"
-            data-revisi1date="<?= htmlspecialchars($row['revisi1date'] ?? '', ENT_QUOTES) ?>"
-            data-revisi2date="<?= htmlspecialchars($row['revisi2date'] ?? '', ENT_QUOTES) ?>"
-            data-revisi3date="<?= htmlspecialchars($row['revisi3date'] ?? '', ENT_QUOTES) ?>"
-            data-revisi4date="<?= htmlspecialchars($row['revisi4date'] ?? '', ENT_QUOTES) ?>"
-            data-revisi5date="<?= htmlspecialchars($row['revisi5date'] ?? '', ENT_QUOTES) ?>">
+            data-revisic="<?= h($row['revisic']  ?? '') ?>"
+            data-revisi2="<?= h($row['revisi2']  ?? '') ?>"
+            data-revisi3="<?= h($row['revisi3']  ?? '') ?>"
+            data-revisi4="<?= h($row['revisi4']  ?? '') ?>"
+            data-revisi5="<?= h($row['revisi5']  ?? '') ?>"
+            data-revisin="<?= h($row['revisin']  ?? '') ?>"
+            data-drevisi2="<?= h($row['drevisi2'] ?? '') ?>"
+            data-drevisi3="<?= h($row['drevisi3'] ?? '') ?>"
+            data-drevisi4="<?= h($row['drevisi4'] ?? '') ?>"
+            data-drevisi5="<?= h($row['drevisi5'] ?? '') ?>"
+            data-revisi1date="<?= h(fmt_date_val($row['revisi1date'] ?? null)) ?>"
+            data-revisi2date="<?= h(fmt_date_val($row['revisi2date'] ?? null)) ?>"
+            data-revisi3date="<?= h(fmt_date_val($row['revisi3date'] ?? null)) ?>"
+            data-revisi4date="<?= h(fmt_date_val($row['revisi4date'] ?? null)) ?>"
+            data-revisi5date="<?= h(fmt_date_val($row['revisi5date'] ?? null)) ?>">
             Detail Revisi
           </button>
         </div>

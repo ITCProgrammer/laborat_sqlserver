@@ -197,37 +197,70 @@ function has_line_diff($conn1, $codeUpper) {
     return linesDiffer($db2Lines, $mysqlLines);
 }
 
+function fmt_date_val($value, $format = 'Y-m-d') {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format($format);
+    }
+    if ($value === null) {
+        return '';
+    }
+    return (string)$value;
+}
+
+function str_from_sqlsrv($value) {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    if (is_resource($value)) {
+        $v = stream_get_contents($value);
+        return $v === false ? '' : $v;
+    }
+    if ($value === null) {
+        return '';
+    }
+    return (string)$value;
+}
+
+function h($value) {
+    return htmlspecialchars(str_from_sqlsrv($value), ENT_QUOTES);
+}
+
 
 /* --------------- 1) Snapshot MySQL (header terakhir per code) --------------- */
 $sqlSnap = "
 SELECT a.*
-FROM approval_bon_order a
+FROM db_laborat.approval_bon_order a
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
 WHERE a.is_revision = 1
 ";
-$resSnap = mysqli_query($con, $sqlSnap);
+$assetBase = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+if ($assetBase === '/') $assetBase = '';
+$dtCss = $assetBase . '/bower_components/DataTable/datatables.min.css';
+$dtJs  = $assetBase . '/bower_components/DataTable/datatables.min.js';
+$dtRowsJs = $assetBase . '/bower_components/DataTable/dataTables.rowsGroup.js';
+$resSnap = sqlsrv_query($con, $sqlSnap);
 
 $lastMySQLByCode = [];
 if ($resSnap) {
-    while ($r = mysqli_fetch_assoc($resSnap)) {
+    while ($r = sqlsrv_fetch_array($resSnap, SQLSRV_FETCH_ASSOC)) {
         $lastMySQLByCode[strtoupper(trim($r['code']))] = $r;
     }
 }
 
 /* --------------- (opsional) siapkan snapshot line utk approvedTable (riwayat) --------------- */
 $lastLinesByCode = [];
-$qLines = mysqli_query($con, "
+$qLines = sqlsrv_query($con, "
 SELECT lr.*
-FROM line_revision lr
-JOIN approval_bon_order a ON a.id = lr.approval_id
+FROM db_laborat.line_revision lr
+JOIN db_laborat.approval_bon_order a ON a.id = lr.approval_id
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
@@ -235,7 +268,7 @@ WHERE a.is_revision = 1
 ORDER BY lr.code, lr.orderline
 ");
 if ($qLines) {
-    while ($r = mysqli_fetch_assoc($qLines)) {
+    while ($r = sqlsrv_fetch_array($qLines, SQLSRV_FETCH_ASSOC)) {
         $codeKey = strtoupper(trim($r['code']));
         if (!isset($lastLinesByCode[$codeKey])) $lastLinesByCode[$codeKey] = [];
         $lastLinesByCode[$codeKey][] = $r;
@@ -461,20 +494,22 @@ while ($row = db2_fetch_assoc($resultTBO)) {
 
 /* --------------- 4) Approved (riwayat): exclude yang lagi pending --------------- */
 $excludeList = "";
+$excludeParams = [];
 if (!empty($tboRows)) {
-    $codes = [];
+    $placeholders = [];
     foreach ($tboRows as $r) {
-        $codes[] = "'" . mysqli_real_escape_string($con, strtoupper(trim($r['CODE']))) . "'";
+        $placeholders[] = "?";
+        $excludeParams[] = strtoupper(trim($r['CODE']));
     }
-    $excludeList = " AND UPPER(a.code) NOT IN (" . implode(",", $codes) . ") ";
+    $excludeList = " AND UPPER(a.code) NOT IN (" . implode(",", $placeholders) . ") ";
 }
 
 $sqlApproved = "
 SELECT a.*
-FROM approval_bon_order a
+FROM db_laborat.approval_bon_order a
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
@@ -482,12 +517,26 @@ WHERE a.is_revision = 1
 {$excludeList}
 ORDER BY a.id DESC
 ";
-$resultApproved = mysqli_query($con, $sqlApproved);
+$resultApproved = sqlsrv_query($con, $sqlApproved, $excludeParams);
+$approvedRows = [];
+if ($resultApproved) {
+    while ($row = sqlsrv_fetch_array($resultApproved, SQLSRV_FETCH_ASSOC)) {
+        $approvedRows[] = $row;
+    }
+}
 ?>
+<script>
+  window.DT_ASSET_BASE = <?= json_encode($assetBase) ?>;
+  window.DT_ASSET_JS = <?= json_encode($dtJs) ?>;
+  window.DT_ASSET_CSS = <?= json_encode($dtCss) ?>;
+</script>
 <style>
-.modal-full{width:98%;max-width:98%}
-.btn-outline-purple{background:transparent;color:#6f42c1;border:1px solid #6f42c1}
-.btn-outline-purple:hover,.btn-outline-purple:focus{background:#6f42c1;color:#fff}
+.modal-dialog.modal-full{width:98% !important;max-width:98%}
+@media (max-width: 768px){
+  .modal-dialog.modal-full{width:100% !important;max-width:100%}
+}
+.btn.btn-outline-purple{background:transparent !important;color:#6f42c1 !important;border:1px solid #6f42c1 !important}
+.btn.btn-outline-purple:hover,.btn.btn-outline-purple:focus{background:#6f42c1 !important;color:#fff !important}
 
 #detailModal .modal-body{
   max-height: 90vh;
@@ -540,10 +589,10 @@ $resultApproved = mysqli_query($con, $sqlApproved);
               ?>
                 <tr>
                   <td style="padding:4px 8px;">
-                    <div style="margin-bottom:2px; word-break:break-word;"><?= htmlspecialchars($customer) ?></div>
+                    <div style="margin-bottom:2px; word-break:break-word;"><?= h($customer) ?></div>
                     <div style="display:flex; align-items:center; font-weight:700;">
-                      <span style="flex:1 1 auto; min-width:0; word-break:break-word;"><?= htmlspecialchars($row['REVISIN_LAST']) ?></span>
-                      <span style="flex:0 0 auto; margin-left:auto;"><?= htmlspecialchars($row['REVISIC_LAST']) ?></span>
+                      <span style="flex:1 1 auto; min-width:0; word-break:break-word;"><?= h($row['REVISIN_LAST'] ?? '') ?></span>
+                      <span style="flex:0 0 auto; margin-left:auto;"><?= h($row['REVISIC_LAST'] ?? '') ?></span>
                     </div>
                   </td>
                   <td>
@@ -553,36 +602,43 @@ $resultApproved = mysqli_query($con, $sqlApproved);
                       <?= $code ?>
                     </a>
                   </td>
-                  <td><?= htmlspecialchars($tgl) ?></td>
+                  <td><?= h($tgl) ?></td>
                   <td>
                     <div class="d-flex align-items-center gap-2">
                       <select class="form-control form-control-sm pic-select" data-code="<?= $code ?>">
                         <option value="">-- Pilih PIC --</option>
-                        <?php $resultPIC = mysqli_query($con,"SELECT * FROM tbl_user WHERE pic_bonorder=1 ORDER BY id ASC");
-                        while ($rowPIC = mysqli_fetch_assoc($resultPIC)): ?>
-                          <option value="<?= htmlspecialchars($rowPIC['username']) ?>"><?= htmlspecialchars($rowPIC['username']) ?></option>
-                        <?php endwhile; ?>
+                        <?php
+                        $resultPIC = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_user WHERE pic_bonorder=1 ORDER BY id ASC");
+                        $picRows = [];
+                        if ($resultPIC) {
+                            while ($rowPIC = sqlsrv_fetch_array($resultPIC, SQLSRV_FETCH_ASSOC)) {
+                                $picRows[] = $rowPIC;
+                            }
+                        }
+                        foreach ($picRows as $rowPIC): ?>
+                          <option value="<?= h($rowPIC['username']) ?>"><?= h($rowPIC['username']) ?></option>
+                        <?php endforeach; ?>
                       </select>
-                      <button class="btn btn-success btn-sm approve-btn" data-code="<?= $code ?>" data-approval-rmp-dt="<?= htmlspecialchars($approvalDtStr, ENT_QUOTES) ?>">Approve</button>
+                      <button class="btn btn-success btn-sm approve-btn" data-code="<?= $code ?>" data-approval-rmp-dt="<?= h($approvalDtStr) ?>">Approve</button>
                       <!-- <button class="btn btn-danger btn-sm reject-btn"  data-code="<?= $code ?>">Reject</button> -->
 
                       <button class="btn btn-outline-purple btn-sm revisi-btn"
                         data-code="<?= $code ?>"
-                        data-revisic="<?= htmlspecialchars($row['REVISIC']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi2="<?= htmlspecialchars($row['REVISI2']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi3="<?= htmlspecialchars($row['REVISI3']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi4="<?= htmlspecialchars($row['REVISI4']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi5="<?= htmlspecialchars($row['REVISI5']  ?? '', ENT_QUOTES) ?>"
-                        data-revisin="<?= htmlspecialchars($row['REVISIN']  ?? '', ENT_QUOTES) ?>"
-                        data-drevisi2="<?= htmlspecialchars($row['DREVISI2'] ?? '', ENT_QUOTES) ?>"
-                        data-drevisi3="<?= htmlspecialchars($row['DREVISI3'] ?? '', ENT_QUOTES) ?>"
-                        data-drevisi4="<?= htmlspecialchars($row['DREVISI4'] ?? '', ENT_QUOTES) ?>"
-                        data-drevisi5="<?= htmlspecialchars($row['DREVISI5'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi1date="<?= htmlspecialchars($row['REVISI1DATE'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi2date="<?= htmlspecialchars($row['REVISI2DATE'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi3date="<?= htmlspecialchars($row['REVISI3DATE'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi4date="<?= htmlspecialchars($row['REVISI4DATE'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi5date="<?= htmlspecialchars($row['REVISI5DATE'] ?? '', ENT_QUOTES) ?>">
+                        data-revisic="<?= h($row['REVISIC']  ?? '') ?>"
+                        data-revisi2="<?= h($row['REVISI2']  ?? '') ?>"
+                        data-revisi3="<?= h($row['REVISI3']  ?? '') ?>"
+                        data-revisi4="<?= h($row['REVISI4']  ?? '') ?>"
+                        data-revisi5="<?= h($row['REVISI5']  ?? '') ?>"
+                        data-revisin="<?= h($row['REVISIN']  ?? '') ?>"
+                        data-drevisi2="<?= h($row['DREVISI2'] ?? '') ?>"
+                        data-drevisi3="<?= h($row['DREVISI3'] ?? '') ?>"
+                        data-drevisi4="<?= h($row['DREVISI4'] ?? '') ?>"
+                        data-drevisi5="<?= h($row['DREVISI5'] ?? '') ?>"
+                        data-revisi1date="<?= h(fmt_date_val($row['REVISI1DATE'] ?? null)) ?>"
+                        data-revisi2date="<?= h(fmt_date_val($row['REVISI2DATE'] ?? null)) ?>"
+                        data-revisi3date="<?= h(fmt_date_val($row['REVISI3DATE'] ?? null)) ?>"
+                        data-revisi4date="<?= h(fmt_date_val($row['REVISI4DATE'] ?? null)) ?>"
+                        data-revisi5date="<?= h(fmt_date_val($row['REVISI5DATE'] ?? null)) ?>">
                         Detail Revisi
                       </button>
                     </div>
@@ -616,7 +672,7 @@ $resultApproved = mysqli_query($con, $sqlApproved);
                 </tr>
               </thead>
               <tbody>
-              <?php while ($row = mysqli_fetch_assoc($resultApproved)):
+              <?php foreach ($approvedRows as $row):
                 $codeApp   = strtoupper(trim($row['code']));
                 $reviN_last = first_non_empty([$row['drevisi5'],$row['drevisi4'],$row['drevisi3'],$row['drevisi2'],$row['revisin']]);
                 $reviC_last = first_non_empty([$row['revisi5'],$row['revisi4'],$row['revisi3'],$row['revisi2'],$row['revisic']]);
@@ -626,56 +682,51 @@ $resultApproved = mysqli_query($con, $sqlApproved);
                 <tr>
                   <td style="display:none;"><?= (int)$row['id'] ?></td>
                   <td>
-                    <div style="margin-bottom:2px; word-break:break-word;"><?= htmlspecialchars($row['customer']) ?></div>
+                    <div style="margin-bottom:2px; word-break:break-word;"><?= h($row['customer'] ?? '') ?></div>
                     <div style="display:flex; align-items:center; font-weight:700;">
-                      <span style="flex:1 1 auto; min-width:0; word-break:break-word;"><?= htmlspecialchars($reviN_last) ?></span>
-                      <span style="flex:0 0 auto; margin-left:auto;"><?= htmlspecialchars($reviC_last) ?></span>
+                      <span style="flex:1 1 auto; min-width:0; word-break:break-word;"><?= h($reviN_last) ?></span>
+                      <span style="flex:0 0 auto; margin-left:auto;"><?= h($reviC_last) ?></span>
                     </div>
                   </td>
                   <td>
                     <!-- Klik dari APPROVED -->
                     <a href="#"
                       class="btn btn-primary btn-sm open-detail"
-                      data-code="<?= htmlspecialchars($row['code']) ?>"
+                      data-code="<?= h($row['code'] ?? '') ?>"
                       data-toggle="modal" data-target="#detailModal">
-                      <?= htmlspecialchars($row['code']) ?>
+                      <?= h($row['code'] ?? '') ?>
                     </a>
                   </td>
-                  <!-- <td><?= htmlspecialchars($row['tgl_approve_rmp']) ?></td> -->
-                  <td>
-                      <?= !empty($row['approvalrmpdatetime']) 
-                          ? htmlspecialchars(date('Y-m-d', strtotime($row['approvalrmpdatetime']))) 
-                          : '' ?>
-                  </td>
-                  <td><?= htmlspecialchars($row['tgl_approve_lab']) ?></td>
+                  <td><?= h(fmt_date_val($row['tgl_approve_rmp'] ?? null)) ?></td>
+                  <td><?= h(fmt_date_val($row['tgl_approve_lab'] ?? null)) ?></td>
                   <!-- <td><?= htmlspecialchars($row['tgl_rejected_lab']) ?></td> -->
-                  <td><?= htmlspecialchars($row['pic_lab']) ?></td>
+                  <td><?= h($row['pic_lab'] ?? '') ?></td>
                   <td>
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                      <strong class="<?= ($row['status']==='Approved'?'text-success':'text-danger') ?>"><?= htmlspecialchars($row['status']) ?></strong>
+                      <strong class="<?= ($row['status']==='Approved'?'text-success':'text-danger') ?>"><?= h($row['status'] ?? '') ?></strong>
                       <button class="btn btn-outline-purple btn-sm revisi-btn"
                         data-code="<?= $codeApp ?>"
-                        data-revisic="<?= htmlspecialchars($row['revisic']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi2="<?= htmlspecialchars($row['revisi2']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi3="<?= htmlspecialchars($row['revisi3']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi4="<?= htmlspecialchars($row['revisi4']  ?? '', ENT_QUOTES) ?>"
-                        data-revisi5="<?= htmlspecialchars($row['revisi5']  ?? '', ENT_QUOTES) ?>"
-                        data-revisin="<?= htmlspecialchars($row['revisin']  ?? '', ENT_QUOTES) ?>"
-                        data-drevisi2="<?= htmlspecialchars($row['drevisi2'] ?? '', ENT_QUOTES) ?>"
-                        data-drevisi3="<?= htmlspecialchars($row['drevisi3'] ?? '', ENT_QUOTES) ?>"
-                        data-drevisi4="<?= htmlspecialchars($row['drevisi4'] ?? '', ENT_QUOTES) ?>"
-                        data-drevisi5="<?= htmlspecialchars($row['drevisi5'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi1date="<?= htmlspecialchars($row['revisi1date'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi2date="<?= htmlspecialchars($row['revisi2date'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi3date="<?= htmlspecialchars($row['revisi3date'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi4date="<?= htmlspecialchars($row['revisi4date'] ?? '', ENT_QUOTES) ?>"
-                        data-revisi5date="<?= htmlspecialchars($row['revisi5date'] ?? '', ENT_QUOTES) ?>">
+                        data-revisic="<?= h($row['revisic']  ?? '') ?>"
+                        data-revisi2="<?= h($row['revisi2']  ?? '') ?>"
+                        data-revisi3="<?= h($row['revisi3']  ?? '') ?>"
+                        data-revisi4="<?= h($row['revisi4']  ?? '') ?>"
+                        data-revisi5="<?= h($row['revisi5']  ?? '') ?>"
+                        data-revisin="<?= h($row['revisin']  ?? '') ?>"
+                        data-drevisi2="<?= h($row['drevisi2'] ?? '') ?>"
+                        data-drevisi3="<?= h($row['drevisi3'] ?? '') ?>"
+                        data-drevisi4="<?= h($row['drevisi4'] ?? '') ?>"
+                        data-drevisi5="<?= h($row['drevisi5'] ?? '') ?>"
+                        data-revisi1date="<?= h(fmt_date_val($row['revisi1date'] ?? null)) ?>"
+                        data-revisi2date="<?= h(fmt_date_val($row['revisi2date'] ?? null)) ?>"
+                        data-revisi3date="<?= h(fmt_date_val($row['revisi3date'] ?? null)) ?>"
+                        data-revisi4date="<?= h(fmt_date_val($row['revisi4date'] ?? null)) ?>"
+                        data-revisi5date="<?= h(fmt_date_val($row['revisi5date'] ?? null)) ?>">
                         Detail Revisi
                       </button>
                     </div>
                   </td>
                 </tr>
-              <?php endwhile; ?>
+              <?php endforeach; ?>
               </tbody>
             </table>
           </div>
@@ -711,6 +762,11 @@ $resultApproved = mysqli_query($con, $sqlApproved);
     </div>
   </div>
 </div>
+
+<!-- Ensure DataTables assets available for this page -->
+<link rel="stylesheet" href="<?= h($dtCss) ?>">
+<script src="<?= h($dtJs) ?>"></script>
+<script src="<?= h($dtRowsJs) ?>"></script>
 
 <script>
 // ==== Modal Detail (Approved vs TBO) ====
@@ -773,8 +829,8 @@ $(document).on('click', '.open-detail', function(e){
               .table.table-bordered > tbody > tr.revisi-summary td:first-child { border-left: none; background:#fafafa; }
               .table > tbody > tr.has-revisi > td { padding-bottom:6px; }
               .table > tbody > tr.revisi-summary > td { padding-top:6px; }
-              .btn-outline-purple{background-color:transparent;color:#6f42c1;border:1px solid #6f42c1}
-              .btn-outline-purple:hover,.btn-outline-purple:focus{background:#6f42c1;color:#fff}
+              .btn.btn-outline-purple{background-color:transparent !important;color:#6f42c1 !important;border:1px solid #6f42c1 !important}
+              .btn.btn-outline-purple:hover,.btn.btn-outline-purple:focus{background:#6f42c1 !important;color:#fff !important}
           </style>
           <table class='table table-bordered table-striped' id='detailApprovedTable'>
               <thead>
@@ -821,7 +877,7 @@ $(document).on('click', '.open-detail', function(e){
                 <td>${item.PO_GREIGE || ''}</td>
             </tr>
 
-          ${item.HAS_REVISI && `
+          ${item.HAS_REVISI ? `
             <tr class='revisi-summary'>
               <td></td>
               <td colspan='15' style=\"background:#fafafa;\">
@@ -833,33 +889,36 @@ $(document).on('click', '.open-detail', function(e){
                   </div>
               </td>
             </tr>
-          `}
+          ` : ''}
         `;
       });
 
       html += `</tbody></table>`;
       $('#modal-content').html(html);
 
-      // init DataTable (stabil di modal)
-      var dt = $('#detailApprovedTable').DataTable({
-        destroy: true,
-        deferRender: true,
-        autoWidth: false,
-        scrollX: true,                // tabel lebar aman di modal
-        paging: true,
-        searching: true,
-        ordering: true,
-        order: [[0, 'asc']],          // kolom 1 = orderline
-        columnDefs: [
-          { targets: 0, type: 'num' },  // sorting numerik utk orderline
-          { targets: '_all', defaultContent: '' }
-        ]
-      });
+      var dt = null;
+      if ($.fn && $.fn.DataTable) {
+        // init DataTable (stabil di modal)
+        dt = $('#detailApprovedTable').DataTable({
+          destroy: true,
+          deferRender: true,
+          autoWidth: false,
+          scrollX: true,                // tabel lebar aman di modal
+          paging: true,
+          searching: true,
+          ordering: true,
+          order: [[0, 'asc']],          // kolom 1 = orderline
+          columnDefs: [
+            { targets: 0, type: 'num' },  // sorting numerik utk orderline
+            { targets: '_all', defaultContent: '' }
+          ]
+        });
+      }
 
       // adjust kolom setelah modal benar2 tampil (biar header/width rapi)
       $('#detailModal')
         .off('shown.bs.modal.dtfix')
-        .on('shown.bs.modal.dtfix', function(){ dt.columns.adjust().draw(false); })
+        .on('shown.bs.modal.dtfix', function(){ if (dt) dt.columns.adjust().draw(false); })
         .modal('show');
     },
     error: function(){
@@ -942,8 +1001,10 @@ function renderDetailTableFromLines(rows, title){
 
   html += '</tbody></table></div>';
   $('#modal-content').html(html);
-  if ($.fn.DataTable.isDataTable('#detailApprovedTable')) $('#detailApprovedTable').DataTable().destroy();
-  $('#detailApprovedTable').DataTable({ paging:true, searching:true, ordering:true, order:[[0,'asc']] });
+  if ($.fn && $.fn.DataTable) {
+    if ($.fn.DataTable.isDataTable('#detailApprovedTable')) $('#detailApprovedTable').DataTable().destroy();
+    $('#detailApprovedTable').DataTable({ paging:true, searching:true, ordering:true, order:[[0,'asc']] });
+  }
 }
 
 function esc(x){ return $('<div/>').text(x==null?'':String(x)).html(); }
@@ -977,11 +1038,47 @@ $(document).on('click', '#tboTable tbody .revisi-btn',      function(e){ e.preve
 
 <script>
 $(document).ready(function(){
-  const tboTable = $('#tboTable').DataTable();
-  const approvedTable = $('#approvedTable').DataTable({
-    order: [[0,'desc']],
-    columnDefs: [{ targets:0, visible:false }]
-  });
+  // debug hooks removed
+
+  let tboTable;
+  let approvedTable;
+  function initMainTables(){
+    if (!$.fn || !$.fn.DataTable) return false;
+    if (!tboTable) tboTable = $('#tboTable').DataTable();
+    if (!approvedTable) {
+      approvedTable = $('#approvedTable').DataTable({
+        order: [[0,'desc']],
+        columnDefs: [{ targets:0, visible:false }]
+      });
+    }
+    return true;
+  }
+  function ensureDataTables(){
+    if ($.fn && $.fn.DataTable) return initMainTables();
+    if (window.DT_ASSET_CSS) {
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = window.DT_ASSET_CSS;
+      document.head.appendChild(link);
+    }
+    if (window.DT_ASSET_JS) {
+      $.ajax({ url: window.DT_ASSET_JS, type: 'GET', cache: true });
+      $.getScript(window.DT_ASSET_JS)
+        .done(function(){
+          initMainTables();
+        })
+        .fail(function(){});
+      var s = document.createElement('script');
+      s.src = window.DT_ASSET_JS;
+      s.onload = function(){
+        initMainTables();
+      };
+      s.onerror = function(){};
+      document.head.appendChild(s);
+    }
+  }
+  $(window).on('load', ensureDataTables);
+  setTimeout(ensureDataTables, 0);
 
   function getPIC(code){ return $("select.pic-select[data-code='"+code+"']").val(); }
   function getCustomer(code){ return $("tr:has(button[data-code='"+code+"']) td:first").text(); }
@@ -993,6 +1090,7 @@ $(document).ready(function(){
 
   function reloadTboTable(){
     $.get("pages/ajax/refresh_tbo_table_revisi.php", function (html) {
+      if (!tboTable) return;
       const $rows = $($.parseHTML(html)).filter('tr');
       tboTable.clear();
       if ($rows.length) tboTable.rows.add($rows);
@@ -1003,6 +1101,7 @@ $(document).ready(function(){
 
   function reloadApprovedTable(isRevision=1){
     $.get("pages/ajax/refresh_approved_table_revisi.php", { is_revision:isRevision }, function (html) {
+      if (!approvedTable) return;
       const $rows = $($.parseHTML(html)).filter('tr');
       approvedTable.clear();
       if ($rows.length) approvedTable.rows.add($rows);

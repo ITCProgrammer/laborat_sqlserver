@@ -10,6 +10,37 @@ if (!function_exists('first_non_empty')) {
     }
 }
 
+function sqlsrv_value_to_string($value) {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    if (is_resource($value)) {
+        $v = stream_get_contents($value);
+        return $v === false ? '' : $v;
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function normalize_sqlsrv_row(array $row) {
+    foreach ($row as $k => $v) {
+        $row[$k] = sqlsrv_value_to_string($v);
+    }
+    return $row;
+}
+
+function fmt_date_val($value, $format = 'Y-m-d') {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format($format);
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function h($value) {
+    return htmlspecialchars(sqlsrv_value_to_string($value), ENT_QUOTES);
+}
+
 /* ---------------------------
    Helper: ambil detail line DB2 per CODE
    --------------------------- */
@@ -154,32 +185,33 @@ function get_db2_lines($conn1, $codeUpper) {
    --------------------------- */
 $sqlSnap = "
 SELECT a.*
-FROM approval_bon_order a
+FROM db_laborat.approval_bon_order a
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
 WHERE a.is_revision = 1
 ";
-$resSnap = mysqli_query($con, $sqlSnap);
+$resSnap = sqlsrv_query($con, $sqlSnap);
 
 $lastMySQLByCode = [];
 if ($resSnap) {
-    while ($r = mysqli_fetch_assoc($resSnap)) {
+    while ($r = sqlsrv_fetch_array($resSnap, SQLSRV_FETCH_ASSOC)) {
+        $r = normalize_sqlsrv_row($r);
         $lastMySQLByCode[strtoupper(trim($r['code']))] = $r;
     }
 }
 
 $lastLinesByCode = [];
-$qLines = mysqli_query($con, "
+$qLines = sqlsrv_query($con, "
 SELECT lr.*
-FROM line_revision lr
-JOIN approval_bon_order a ON a.id = lr.approval_id
+FROM db_laborat.line_revision lr
+JOIN db_laborat.approval_bon_order a ON a.id = lr.approval_id
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
@@ -187,7 +219,8 @@ WHERE a.is_revision = 1
 ORDER BY lr.code, lr.orderline
 ");
 if ($qLines) {
-    while ($r = mysqli_fetch_assoc($qLines)) {
+    while ($r = sqlsrv_fetch_array($qLines, SQLSRV_FETCH_ASSOC)) {
+        $r = normalize_sqlsrv_row($r);
         $codeKey = strtoupper(trim($r['code']));
         if (!isset($lastLinesByCode[$codeKey])) $lastLinesByCode[$codeKey] = [];
         $lastLinesByCode[$codeKey][] = $r;
@@ -394,9 +427,10 @@ $resultTBO = db2_exec($conn1, $sqlTBO, ['cursor' => DB2_SCROLLABLE]);
 
 // Ambil daftar PIC sekali
 $picOptions = '';
-$resPIC = mysqli_query($con, "SELECT username FROM tbl_user WHERE pic_bonorder=1 ORDER BY id ASC");
-while ($r = mysqli_fetch_assoc($resPIC)) {
-    $u = htmlspecialchars($r['username']);
+$resPIC = sqlsrv_query($con, "SELECT username FROM db_laborat.tbl_user WHERE pic_bonorder=1 ORDER BY id ASC");
+while ($r = sqlsrv_fetch_array($resPIC, SQLSRV_FETCH_ASSOC)) {
+    $r = normalize_sqlsrv_row($r);
+    $u = h($r['username'] ?? '');
     $picOptions .= "<option value=\"{$u}\">{$u}</option>";
 }
 
@@ -426,13 +460,13 @@ while ($row = db2_fetch_assoc($resultTBO)) {
     ?>
     <tr>
       <td style="padding:4px 8px;">
-        <div style="margin-bottom:2px; word-break:break-word;"><?= htmlspecialchars($customer) ?></div>
+        <div style="margin-bottom:2px; word-break:break-word;"><?= h($customer) ?></div>
         <div style="display:flex; align-items:center; font-weight:700;">
           <span style="flex:1 1 auto; min-width:0; word-break:break-word;">
-            <?= htmlspecialchars($row['REVISIN_LAST'] ?? '') ?>
+            <?= h($row['REVISIN_LAST'] ?? '') ?>
           </span>
           <span style="flex:0 0 auto; margin-left:auto;">
-            <?= htmlspecialchars($row['REVISIC_LAST'] ?? '') ?>
+            <?= h($row['REVISIC_LAST'] ?? '') ?>
           </span>
 
         </div>
@@ -443,7 +477,7 @@ while ($row = db2_fetch_assoc($resultTBO)) {
           <?= $code ?>
         </a>
       </td>
-      <td><?= htmlspecialchars($tgl) ?></td>
+      <td><?= h($tgl) ?></td>
       <td>
         <div class="d-flex align-items-center gap-2">
           <select class="form-control form-control-sm pic-select" data-code="<?= $code ?>">
@@ -454,21 +488,21 @@ while ($row = db2_fetch_assoc($resultTBO)) {
 
           <button class="btn btn-outline-purple btn-sm revisi-btn"
             data-code="<?= $code ?>"
-            data-revisic="<?= htmlspecialchars($row['REVISIC']  ?? '', ENT_QUOTES) ?>"
-            data-revisi2="<?= htmlspecialchars($row['REVISI2']  ?? '', ENT_QUOTES) ?>"
-            data-revisi3="<?= htmlspecialchars($row['REVISI3']  ?? '', ENT_QUOTES) ?>"
-            data-revisi4="<?= htmlspecialchars($row['REVISI4']  ?? '', ENT_QUOTES) ?>"
-            data-revisi5="<?= htmlspecialchars($row['REVISI5']  ?? '', ENT_QUOTES) ?>"
-            data-revisin="<?= htmlspecialchars($row['REVISIN']  ?? '', ENT_QUOTES) ?>"
-            data-drevisi2="<?= htmlspecialchars($row['DREVISI2'] ?? '', ENT_QUOTES) ?>"
-            data-drevisi3="<?= htmlspecialchars($row['DREVISI3'] ?? '', ENT_QUOTES) ?>"
-            data-drevisi4="<?= htmlspecialchars($row['DREVISI4'] ?? '', ENT_QUOTES) ?>"
-            data-drevisi5="<?= htmlspecialchars($row['DREVISI5'] ?? '', ENT_QUOTES) ?>"
-            data-revisi1date="<?= htmlspecialchars($row['REVISI1DATE'] ?? '', ENT_QUOTES) ?>"
-            data-revisi2date="<?= htmlspecialchars($row['REVISI2DATE'] ?? '', ENT_QUOTES) ?>"
-            data-revisi3date="<?= htmlspecialchars($row['REVISI3DATE'] ?? '', ENT_QUOTES) ?>"
-            data-revisi4date="<?= htmlspecialchars($row['REVISI4DATE'] ?? '', ENT_QUOTES) ?>"
-            data-revisi5date="<?= htmlspecialchars($row['REVISI5DATE'] ?? '', ENT_QUOTES) ?>">
+            data-revisic="<?= h($row['REVISIC']  ?? '') ?>"
+            data-revisi2="<?= h($row['REVISI2']  ?? '') ?>"
+            data-revisi3="<?= h($row['REVISI3']  ?? '') ?>"
+            data-revisi4="<?= h($row['REVISI4']  ?? '') ?>"
+            data-revisi5="<?= h($row['REVISI5']  ?? '') ?>"
+            data-revisin="<?= h($row['REVISIN']  ?? '') ?>"
+            data-drevisi2="<?= h($row['DREVISI2'] ?? '') ?>"
+            data-drevisi3="<?= h($row['DREVISI3'] ?? '') ?>"
+            data-drevisi4="<?= h($row['DREVISI4'] ?? '') ?>"
+            data-drevisi5="<?= h($row['DREVISI5'] ?? '') ?>"
+            data-revisi1date="<?= h($row['REVISI1DATE'] ?? '') ?>"
+            data-revisi2date="<?= h($row['REVISI2DATE'] ?? '') ?>"
+            data-revisi3date="<?= h($row['REVISI3DATE'] ?? '') ?>"
+            data-revisi4date="<?= h($row['REVISI4DATE'] ?? '') ?>"
+            data-revisi5date="<?= h($row['REVISI5DATE'] ?? '') ?>">
             Detail Revisi
           </button>
         </div>

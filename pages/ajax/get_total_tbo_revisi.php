@@ -4,6 +4,25 @@ require_once '../lib/revisi_compare.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+function sqlsrv_value_to_string($value) {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    if (is_resource($value)) {
+        $v = stream_get_contents($value);
+        return $v === false ? '' : $v;
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function normalize_sqlsrv_row(array $row) {
+    foreach ($row as $k => $v) {
+        $row[$k] = sqlsrv_value_to_string($v);
+    }
+    return $row;
+}
+
 /* ===== Ambil detail line DB2 (SAMA persis dengan Approval-Revisi-Bon-Order.php) ===== */
 function get_db2_lines($conn1, $codeUpper) {
     $sql = "
@@ -133,22 +152,25 @@ function get_db2_lines($conn1, $codeUpper) {
 /* ===== kalau MySQL belum punya snapshot line utk code ini → JANGAN dianggap beda ===== */
 function has_line_diff($conn1, $con, $codeUpper) {
     $db2Lines = get_db2_lines($conn1, $codeUpper);
-    $codeEsc  = mysqli_real_escape_string($con, $codeUpper);
-    $res = mysqli_query($con, "
+    $res = sqlsrv_query($con, "
         SELECT lr.*
-        FROM line_revision lr
-        JOIN approval_bon_order a ON a.id = lr.approval_id
+        FROM db_laborat.line_revision lr
+        JOIN db_laborat.approval_bon_order a ON a.id = lr.approval_id
         JOIN (
           SELECT code, MAX(id) AS max_id
-          FROM approval_bon_order
+          FROM db_laborat.approval_bon_order
           WHERE is_revision = 1
           GROUP BY code
         ) m ON m.max_id = a.id
-        WHERE a.is_revision = 1 AND UPPER(lr.code) = '{$codeEsc}'
+        WHERE a.is_revision = 1 AND UPPER(lr.code) = ?
         ORDER BY lr.orderline
-    ");
+    ", [$codeUpper]);
     $mysqlLines = [];
-    if ($res) while ($r = mysqli_fetch_assoc($res)) $mysqlLines[] = $r;
+    if ($res) {
+        while ($r = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) {
+            $mysqlLines[] = normalize_sqlsrv_row($r);
+        }
+    }
     if (empty($mysqlLines)) return false;
     return linesDiffer($db2Lines, $mysqlLines);
 }
@@ -156,18 +178,19 @@ function has_line_diff($conn1, $con, $codeUpper) {
 /* ===== Snapshot header MySQL terakhir per code ===== */
 $sqlSnap = "
 SELECT a.*
-FROM approval_bon_order a
+FROM db_laborat.approval_bon_order a
 JOIN (
   SELECT code, MAX(id) AS max_id
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE is_revision = 1
   GROUP BY code
 ) m ON m.max_id = a.id
 WHERE a.is_revision = 1
 ";
-$resSnap = mysqli_query($con, $sqlSnap);
+$resSnap = sqlsrv_query($con, $sqlSnap);
 $lastMySQLByCode = [];
-if ($resSnap) while ($r = mysqli_fetch_assoc($resSnap)) {
+if ($resSnap) while ($r = sqlsrv_fetch_array($resSnap, SQLSRV_FETCH_ASSOC)) {
+    $r = normalize_sqlsrv_row($r);
     $lastMySQLByCode[strtoupper(trim($r['code']))] = $r;
 }
 
