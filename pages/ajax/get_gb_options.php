@@ -9,33 +9,26 @@ $search = '';
 if (isset($_GET['search'])) $search = trim($_GET['search']);
 if (empty($search) && isset($_GET['term'])) $search = trim($_GET['term']);
 
-// use MySQL connection ($con) from koneksi.php
-// basic sanitization for MySQL
-$search_esc = mysqli_real_escape_string($con, $search);
-
-if ($search_esc !== '') {
-    $like = "%" . $search_esc . "%";
-    $sql = "SELECT TRIM(bao.option) AS opt FROM balance_additional_option bao WHERE TRIM(bao.type) = 'G_B' AND TRIM(bao.option) LIKE ? LIMIT 10";
-    $stmt = mysqli_prepare($con, $sql);
-    if ($stmt) {
-        $param = $like;
-        mysqli_stmt_bind_param($stmt, 's', $param);
-        mysqli_stmt_execute($stmt);
-        $res = mysqli_stmt_get_result($stmt);
-    } else {
-        $res = false;
-    }
+if ($search !== '') {
+    $like = "%" . $search . "%";
+    $sql = "SELECT TOP 10 LTRIM(RTRIM(bao.[option])) AS opt
+            FROM db_laborat.balance_additional_option bao
+            WHERE LTRIM(RTRIM(bao.[type])) = 'G_B' AND LTRIM(RTRIM(bao.[option])) LIKE ?";
+    $stmt = sqlsrv_query($con, $sql, [$like]);
 } else {
-    $sql = "SELECT TRIM(bao.option) AS opt FROM balance_additional_option bao WHERE TRIM(bao.type) = 'G_B' LIMIT 10";
-    $res = mysqli_query($con, $sql);
+    $sql = "SELECT TOP 10 LTRIM(RTRIM(bao.[option])) AS opt
+            FROM db_laborat.balance_additional_option bao
+            WHERE LTRIM(RTRIM(bao.[type])) = 'G_B'";
+    $stmt = sqlsrv_query($con, $sql);
 }
 
-if ($res) {
-    while ($row = mysqli_fetch_assoc($res)) {
+if ($stmt) {
+    while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
         $opt = $row['opt'] ?? '';
         $id = htmlspecialchars($opt, ENT_QUOTES);
         $results[] = [ 'id' => $id, 'text' => $opt, 'option' => $opt ];
     }
+    sqlsrv_free_stmt($stmt);
 }
 
 echo json_encode($results);

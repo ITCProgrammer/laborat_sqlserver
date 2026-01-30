@@ -2,11 +2,11 @@
 include "../../koneksi.php";
 
 $approvedCodes = [];
-$res = mysqli_query($con, "SELECT code FROM approval_bon_order WHERE is_revision = 0");
-while ($r = mysqli_fetch_assoc($res)) {
-    $approvedCodes[] = "'" . mysqli_real_escape_string($con, $r['code']) . "'";
+$res = sqlsrv_query($con, "SELECT code FROM db_laborat.approval_bon_order WHERE is_revision = 0");
+while ($res && ($r = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC))) {
+    $approvedCodes[] = strtoupper(trim($r['code']));
 }
-$codeList = implode(",", $approvedCodes);
+$codeList = $approvedCodes;
 
 $sqlTBO = "SELECT DISTINCT 
                 isa.CODE AS CODE,
@@ -26,10 +26,22 @@ $sqlTBO = "SELECT DISTINCT
                 AND DATE(s.CREATIONDATETIME) > DATE('2025-06-01')";
 
 if (!empty($codeList)) {
-    $sqlTBO .= " AND isa.CODE NOT IN ($codeList)";
+    $inList = implode(",", array_map(function ($c) {
+        return "'" . db2_quote($c) . "'";
+    }, $codeList));
+    $sqlTBO .= " AND isa.CODE NOT IN ($inList)";
 }
 
 $resultTBO = db2_exec($conn1, $sqlTBO, ['cursor' => DB2_SCROLLABLE]);
+
+function db2_quote($s) { return str_replace("'", "''", $s); }
+
+$picOptions = [];
+$queryPIC = "SELECT username FROM db_laborat.tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC";
+$resultPIC = sqlsrv_query($con, $queryPIC);
+while ($resultPIC && ($rowPIC = sqlsrv_fetch_array($resultPIC, SQLSRV_FETCH_ASSOC))) {
+    $picOptions[] = $rowPIC['username'];
+}
 
 $seen = [];
 while ($row = db2_fetch_assoc($resultTBO)) {
@@ -51,12 +63,9 @@ while ($row = db2_fetch_assoc($resultTBO)) {
             <div class='d-flex align-items-center gap-2'>
                 <select class='form-control form-control-sm pic-select' data-code='$code'>
                     <option value=''>-- Pilih PIC --</option>";
-
-    $queryPIC = "SELECT * FROM tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC";
-    $resultPIC = mysqli_query($con, $queryPIC);
-    while ($rowPIC = mysqli_fetch_assoc($resultPIC)) {
-        $username = htmlspecialchars($rowPIC['username']);
-        echo "<option value='$username'>$username</option>";
+    foreach ($picOptions as $username) {
+        $safe = htmlspecialchars($username);
+        echo "<option value='$safe'>$safe</option>";
     }
 
     echo "      </select>

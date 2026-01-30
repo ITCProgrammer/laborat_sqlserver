@@ -25,18 +25,18 @@ $sqlBalance = "SELECT DISTINCT
           b.CREATIONDATETIME as creation_datetime,
           bep.month_period as month_period,
           CASE
-            WHEN bep.month_period IS NOT NULL THEN DATE_FORMAT(DATE_ADD(b.CREATIONDATETIME, INTERVAL bep.month_period MONTH), '%Y-%m-%d')
+            WHEN bep.month_period IS NOT NULL THEN CONVERT(varchar(10), DATEADD(month, bep.month_period, b.CREATIONDATETIME), 23)
             ELSE NULL
           END AS expired_date,
-          CASE 
+          CASE
               WHEN tre.element_id IS NOT NULL THEN 1
               ELSE 0
           END AS on_matching
-        FROM balance b
-        LEFT JOIN tbl_resep_element tre ON b.NUMBERID = tre.element_id
-        LEFT JOIN balance_expired_period bep ON (
+        FROM db_laborat.balance b
+        LEFT JOIN db_laborat.tbl_resep_element tre ON b.NUMBERID = tre.element_id
+        LEFT JOIN db_laborat.balance_expired_period bep ON (
             bep.warehouse_zone = b.WHSLOCATIONWAREHOUSEZONECODE
-            AND FIND_IN_SET(b.DECOSUBCODE01, bep.subcode01)
+            AND CHARINDEX(',' + b.DECOSUBCODE01 + ',', ',' + ISNULL(bep.subcode01, '') + ',') > 0
             AND bep.greige_blc = b.G_B
         )
         WHERE 1=1";
@@ -49,23 +49,23 @@ if ($status == 'available') {
 }
 if ($status == 'expired') {
   // only include rows where we have a computed expired_date and it's before now
-  $sqlBalance .= " AND bep.month_period IS NOT NULL AND DATE_ADD(b.CREATIONDATETIME, INTERVAL bep.month_period MONTH) < NOW()";
+  $sqlBalance .= " AND bep.month_period IS NOT NULL AND DATEADD(month, bep.month_period, b.CREATIONDATETIME) < GETDATE()";
 }
 
 // Apply qty filter: 'nonzero' (default) => qty > 0; 'include_zero' => no filter; 'only_zero' => qty = 0
 if ($qty_filter === 'nonzero') {
-  $sqlBalance .= " AND COALESCE(b.BASEPRIMARYQUANTITYUNIT, 0) > 0";
+  $sqlBalance .= " AND ISNULL(b.BASEPRIMARYQUANTITYUNIT, 0) > 0";
 } elseif ($qty_filter === 'only_zero') {
-  $sqlBalance .= " AND COALESCE(b.BASEPRIMARYQUANTITYUNIT, 0) = 0";
+  $sqlBalance .= " AND ISNULL(b.BASEPRIMARYQUANTITYUNIT, 0) = 0";
 }
 
-$sqlBalance .= " ORDER BY CREATIONDATETIME DESC";
+$sqlBalance .= " ORDER BY b.CREATIONDATETIME DESC";
 
-$qBalance = mysqli_query($con, $sqlBalance);
+$qBalance = sqlsrv_query($con, $sqlBalance);
 
 $data = [];
 
-while ($row = mysqli_fetch_assoc($qBalance)) {
+while ($qBalance && ($row = sqlsrv_fetch_array($qBalance, SQLSRV_FETCH_ASSOC))) {
   $item_code = implode('', [
     $row['decosub01'],
     $row['decosub02'],
@@ -78,6 +78,9 @@ while ($row = mysqli_fetch_assoc($qBalance)) {
   $row['greige_blc'] = $row['greige_blc'] ?? null;
 
   $data[] = $row;
+}
+if ($qBalance) {
+  sqlsrv_free_stmt($qBalance);
 }
 
 echo json_encode([

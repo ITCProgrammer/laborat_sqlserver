@@ -26,7 +26,12 @@ try {
     $UPDATEDBY = $_SESSION['userLAB'] ?? 'anonymous';
 
     // Do not update quantity fields here — quantities must remain unchanged during edit
-    $sql = "UPDATE balance SET
+    $quality_level_code = ($quality_level_code === '' || !is_numeric($quality_level_code))
+        ? null
+        : (int) $quality_level_code;
+    $element_id = is_numeric($element_id) ? (int) $element_id : $element_id;
+
+    $sql = "UPDATE db_laborat.balance SET
         DECOSUBCODE01 = ?,
         DECOSUBCODE02 = ?,
         DECOSUBCODE03 = ?,
@@ -37,15 +42,11 @@ try {
         LOTCODE = ?,
         PROJECTCODE = ?,
         G_B = ?,
-        LASTUPDATEDATETIME = NOW(),
-        LASTUPDATEDATETIMEUTC = NOW()
-        WHERE NUMBERID = ? LIMIT 1";
+        LASTUPDATEDATETIME = GETDATE(),
+        LASTUPDATEDATETIMEUTC = GETDATE()
+        WHERE NUMBERID = ?";
 
-    $stmt = $con->prepare($sql);
-    if (!$stmt) throw new Exception('Prepare failed: ' . $con->error);
-
-    // 11 strings: 10 fields above + element_id
-    $stmt->bind_param('sssssssssss',
+    $stmt = sqlsrv_prepare($con, $sql, [
         $decosub01,
         $decosub02,
         $decosub03,
@@ -57,12 +58,19 @@ try {
         $project_code,
         $g_b,
         $element_id
-    );
+    ]);
+    if (!$stmt) {
+        $errors = sqlsrv_errors();
+        throw new Exception('Prepare failed: ' . ($errors ? $errors[0]['message'] : 'unknown error'));
+    }
 
-    $ok = $stmt->execute();
-    if (!$ok) throw new Exception('Execute failed: ' . $stmt->error);
+    $ok = sqlsrv_execute($stmt);
+    if (!$ok) {
+        $errors = sqlsrv_errors();
+        throw new Exception('Execute failed: ' . ($errors ? $errors[0]['message'] : 'unknown error'));
+    }
 
-    $stmt->close();
+    sqlsrv_free_stmt($stmt);
 
     echo json_encode(['status' => 'success', 'message' => 'Element updated']);
 

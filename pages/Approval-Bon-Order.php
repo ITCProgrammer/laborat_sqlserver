@@ -2,13 +2,11 @@
 include "koneksi.php";
 
 $approvedCodes = [];
-$res = mysqli_query($con, "SELECT code FROM approval_bon_order WHERE is_revision = 0");
-while ($r = mysqli_fetch_assoc($res)) {
-    $approvedCodes[] = "'" . mysqli_real_escape_string($con, $r['code']) . "'";
+$res = sqlsrv_query($con, "SELECT code FROM db_laborat.approval_bon_order WHERE is_revision = 0");
+while ($res && ($r = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC))) {
+    $approvedCodes[] = strtoupper(trim($r['code']));
 }
-
-// Bentuk list code (untuk IN (...))
-$codeList = implode(",", $approvedCodes);
+$codeList = $approvedCodes;
 
 // Ambil data siap approve
 $sqlTBO = "SELECT DISTINCT 
@@ -29,7 +27,10 @@ $sqlTBO = "SELECT DISTINCT
                 AND DATE(s.CREATIONDATETIME) > DATE('2025-06-01')";
 
 if (!empty($codeList)) {
-    $sqlTBO .= " AND isa.CODE NOT IN ($codeList)";
+    $inList = implode(",", array_map(function ($c) {
+        return "'" . db2_quote($c) . "'";
+    }, $codeList));
+    $sqlTBO .= " AND isa.CODE NOT IN ($inList)";
 }
 
 $resultTBO = db2_exec($conn1, $sqlTBO, ['cursor' => DB2_SCROLLABLE]);
@@ -38,20 +39,37 @@ $resultTBO = db2_exec($conn1, $sqlTBO, ['cursor' => DB2_SCROLLABLE]);
 // $sqlApproved = "SELECT * FROM approval_bon_order WHERE is_revision = 0 ORDER BY id DESC";
 // $resultApproved = mysqli_query($con, $sqlApproved);
 $sqlApproved = "SELECT id, customer, code, tgl_approve_lab, pic_lab, status, approvalrmpdatetime
-                FROM approval_bon_order
+                FROM db_laborat.approval_bon_order
                 WHERE is_revision = 0
                 ORDER BY id DESC";
-$resApproved = mysqli_query($con, $sqlApproved);
+$resApproved = sqlsrv_query($con, $sqlApproved);
 
 // Kumpulkan rows dan daftar code
 $rowsApproved = [];
 $codes = [];
-while ($r = mysqli_fetch_assoc($resApproved)) {
+while ($resApproved && ($r = sqlsrv_fetch_array($resApproved, SQLSRV_FETCH_ASSOC))) {
     $rowsApproved[] = $r;
     $codes[] = strtoupper(trim($r['code']));
 } 
 
 function db2_quote($s){ return str_replace("'", "''", $s); }
+
+function fmt_ymd($value) {
+    if ($value instanceof DateTime) {
+        return $value->format('Y-m-d');
+    }
+    if (empty($value)) {
+        return '';
+    }
+    return date('Y-m-d', strtotime($value));
+}
+
+function fmt_value($value) {
+    if ($value instanceof DateTime) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    return $value;
+}
 
 // $mapDb2Date = [];
 // if (!empty($codes)) {
@@ -136,10 +154,10 @@ function db2_quote($s){ return str_replace("'", "''", $s); }
                                                 <option value="">-- Pilih PIC --</option>
                                                 <?php
                                                     // Daftar PIC yang bisa dipilih
-                                                    $queryPIC = "SELECT * FROM tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC";
-                                                    $resultPIC = mysqli_query($con, $queryPIC);
+                                                    $queryPIC = "SELECT * FROM db_laborat.tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC";
+                                                    $resultPIC = sqlsrv_query($con, $queryPIC);
                                                 ?>
-                                                <?php while ($rowPIC = mysqli_fetch_assoc($resultPIC)) : ?>
+                                                <?php while ($resultPIC && ($rowPIC = sqlsrv_fetch_array($resultPIC, SQLSRV_FETCH_ASSOC))) : ?>
                                                     <option value="<?= $rowPIC['username'] ?>"><?= $rowPIC['username'] ?></option>
                                                 <?php endwhile; ?>
                                             </select>
@@ -192,11 +210,9 @@ function db2_quote($s){ return str_replace("'", "''", $s); }
                                     </a>
                                 </td>
                                 <td>
-                                    <?= !empty($row['approvalrmpdatetime']) 
-                                        ? htmlspecialchars(date('Y-m-d', strtotime($row['approvalrmpdatetime']))) 
-                                        : '' ?>
+                                    <?= htmlspecialchars(fmt_ymd($row['approvalrmpdatetime'])) ?>
                                 </td>
-                                <td><?= htmlspecialchars($row['tgl_approve_lab']) ?></td>
+                                <td><?= htmlspecialchars(fmt_ymd($row['tgl_approve_lab'])) ?></td>
                                 <td><?= htmlspecialchars($row['pic_lab']) ?></td>
                                 <td><strong class="<?= ($row['status']==='Approved'?'text-success':'text-danger') ?>">
                                     <?= htmlspecialchars($row['status']) ?>

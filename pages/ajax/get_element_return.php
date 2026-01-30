@@ -17,47 +17,43 @@ if (!isset($_POST['element_id']) || empty($_POST['element_id'])) {
 $element_id = $_POST['element_id'];
 
 // --- Ambil data element untuk direturn---
-$queryElement = " SELECT DISTINCT
+ $queryElement = " SELECT TOP 1
         b.NUMBERID as element_id, 
         b.ELEMENTSCODE as element_code,
         b.BASEPRIMARYQUANTITYUNIT as curr_qty,
-        tre.no_resep,
-        COALESCE(bt.used_stock, 0) AS used_stock,
-        (b.BASEPRIMARYQUANTITYUNIT + COALESCE(bt.used_stock, 0) / 1000) AS initial_stock
-    FROM balance b
-    LEFT JOIN tbl_resep_element tre ON b.NUMBERID = tre.element_id
+        ISNULL(bt.used_stock, 0) AS used_stock,
+        (b.BASEPRIMARYQUANTITYUNIT + ISNULL(bt.used_stock, 0) / 1000) AS initial_stock
+    FROM db_laborat.balance b
     LEFT JOIN (
         SELECT element_id, SUM(qty) AS used_stock
-        FROM balance_transactions
+        FROM db_laborat.balance_transactions
         GROUP BY element_id
     ) bt ON bt.element_id = b.NUMBERID
     WHERE b.NUMBERID = ?
-    GROUP BY b.NUMBERID
-    LIMIT 1
 ";
 
-$stmt = $con->prepare($queryElement);
+$stmt = sqlsrv_prepare($con, $queryElement, [$element_id]);
 if (!$stmt) {
-    echo json_encode(['success' => false, 'data' => null, 'message' => 'Prepare failed: ' . $con->error]);
+    $errors = sqlsrv_errors();
+    echo json_encode(['success' => false, 'data' => null, 'message' => 'Prepare failed: ' . ($errors ? $errors[0]['message'] : 'unknown error')]);
     exit;
 }
 
-$stmt->bind_param("s", $element_id);
-$stmt->execute();
-$result = $stmt->get_result();
+if (!sqlsrv_execute($stmt)) {
+    $errors = sqlsrv_errors();
+    echo json_encode(['success' => false, 'data' => null, 'message' => 'Execute failed: ' . ($errors ? $errors[0]['message'] : 'unknown error')]);
+    exit;
+}
 
-if ($row = $result->fetch_assoc()) {
+if ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
     // fetch associated resep list for this element
     $noResepList = [];
-    $stmt2 = $con->prepare("SELECT DISTINCT no_resep FROM tbl_resep_element WHERE element_id = ?");
+    $stmt2 = sqlsrv_query($con, "SELECT DISTINCT no_resep FROM db_laborat.tbl_resep_element WHERE element_id = ?", [$element_id]);
     if ($stmt2) {
-        $stmt2->bind_param('s', $element_id);
-        $stmt2->execute();
-        $r2 = $stmt2->get_result();
-        while ($rr = $r2->fetch_assoc()) {
+        while ($rr = sqlsrv_fetch_array($stmt2, SQLSRV_FETCH_ASSOC)) {
             $noResepList[] = $rr['no_resep'];
         }
-        $stmt2->close();
+        sqlsrv_free_stmt($stmt2);
     }
 
     $response['success'] = true;
@@ -73,6 +69,6 @@ if ($row = $result->fetch_assoc()) {
     $response['message'] = 'Data not found';
 }
 
-$stmt->close();
+sqlsrv_free_stmt($stmt);
 echo json_encode($response);
 exit;
