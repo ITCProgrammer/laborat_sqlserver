@@ -4,19 +4,14 @@ error_reporting(E_ERROR | E_PARSE);
 
 require_once '../../koneksi.php';
 
-// --- Helper ---
-function esc($con, $s) { return mysqli_real_escape_string($con, (string)$s); }
-
-/** Ubah berbagai format tanggal ke SQL 'YYYY-mm-dd' atau NULL */
-function to_date_sql($con, $s) {
+/** Ubah berbagai format tanggal ke 'YYYY-mm-dd' atau NULL */
+function to_date($s) {
     $s = trim((string)$s);
-    if ($s === '') return "NULL";
-
-    // bersihkan separator umum
+    if ($s === '') return null;
     $s = str_replace(['T', '/'], [' ', '-'], $s);
     $ts = strtotime($s);
-    if ($ts === false) return "NULL";
-    return "'" . esc($con, date('Y-m-d', $ts)) . "'";
+    if ($ts === false) return null;
+    return date('Y-m-d', $ts);
 }
 
 /** Ambil POST wajib, jika kosong -> error 400 */
@@ -74,133 +69,143 @@ if (!in_array($status, ['Approved', 'Rejected'], true)) {
 }
 
 // Siapkan nilai tanggal lab
-$tgl_approve_lab_sql  = ($status === 'Approved') ? "NOW()" : "NULL";
-$tgl_rejected_lab_sql = ($status === 'Rejected') ? "NOW()" : "NULL";
+$tgl_approve_lab_val  = ($status === 'Approved') ? date('Y-m-d H:i:s') : null;
+$tgl_rejected_lab_val = ($status === 'Rejected') ? date('Y-m-d H:i:s') : null;
 
 // Siapkan nilai tanggal RMP
-$tgl_approve_rmp_sql = to_date_sql($con, $tgl_approve_rmp);
+$tgl_approve_rmp_val = to_date($tgl_approve_rmp);
 
 // Mulai transaksi
-mysqli_begin_transaction($con);
+sqlsrv_begin_transaction($con);
 
 try {
     // Insert ke approval_bon_order (HEADER tetap sama)
     $sql = "
-        INSERT INTO approval_bon_order
+        INSERT INTO db_laborat.approval_bon_order
             (code, customer, tgl_approve_rmp, tgl_approve_lab, tgl_rejected_lab, pic_lab, status, is_revision,
              revisic, revisi2, revisi3, revisi4, revisi5,
              revisin, drevisi2, drevisi3, drevisi4, drevisi5,
              revisi1date, revisi2date, revisi3date, revisi4date, revisi5date, approvalrmpdatetime)
         VALUES
-            (
-                '" . esc($con, $code) . "',
-                '" . esc($con, $customer) . "',
-                {$tgl_approve_rmp_sql},
-                {$tgl_approve_lab_sql},
-                {$tgl_rejected_lab_sql},
-                '" . esc($con, $pic_lab) . "',
-                '" . esc($con, $status) . "',
-                {$is_revision},
-
-                '" . esc($con, $revisic)  . "',
-                '" . esc($con, $revisi2)  . "',
-                '" . esc($con, $revisi3)  . "',
-                '" . esc($con, $revisi4)  . "',
-                '" . esc($con, $revisi5)  . "',
-                '" . esc($con, $revisin)  . "',
-                '" . esc($con, $drevisi2) . "',
-                '" . esc($con, $drevisi3) . "',
-                '" . esc($con, $drevisi4) . "',
-                '" . esc($con, $drevisi5) . "',
-
-                " . to_date_sql($con, $revisi1date) . ",
-                " . to_date_sql($con, $revisi2date) . ",
-                " . to_date_sql($con, $revisi3date) . ",
-                " . to_date_sql($con, $revisi4date) . ",
-                " . to_date_sql($con, $revisi5date) . ",
-                " . ($approvalrmpdatetime === null 
-                        ? "NULL" 
-                        : "'" . esc($con, $approvalrmpdatetime) . "'"
-                ) . "
-            )
+            (?, ?, ?, ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?,
+             ?, ?, ?, ?, ?, ?)
     ";
 
-    if (!mysqli_query($con, $sql)) {
-        throw new Exception("Gagal simpan header: " . mysqli_error($con));
+    $params = [
+        $code,
+        $customer,
+        $tgl_approve_rmp_val,
+        $tgl_approve_lab_val,
+        $tgl_rejected_lab_val,
+        $pic_lab,
+        $status,
+        $is_revision,
+
+        $revisic,
+        $revisi2,
+        $revisi3,
+        $revisi4,
+        $revisi5,
+
+        $revisin,
+        $drevisi2,
+        $drevisi3,
+        $drevisi4,
+        $drevisi5,
+
+        to_date($revisi1date),
+        to_date($revisi2date),
+        to_date($revisi3date),
+        to_date($revisi4date),
+        to_date($revisi5date),
+        $approvalrmpdatetime
+    ];
+
+    $stmt = sqlsrv_query($con, $sql, $params);
+    if (!$stmt) {
+        $errors = sqlsrv_errors();
+        throw new Exception("Gagal simpan header: " . ($errors ? $errors[0]['message'] : 'unknown error'));
     }
 
-    $approval_id = mysqli_insert_id($con);
+    $idRes = sqlsrv_query($con, "SELECT SCOPE_IDENTITY() AS id");
+    $idRow = $idRes ? sqlsrv_fetch_array($idRes, SQLSRV_FETCH_ASSOC) : null;
+    $approval_id = $idRow ? (int) $idRow['id'] : 0;
 
     // Jika ada data line -> insert batch ke line_revision
     if (!empty($lines)) {
         $values = [];
         foreach ($lines as $ln) {
             // ====== AMBIL NILAI DENGAN NAMA BARU (sesuai DB2) + fallback ke nama lama ======
-            $orderline  = esc($con, $ln['orderline'] ?? '');
+            $orderline  = trim((string)($ln['orderline'] ?? ''));
 
             // C-group: revisic (utama) + revisic1..revisic4
-            $lv_revisic  = esc($con, $ln['revisic']  ?? '');                            // C (utama)
-            $lv_revc1    = esc($con, $ln['revisic1'] ?? ($ln['revisi2'] ?? ''));        // fallback lama
-            $lv_revc2    = esc($con, $ln['revisic2'] ?? ($ln['revisi3'] ?? ''));
-            $lv_revc3    = esc($con, $ln['revisic3'] ?? ($ln['revisi4'] ?? ''));
-            $lv_revc4    = esc($con, $ln['revisic4'] ?? ($ln['revisi5'] ?? ''));
+            $lv_revisic  = trim((string)($ln['revisic']  ?? ''));                            // C (utama)
+            $lv_revc1    = trim((string)($ln['revisic1'] ?? ($ln['revisi2'] ?? '')));        // fallback lama
+            $lv_revc2    = trim((string)($ln['revisic2'] ?? ($ln['revisi3'] ?? '')));
+            $lv_revc3    = trim((string)($ln['revisic3'] ?? ($ln['revisi4'] ?? '')));
+            $lv_revc4    = trim((string)($ln['revisic4'] ?? ($ln['revisi5'] ?? '')));
 
             // D-group: revisid (utama) + revisi2..revisi5
-            $lv_revid    = esc($con, $ln['revisid']  ?? ($ln['revisin']  ?? ''));       // fallback lama: revisin
-            $lv_revid1   = esc($con, $ln['revisi2'] ?? ($ln['drevisi2'] ?? ''));
-            $lv_revid2   = esc($con, $ln['revisi3'] ?? ($ln['drevisi3'] ?? ''));
-            $lv_revid3   = esc($con, $ln['revisi4'] ?? ($ln['drevisi4'] ?? ''));
-            $lv_revid4   = esc($con, $ln['revisi5'] ?? ($ln['drevisi5'] ?? ''));
+            $lv_revid    = trim((string)($ln['revisid']  ?? ($ln['revisin']  ?? '')));       // fallback lama: revisin
+            $lv_revid1   = trim((string)($ln['revisi2'] ?? ($ln['drevisi2'] ?? '')));
+            $lv_revid2   = trim((string)($ln['revisi3'] ?? ($ln['drevisi3'] ?? '')));
+            $lv_revid3   = trim((string)($ln['revisi4'] ?? ($ln['drevisi4'] ?? '')));
+            $lv_revid4   = trim((string)($ln['revisi5'] ?? ($ln['drevisi5'] ?? '')));
 
             // Dates (tetap sama namanya)
-            $d1 = to_date_sql($con, $ln['revisi1date'] ?? '');
-            $d2 = to_date_sql($con, $ln['revisi2date'] ?? '');
-            $d3 = to_date_sql($con, $ln['revisi3date'] ?? '');
-            $d4 = to_date_sql($con, $ln['revisi4date'] ?? '');
-            $d5 = to_date_sql($con, $ln['revisi5date'] ?? '');
+            $d1 = to_date($ln['revisi1date'] ?? '');
+            $d2 = to_date($ln['revisi2date'] ?? '');
+            $d3 = to_date($ln['revisi3date'] ?? '');
+            $d4 = to_date($ln['revisi4date'] ?? '');
+            $d5 = to_date($ln['revisi5date'] ?? '');
 
-            $values[] = "(" .
-                intval($approval_id) . ", " .
-                "'" . esc($con, $code) . "', " .
-                "'" . $orderline . "', " .
-                // kolom BARU sesuai DB2:
-                "'" . $lv_revisic . "', " .   // revisic (C utama)
-                "'" . $lv_revc1   . "', " .   // revisic1
-                "'" . $lv_revc2   . "', " .   // revisic2
-                "'" . $lv_revc3   . "', " .   // revisic3
-                "'" . $lv_revc4   . "', " .   // revisic4
-                "'" . $lv_revid   . "', " .   // revisid (D utama)
-                "'" . $lv_revid1  . "', " .   // revisi2
-                "'" . $lv_revid2  . "', " .   // revisi3
-                "'" . $lv_revid3  . "', " .   // revisi4
-                "'" . $lv_revid4  . "', " .   // revisi5
-                "{$d1}, {$d2}, {$d3}, {$d4}, {$d5}" .
-            ")";
+            $values[] = [
+                $approval_id,
+                $code,
+                $orderline,
+                $lv_revisic,
+                $lv_revc1,
+                $lv_revc2,
+                $lv_revc3,
+                $lv_revc4,
+                $lv_revid,
+                $lv_revid1,
+                $lv_revid2,
+                $lv_revid3,
+                $lv_revid4,
+                $d1, $d2, $d3, $d4, $d5
+            ];
         }
 
         if (!empty($values)) {
             $sqlLines = "
-                INSERT INTO line_revision
+                INSERT INTO db_laborat.line_revision
                     (approval_id, code, orderline,
                      revisic, revisic1, revisic2, revisic3, revisic4,
                      revisid, revisi2, revisi3, revisi4, revisi5,
                      revisi1date, revisi2date, revisi3date, revisi4date, revisi5date)
-                VALUES " . implode(",\n", $values);
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-            if (!mysqli_query($con, $sqlLines)) {
-                throw new Exception("Gagal simpan detail line: " . mysqli_error($con));
+            foreach ($values as $v) {
+                $stmtLine = sqlsrv_query($con, $sqlLines, $v);
+                if (!$stmtLine) {
+                    $errors = sqlsrv_errors();
+                    throw new Exception("Gagal simpan detail line: " . ($errors ? $errors[0]['message'] : 'unknown error'));
+                }
             }
         }
     }
 
-    mysqli_commit($con);
+    sqlsrv_commit($con);
 
     // Respon sukses
     // echo "Data approval berhasil disimpan" . (!empty($lines) ? " (termasuk " . count($lines) . " baris line)." : ".");
     echo "Data approval berhasil disimpan";
 
 } catch (Exception $e) {
-    mysqli_rollback($con);
+    sqlsrv_rollback($con);
     http_response_code(500);
     echo $e->getMessage();
 }
