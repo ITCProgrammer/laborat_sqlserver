@@ -3,6 +3,22 @@ include "../../koneksi.php";
 
 $orderCode = isset($_POST['order_code']) ? trim($_POST['order_code']) : '';
 
+function sqlsrv_value_to_string($value) {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    if (is_resource($value)) {
+        $v = stream_get_contents($value);
+        return $v === false ? '' : $v;
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function h($value) {
+    return htmlspecialchars(sqlsrv_value_to_string($value), ENT_QUOTES, 'UTF-8');
+}
+
 $sql = "
     SELECT 
         i.SALESORDERCODE,
@@ -96,15 +112,16 @@ while ($row = db2_fetch_assoc($stmt)) {
     $project = $row['SALESORDERCODE'] ?? '';
     
     // Escape agar aman dari XSS, pastikan string
-    $po_greige_html = htmlspecialchars($po_greige ?? '');
-    $project_html = htmlspecialchars($project ?? '');
+    $po_greige_html = h($po_greige ?? '');
+    $project_html = h($project ?? '');
 
     // Untuk cek status di MySQL (status_matching_bon_order)
-    $poSafe = mysqli_real_escape_string($con, $po_greige);
-    $projectSafe = mysqli_real_escape_string($con, $orderCode);
-
-    $check = mysqli_query($con, "SELECT * FROM status_matching_bon_order WHERE sales_order_code = '$projectSafe' AND po_greige = '$poSafe'");
-    $existing = mysqli_fetch_assoc($check);
+    $check = sqlsrv_query(
+        $con,
+        "SELECT TOP 1 * FROM db_laborat.status_matching_bon_order WHERE sales_order_code = ? AND po_greige = ?",
+        [$orderCode, $po_greige]
+    );
+    $existing = $check ? sqlsrv_fetch_array($check, SQLSRV_FETCH_ASSOC) : null;
 
     $selectedPIC = $existing['pic_check'] ?? '';
     $selectedStatus = $existing['status_bon_order'] ?? '';
@@ -143,7 +160,7 @@ while ($row = db2_fetch_assoc($stmt)) {
           </td>";
 
     echo "<td>
-            <button class='btn btn-sm btn-primary save-status-btn' data-order='" . htmlspecialchars($orderCode) . "' data-po='$po_greige_html'>$btnText</button>
+            <button class='btn btn-sm btn-primary save-status-btn' data-order='" . h($orderCode) . "' data-po='$po_greige_html'>$btnText</button>
           </td>";
 
     echo "</tr>";

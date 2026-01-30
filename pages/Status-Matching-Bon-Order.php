@@ -8,6 +8,43 @@
     session_write_close(); 
 ?>
 
+<?php
+function sqlsrv_value_to_string($value) {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    if (is_resource($value)) {
+        $v = stream_get_contents($value);
+        return $v === false ? '' : $v;
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function normalize_sqlsrv_row(array $row) {
+    foreach ($row as $k => $v) {
+        $row[$k] = sqlsrv_value_to_string($v);
+    }
+    return $row;
+}
+
+function fmt_date_val($value, $format = 'Y-m-d') {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format($format);
+    }
+    if ($value === null) return '';
+    $s = (string)$value;
+    if ($s === '') return '';
+    $ts = strtotime($s);
+    if ($ts !== false) return date($format, $ts);
+    return $s;
+}
+
+function h($value) {
+    return htmlspecialchars(sqlsrv_value_to_string($value), ENT_QUOTES);
+}
+?>
+
 <style>
     .btn-loading{position:relative;pointer-events:none;opacity:.7}
     .btn-loading .spinner-border{position:absolute;top:50%;left:50%;width:1rem;height:1rem;margin-top:-.5rem;margin-left:-.5rem;border-width:.15em}
@@ -42,19 +79,20 @@
                 <h3 class="box-title">Status Matching Bon order</h3><br>
 
 <?php
-/* 1) Ambil data Approved dari MySQL */
+/* 1) Ambil data Approved dari SQL Server */
 $sqlTBO = "
     SELECT code, customer, tgl_approve_rmp, tgl_approve_lab, pic_lab, is_revision, approvalrmpdatetime
-    FROM approval_bon_order
+    FROM db_laborat.approval_bon_order
     WHERE status = 'Approved' ORDER BY id DESC
 ";
-$rsMy = mysqli_query($con, $sqlTBO);
+$rsMy = sqlsrv_query($con, $sqlTBO);
 
 $approvedRows = [];
 $tempMap = [];
 
 if ($rsMy) {
-    while ($r = mysqli_fetch_assoc($rsMy)) {
+    while ($r = sqlsrv_fetch_array($rsMy, SQLSRV_FETCH_ASSOC)) {
+        $r = normalize_sqlsrv_row($r);
         $r['code'] = trim((string)$r['code']);
         $code = $r['code'];
         if ($code === '') continue;
@@ -95,22 +133,20 @@ if ($rsMy) {
                             $isRevision = (int)$rowTBO['is_revision'] === 1;
                         ?>
                             <tr class="<?= $isRevision ? 'has-revisi' : '' ?>"
-                                data-order="<?= htmlspecialchars($code) ?>"
+                                data-order="<?= h($code) ?>"
                                 data-revision="<?= $isRevision ? '1' : '0' ?>"
                             >
-                                <td class="cell-order" data-code="<?= htmlspecialchars($code) ?>">
-                                    <?= htmlspecialchars($code) ?>
+                                <td class="cell-order" data-code="<?= h($code) ?>">
+                                    <?= h($code) ?>
                                 </td>
-                                <td class="cell-customer" data-cust="<?= htmlspecialchars($rowTBO['customer']) ?>">
-                                    <?= htmlspecialchars($rowTBO['customer']) ?>
+                                <td class="cell-customer" data-cust="<?= h($rowTBO['customer'] ?? '') ?>">
+                                    <?= h($rowTBO['customer'] ?? '') ?>
                                 </td>
                                 <td>
-                                    <?= !empty($rowTBO['approvalrmpdatetime']) 
-                                        ? htmlspecialchars(date('Y-m-d', strtotime($rowTBO['approvalrmpdatetime']))) 
-                                        : '' ?>
+                                    <?= h(fmt_date_val($rowTBO['approvalrmpdatetime'] ?? null)) ?>
                                 </td>
-                                <td><?= htmlspecialchars($rowTBO['tgl_approve_lab']) ?></td>
-                                <td><?= htmlspecialchars($rowTBO['pic_lab']) ?></td>
+                                <td><?= h(fmt_date_val($rowTBO['tgl_approve_lab'] ?? null)) ?></td>
+                                <td><?= h($rowTBO['pic_lab'] ?? '') ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>

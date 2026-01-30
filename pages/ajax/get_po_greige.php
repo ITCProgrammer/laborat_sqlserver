@@ -9,6 +9,22 @@ $userLAB = $_SESSION['userLAB'] ?? '';
 $ipUser  = $_SESSION['ip']      ?? '';
 session_write_close(); 
 
+function sqlsrv_value_to_string($value) {
+    if ($value instanceof DateTimeInterface) {
+        return $value->format('Y-m-d H:i:s');
+    }
+    if (is_resource($value)) {
+        $v = stream_get_contents($value);
+        return $v === false ? '' : $v;
+    }
+    if ($value === null) return '';
+    return (string)$value;
+}
+
+function h($value) {
+    return htmlspecialchars(sqlsrv_value_to_string($value), ENT_QUOTES, 'UTF-8');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_code'])) {
     // --- sanitasi input ---
     $orderCode    = trim($_POST['order_code'] ?? '');
@@ -256,11 +272,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_code'])) {
     // Ambil daftar PIC (sekali saja)
     // ======================
     $optionPICBase = '<option value="">-- Pilih PIC --</option>';
-    $resPIC = mysqli_query($con, "SELECT username FROM tbl_user WHERE pic_bonorder=1 ORDER BY id ASC");
+    $resPIC = sqlsrv_query($con, "SELECT username FROM db_laborat.tbl_user WHERE pic_bonorder=1 ORDER BY id ASC");
     $picList = [];
-    while ($rp = mysqli_fetch_assoc($resPIC)) {
-        $u = htmlspecialchars($rp['username'], ENT_QUOTES, 'UTF-8');
-        $picList[] = $u;
+    if ($resPIC) {
+        while ($rp = sqlsrv_fetch_array($resPIC, SQLSRV_FETCH_ASSOC)) {
+            $u = h($rp['username'] ?? '');
+            $picList[] = $u;
+        }
     }
 
     // ======================
@@ -414,20 +432,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_code'])) {
 
             $selectedPIC = ''; $selectedStatus = ''; $btnLabel = 'Simpan';
             $queryCheck = "
-                SELECT pic_check, status_bonorder 
-                  FROM status_matching_bon_order
-                 WHERE salesorder = '{$row['SALESORDERCODE']}'
-                   AND orderline  = '{$row['ORDERLINE']}'
-                   AND warna      = '{$row['WARNA']}'
-                   AND po_greige  = '$po'
+                SELECT TOP 1 pic_check, status_bonorder 
+                  FROM db_laborat.status_matching_bon_order
+                 WHERE salesorder = ?
+                   AND orderline  = ?
+                   AND warna      = ?
+                   AND po_greige  = ?
                  ORDER BY id DESC
-                 LIMIT 1
             ";
-            $resultCheck = mysqli_query($con, $queryCheck);
-            if ($resultCheck && mysqli_num_rows($resultCheck) > 0) {
-                $dataCheck = mysqli_fetch_assoc($resultCheck);
-                $selectedPIC    = htmlspecialchars($dataCheck['pic_check'] ?? '');
-                $selectedStatus = htmlspecialchars($dataCheck['status_bonorder'] ?? '');
+            $resultCheck = sqlsrv_query($con, $queryCheck, [
+                $row['SALESORDERCODE'],
+                $row['ORDERLINE'],
+                $row['WARNA'],
+                html_entity_decode($po, ENT_QUOTES, 'UTF-8')
+            ]);
+            if ($resultCheck && ($dataCheck = sqlsrv_fetch_array($resultCheck, SQLSRV_FETCH_ASSOC))) {
+                $selectedPIC    = h($dataCheck['pic_check'] ?? '');
+                $selectedStatus = h($dataCheck['status_bonorder'] ?? '');
                 $btnLabel = 'Edit';
             }
 
@@ -449,8 +470,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_code'])) {
             // === Blok revisi (hanya pada baris pertama & kalau ada revisi) ===
             $revBlock = '';
             if ($i === 0 && ($lastC !== '' || $lastD !== '')) {
-                $reviN = htmlspecialchars($lastD, ENT_QUOTES, 'UTF-8');
-                $reviC = htmlspecialchars($lastC, ENT_QUOTES, 'UTF-8');
+                $reviN = h($lastD);
+                $reviC = h($lastC);
                 $revBlock = "
                     <div class='rev-wrap' style='margin-top:6px; background:#ffecec; display:flex; align-items:center; justify-content:space-between; gap:8px;'>
                         <div class='rev-left' style='display:flex; gap:50px; font-weight:700;'>
