@@ -36,8 +36,8 @@ $sqlRecipe = "SELECT TOP 1
                         WHEN a.lr = '0' THEN SUBSTRING(CONVERT(VARCHAR(50), a.second_lr), 3, LEN(CONVERT(VARCHAR(50), a.second_lr))) 
                         ELSE SUBSTRING(CONVERT(VARCHAR(50), a.lr), 3, LEN(CONVERT(VARCHAR(50), a.lr))) 
                     END AS LR,
-                    PARSENAME(REPLACE(b.recipe_code,' ','.'),1) as recipe_code_1,
-                    PARSENAME(REPLACE(b.recipe_code,' ','.'),2) as recipe_code_2,
+                    PARSENAME(REPLACE(b.recipe_code,' ','.'),2) as recipe_code_1,
+                    PARSENAME(REPLACE(b.recipe_code,' ','.'),1) as recipe_code_2,
                     CASE
                         WHEN b.jenis_matching IN ('LD NOW','L/D') THEN '001'
                         ELSE
@@ -402,7 +402,7 @@ while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
             // Cetak pesan alert menggunakan JavaScript
             echo '<script>alert("Terjadi kesalahan. Data yang dimasukkan sudah ada di NOW.");</script>';
             // Kembali ke halaman sebelumnya jika pengguna menekan OK pada alert
-            echo '<script>window.history.back();</script>';
+            // echo '<script>window.history.back();</script>';
             // echo $queryDataMain;
         } else {
             echo '<script>alert("Terjadi kesalahan. pastikan data sudah benar");</script>';
@@ -861,93 +861,168 @@ while ($r_cmp = sqlsrv_fetch_array($recipe_cmp, SQLSRV_FETCH_ASSOC)) {
 }
 
 if ($jenis_suffix == "1") {
-    $where_suhu         = "case
-                                        when left(tsm.idm, 2) = 'DR' then concat(trim(tsm.tside_c),'`C X ', trim(tsm.tside_min), ' MNT')
-                                        when left(tsm.idm, 2) = 'R2' then concat(trim(tsm.cside_c),'`C X ', trim(tsm.cside_min), ' MNT')
-                                        when left(tsm.idm, 2) = 'CD' then concat(trim(tsm.tside_c),'`C X ', trim(tsm.tside_min), ' MNT')
-                                        when left(tsm.idm, 2) = 'D2' then concat(trim(tsm.tside_c),'`C X ', trim(tsm.tside_min), ' MNT')
-                                        when left(tsm.idm, 2) = 'A2' then 
-                                        case
-                                            when tsm.tside_c = 0 and tsm.tside_min = 0 then concat(trim(tsm.cside_c),'`C X ', trim(tsm.cside_min), ' MNT')
-                                            else concat(trim(tsm.tside_c),'`C X ', trim(tsm.tside_min), ' MNT')
-                                        end
-                                        when left(tsm.idm, 2) = 'OB' then 
-                                        case
-                                            when tsm.tside_c = 0 and tsm.tside_min = 0 then concat(trim(tsm.cside_c),'`C X ', trim(tsm.cside_min), ' MNT')
-                                            else concat(trim(tsm.tside_c),'`C X ', trim(tsm.tside_min), ' MNT')
-                                        end
-                                    END	as COMMENTLINE";
-    $where_soaping      = "and (left(tsm.idm, 2) = 'R2' or left(tsm.idm, 2) = 'A2') and (not left(tsm.idm, 2) = 'D2' or not left(tsm.idm, 2) = 'DR')";
-    $where_rc           = "and (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR' or left(tsm.idm, 2) = 'A2') and not tsm.rc_tm = 0";
-    $where_bleaching    = "and (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR') and not tsm.bleaching_tm = 0";
+    $where_suhu = "CASE
+                        WHEN LEFT(tsm.idm, 2) = 'DR' THEN CONCAT(TRIM(MAX(tsm.tside_c)),'`C X ', TRIM(MAX(tsm.tside_min)), ' MNT')
+                        WHEN LEFT(tsm.idm, 2) = 'R2' THEN CONCAT(TRIM(MAX(tsm.cside_c)),'`C X ', TRIM(MAX(tsm.cside_min)), ' MNT')
+                        WHEN LEFT(tsm.idm, 2) = 'CD' THEN CONCAT(TRIM(MAX(tsm.tside_c)),'`C X ', TRIM(MAX(tsm.tside_min)), ' MNT')
+                        WHEN LEFT(tsm.idm, 2) = 'D2' THEN CONCAT(TRIM(MAX(tsm.tside_c)),'`C X ', TRIM(MAX(tsm.tside_min)), ' MNT')
+                        WHEN LEFT(tsm.idm, 2) = 'A2' THEN
+                            CASE
+                                WHEN MAX(tsm.tside_c) = 0 AND MAX(tsm.tside_min) = 0 THEN CONCAT(TRIM(MAX(tsm.cside_c)),'`C X ', TRIM(MAX(tsm.cside_min)), ' MNT')
+                                ELSE CONCAT(TRIM(MAX(tsm.tside_c)),'`C X ', TRIM(MAX(tsm.tside_min)), ' MNT')
+                            END
+                        WHEN LEFT(tsm.idm, 2) = 'OB' THEN
+                            CASE
+                                WHEN MAX(tsm.tside_c) = 0 AND MAX(tsm.tside_min) = 0 THEN CONCAT(TRIM(MAX(tsm.cside_c)),'`C X ', TRIM(MAX(tsm.cside_min)), ' MNT')
+                                ELSE CONCAT(TRIM(MAX(tsm.tside_c)),'`C X ', TRIM(MAX(tsm.tside_min)), ' MNT')
+                            END
+                    END AS COMMENTLINE";
+    $where_soaping   = "and (left(tsm.idm, 2) = 'R2' or left(tsm.idm, 2) = 'A2') and (not left(tsm.idm, 2) = 'D2' or not left(tsm.idm, 2) = 'DR')";
+    $where_rc        = "and (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR' or left(tsm.idm, 2) = 'A2') and not tsm.rc_tm = 0";
+    $where_bleaching = "and (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR') and not tsm.bleaching_tm = 0";
+
 } elseif ($jenis_suffix == "2") {
-    $where_suhu         = "concat(trim(tsm.cside_c),'`C X ', trim(tsm.cside_min), ' MNT') as COMMENTLINE";
-    $where_soaping      = "and (left(tsm.idm, 2) = 'R2' or left(tsm.idm, 3) = 'DR2' or left(tsm.idm, 2) = 'A2')";
-    $where_rc           = "and not (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR') and not tsm.rc_tm = 0";
-    $where_bleaching    = "and not (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR') and not tsm.bleaching_tm = 0";
+    $where_suhu = "CONCAT(TRIM(MAX(tsm.cside_c)),'`C X ', TRIM(MAX(tsm.cside_min)), ' MNT') AS COMMENTLINE";
+    $where_soaping   = "and (left(tsm.idm, 2) = 'R2' or left(tsm.idm, 3) = 'DR2' or left(tsm.idm, 2) = 'A2')";
+    $where_rc        = "and not (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR') and not tsm.rc_tm = 0";
+    $where_bleaching = "and not (left(tsm.idm, 2) = 'CD' or left(tsm.idm, 2) = 'D2' or left(tsm.idm, 2) = 'DR') and not tsm.bleaching_tm = 0";
 }
 
+
 // EXPORT COMMENT
-$sql_suhu_menit = sqlsrv_query($con, "SELECT b.recipe_code,
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2) AS recipe_code_1,
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1) AS recipe_code_2,
-                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
-                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
-                                        END AS no_resep_convert,
+$sql_suhu_menit = sqlsrv_query($con, "SELECT 
+                                        MAX(b.recipe_code) as recipe_code,
+                                        -- recipe_code_1 (kata pertama)
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0
+                                                THEN LEFT(MAX(b.recipe_code), CHARINDEX(' ', MAX(b.recipe_code) + ' ') - 1)
+                                            ELSE MAX(b.recipe_code)
+                                        END as recipe_code_1,
+                                        -- recipe_code_2 (kata kedua)
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0 THEN
+                                                CASE
+                                                    WHEN CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) > 0
+                                                        THEN LEFT(
+                                                            SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000),
+                                                            CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) - 1
+                                                        )
+                                                    ELSE SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)
+                                                END
+                                            ELSE ''
+                                        END as recipe_code_2,
+                                        -- no_resep_convert (tetap logika kamu)
+                                        CASE
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'DR' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'CD' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'OB'
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(MAX(b.no_resep), 3, LEN(MAX(b.no_resep))), 'L'), 4, 8000)
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'D2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'R2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'A2'
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(MAX(b.no_resep), 2, LEN(MAX(b.no_resep))), 'L'), 4, 8000)
+                                        END as no_resep_convert,
                                         $where_suhu
-                                    FROM db_laborat.tbl_status_matching tsm
+                                    FROM db_laborat.tbl_status_matching tsm 
                                     LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
                                     LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
-                                    WHERE tsm.idm = ?
-                                    GROUP BY tsm.idm, b.recipe_code, b.no_resep, tsm.tside_c, tsm.tside_min, tsm.cside_c, tsm.cside_min
+                                    WHERE tsm.idm = '$number_suffix'
+                                    GROUP BY tsm.idm
                                     UNION
-                                    SELECT b.recipe_code,
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2),
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1),
-                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
-                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
-                                        END,
-                                        CONCAT('SOAPING ',LTRIM(RTRIM(tsm.soaping_sh)),'`C X ',LTRIM(RTRIM(tsm.soaping_tm)),' MNT')
-                                    FROM db_laborat.tbl_status_matching tsm
+                                    SELECT
+                                        MAX(b.recipe_code) as recipe_code,
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0
+                                                THEN LEFT(MAX(b.recipe_code), CHARINDEX(' ', MAX(b.recipe_code) + ' ') - 1)
+                                            ELSE MAX(b.recipe_code)
+                                        END as recipe_code_1,
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0 THEN
+                                                CASE
+                                                    WHEN CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) > 0
+                                                        THEN LEFT(
+                                                            SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000),
+                                                            CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) - 1
+                                                        )
+                                                    ELSE SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)
+                                                END
+                                            ELSE ''
+                                        END as recipe_code_2,
+                                        CASE
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'DR' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'CD' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'OB'
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(MAX(b.no_resep), 3, LEN(MAX(b.no_resep))), 'L'), 4, 8000)
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'D2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'R2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'A2'
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(MAX(b.no_resep), 2, LEN(MAX(b.no_resep))), 'L'), 4, 8000)
+                                        END as no_resep_convert,
+                                        CASE
+                                            WHEN TRIM(MAX(tsm.soaping_sh)) = '80' THEN CONCAT('CUCI PANAS ', TRIM(MAX(tsm.soaping_sh)),'`C X ', TRIM(MAX(tsm.soaping_tm)), ' MNT')
+                                            ELSE CONCAT('SOAPING ', TRIM(MAX(tsm.soaping_sh)),'`C X ', TRIM(MAX(tsm.soaping_tm)), ' MNT')
+                                        END AS COMMENTLINE
+                                    FROM db_laborat.tbl_status_matching tsm 
                                     LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
                                     LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
-                                    WHERE tsm.idm = ? AND (LEFT(tsm.idm,2)='R2' OR LEFT(tsm.idm,3)='DR2')
-                                    GROUP BY b.no_resep,b.recipe_code,tsm.soaping_sh,tsm.soaping_tm,tsm.idm
+                                    WHERE tsm.idm = '$number_suffix' $where_soaping
+                                    GROUP BY b.no_resep
                                     UNION
-                                    SELECT b.recipe_code,
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2),
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1),
-                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
-                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
-                                        END,
-                                        CONCAT('RC ',LTRIM(RTRIM(tsm.rc_sh)),'`C X ',LTRIM(RTRIM(tsm.rc_tm)),' MNT')
-                                    FROM db_laborat.tbl_status_matching tsm
+                                    SELECT
+                                        MAX(b.recipe_code) as recipe_code,
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0
+                                                THEN LEFT(MAX(b.recipe_code), CHARINDEX(' ', MAX(b.recipe_code) + ' ') - 1)
+                                            ELSE MAX(b.recipe_code)
+                                        END as recipe_code_1,
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0 THEN
+                                                CASE
+                                                    WHEN CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) > 0
+                                                        THEN LEFT(
+                                                            SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000),
+                                                            CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) - 1
+                                                        )
+                                                    ELSE SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)
+                                                END
+                                            ELSE ''
+                                        END as recipe_code_2,
+                                        CASE
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'DR' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'CD' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'OB'
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(MAX(b.no_resep), 3, LEN(MAX(b.no_resep))), 'L'), 4, 8000)
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'D2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'R2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'A2'
+                                                THEN SUBSTRING(CONCAT(SUBSTRING(MAX(b.no_resep), 2, LEN(MAX(b.no_resep))), 'L'), 4, 8000)
+                                        END as no_resep_convert,
+                                        CONCAT('RC ', TRIM(MAX(tsm.rc_sh)),'`C X ', TRIM(MAX(tsm.rc_tm)), ' MNT') as COMMENTLINE
+                                    FROM db_laborat.tbl_status_matching tsm 
                                     LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
                                     LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
-                                    WHERE tsm.idm = ? AND (LEFT(tsm.idm,2) IN ('CD','D2','DR')) AND tsm.rc_tm <> 0
-                                    GROUP BY b.no_resep,b.recipe_code,tsm.rc_sh,tsm.rc_tm,tsm.idm
+                                    WHERE tsm.idm = '$number_suffix' $where_rc
+                                    GROUP BY b.no_resep
                                     UNION
-                                    SELECT b.recipe_code,
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),2),
-                                        PARSENAME(REPLACE(b.recipe_code,' ','.'),1),
-                                        CASE WHEN LEFT(b.no_resep,2) IN ('DR','CD','OB')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,3, LEN(b.no_resep)-2),'L'),4,100)
-                                                WHEN LEFT(b.no_resep,2) IN ('D2','R2','A2')
-                                                THEN SUBSTRING(CONCAT(SUBSTRING(b.no_resep,2, LEN(b.no_resep)-1),'L'),4,100)
-                                        END,
-                                        CONCAT('BLEACHING ',LTRIM(RTRIM(tsm.bleaching_sh)),'`C X ',LTRIM(RTRIM(tsm.bleaching_tm)),' MNT')
-                                    FROM db_laborat.tbl_status_matching tsm
+                                    SELECT
+                                        MAX(b.recipe_code) as recipe_code,
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0
+                                                THEN LEFT(MAX(b.recipe_code), CHARINDEX(' ', MAX(b.recipe_code) + ' ') - 1)
+                                            ELSE MAX(b.recipe_code)
+                                        END as recipe_code_1,
+                                        CASE
+                                            WHEN CHARINDEX(' ', MAX(b.recipe_code) + ' ') > 0 THEN
+                                                CASE
+                                                    WHEN CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) > 0
+                                                        THEN LEFT(
+                                                            SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000),
+                                                            CHARINDEX(' ', SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)) - 1
+                                                        )
+                                                    ELSE SUBSTRING(MAX(b.recipe_code) + ' ', CHARINDEX(' ', MAX(b.recipe_code) + ' ') + 1, 8000)
+                                                END
+                                            ELSE ''
+                                        END as recipe_code_2,
+                                        CASE
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'DR' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'CD' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'OB'
+                                                THEN CONCAT(SUBSTRING(MAX(b.no_resep), 3, LEN(MAX(b.no_resep))), 'L')
+                                            WHEN SUBSTRING(MAX(b.no_resep), 1,2) = 'D2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'R2' OR SUBSTRING(MAX(b.no_resep), 1,2) = 'A2'
+                                                THEN CONCAT(SUBSTRING(MAX(b.no_resep), 2, LEN(MAX(b.no_resep))), 'L')
+                                        END as no_resep_convert,
+                                        CONCAT('BLEACHING ', TRIM(MAX(tsm.bleaching_sh)),'`C X ', TRIM(MAX(tsm.bleaching_tm)), ' MNT') as COMMENTLINE
+                                    FROM db_laborat.tbl_status_matching tsm 
                                     LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = tsm.idm
                                     LEFT JOIN db_laborat.tbl_matching_detail a ON a.id_matching = b.id
-                                    WHERE tsm.idm = ? AND (LEFT(tsm.idm,2) IN ('CD','D2','DR')) AND tsm.bleaching_sh <> 0
-                                    GROUP BY b.no_resep,b.recipe_code,tsm.bleaching_sh,tsm.bleaching_tm,tsm.idm
-                                    ", [$number_suffix,$number_suffix,$number_suffix,$number_suffix]);
+                                    WHERE tsm.idm = '$number_suffix' $where_bleaching 
+                                    GROUP BY b.no_resep");
 $sql_suhu_menit or die("Query suhu/menit gagal:\n".print_r(sqlsrv_errors(),true));
 
 
