@@ -60,7 +60,7 @@ $filename = "Recipe_" . $_GET['rcode'] . ".csv";
 
 while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
     if ($jenis_suffix == "1") {
-        $RECIPESUBCODE01 = $r['recipe_code_1'];
+        $RECIPESUBCODE01 = $r['recipe_code_2'];
     } elseif ($jenis_suffix == "2") {
         $RECIPESUBCODE01 = $r['recipe_code_2'];
     }
