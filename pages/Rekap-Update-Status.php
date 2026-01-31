@@ -1,16 +1,30 @@
 <?php
     include "koneksi.php";
 
+    if (!function_exists('formatSqlsrvDateTime')) {
+        function formatSqlsrvDateTime($value, $format)
+        {
+            if ($value instanceof DateTimeInterface) {
+                return $value->format($format);
+            }
+            if ($value === null || $value === '') {
+                return '';
+            }
+            $ts = strtotime($value);
+            return $ts ? date($format, $ts) : '';
+        }
+    }
+
     $sql = "SELECT 
               * 
-            FROM tbl_log_history_matching t
+            FROM db_laborat.tbl_log_history_matching t
     ";
 
-    $res = mysqli_query($con, $sql);
+    $res = sqlsrv_query($con, $sql);
 
     $data1 = [];
     $no = 1;
-    while ($r = mysqli_fetch_assoc($res)) {
+    while ($r = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) {
         $data1[] = [
             'no'       => $no++,
             'sales_order' => $r['salesorder'],
@@ -23,8 +37,8 @@
             'ip_update'      => $r['ip_update'],
             'user_update'      => $r['user_update'],
             'process'       => $r['process'],
-            'date_update' => !empty($r['date_update']) ? date('Y-m-d', strtotime($r['date_update'])) : '',
-            'time_update' => !empty($r['date_update']) ? date('H:i:s', strtotime($r['date_update'])) : '',
+            'date_update' => formatSqlsrvDateTime($r['date_update'], 'Y-m-d'),
+            'time_update' => formatSqlsrvDateTime($r['date_update'], 'H:i:s'),
         ];
     }
 ?>
@@ -85,23 +99,23 @@
         $startDate = date('Y-m-d', strtotime('-150 days'));
         
         $sql = "SELECT 
-                  DATE(date_update) as tanggal,
+                  CONVERT(date, date_update) as tanggal,
                   process,
                   user_update,
                   COUNT(*) as jumlah
-                FROM tbl_log_history_matching
+                FROM db_laborat.tbl_log_history_matching
                 WHERE date_update BETWEEN '$startDate' AND '$endDate 23:59:59'
-                GROUP BY DATE(date_update), process, user_update
+                GROUP BY CONVERT(date, date_update), process, user_update
                 ORDER BY tanggal DESC, process, jumlah DESC";
 
-        $res = mysqli_query($con, $sql);
+        $res = sqlsrv_query($con, $sql);
 
         $data = [];
         $total_update = 0;
         $total_insert = 0;
         
-        while ($row = mysqli_fetch_assoc($res)) {
-            $tanggal = $row['tanggal'];
+        while ($row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) {
+            $tanggal = formatSqlsrvDateTime($row['tanggal'], 'Y-m-d');
             $process = $row['process'];
             $user = $row['user_update'];
             $jumlah = $row['jumlah'];
