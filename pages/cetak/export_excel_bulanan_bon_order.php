@@ -3,8 +3,7 @@
 // Kolom: A Bulan | B RMP Approved | C Bon Order Approved Lab | D OK | E Matching Ulang | F=B-C | G=(F+C)-(D+E)
 
 declare(strict_types=1);
-include "../../koneksi.php"; // $con (MySQLi), $conn1 (DB2)
-mysqli_set_charset($con, "utf8mb4");
+include "../../koneksi.php"; // $con (sqlsrv), $conn1 (DB2)
 
 /* ===== Param bulan ===== */
 $year  = isset($_GET['year'])  ? (int)$_GET['year']  : (int)date('Y');
@@ -59,16 +58,17 @@ if ($codesRmp) {
 $codesLab = [];
 $qLab = "
   SELECT DISTINCT code
-  FROM approval_bon_order
+  FROM db_laborat.approval_bon_order
   WHERE status='Approved'
-    AND DATE(approvalrmpdatetime) BETWEEN DATE('$startDate') AND DATE('$endDate')
+    AND CONVERT(date, approvalrmpdatetime) BETWEEN '$startDate' AND '$endDate'
 ";
-$resLab = mysqli_query($con, $qLab) or die('MySQL error: ambil code approved lab.');
-while ($r = mysqli_fetch_assoc($resLab)) {
+$resLab = sqlsrv_query($con, $qLab);
+if (!$resLab) { http_response_code(500); die('SQL Server error: ambil code approved lab. '.htmlspecialchars(print_r(sqlsrv_errors(), true))); }
+while ($r = sqlsrv_fetch_array($resLab, SQLSRV_FETCH_ASSOC)) {
     $c = trim((string)$r['code']);
     if ($c !== '') $codesLab[] = "'" . str_replace("'", "''", $c) . "'";
 }
-mysqli_free_result($resLab);
+sqlsrv_free_stmt($resLab);
 
 $C = 0;
 if ($codesLab) {
@@ -131,13 +131,14 @@ if ($codesLab) {
 
         $qStatus = "
             SELECT abo.code, smbo.status_bonorder
-            FROM approval_bon_order abo
-            LEFT JOIN status_matching_bon_order smbo ON smbo.salesorder = abo.code
-            WHERE DATE(abo.approvalrmpdatetime) BETWEEN '$startDate' AND '$endDate'
+            FROM db_laborat.approval_bon_order abo
+            LEFT JOIN db_laborat.status_matching_bon_order smbo ON smbo.salesorder = abo.code
+            WHERE CONVERT(date, abo.approvalrmpdatetime) BETWEEN '$startDate' AND '$endDate'
               AND abo.code IN ($inCodesForStatus)
         ";
-        $resStatus = mysqli_query($con, $qStatus) or die('MySQL error: status review.');
-        while ($r = mysqli_fetch_assoc($resStatus)) {
+        $resStatus = sqlsrv_query($con, $qStatus);
+        if (!$resStatus) { http_response_code(500); die('SQL Server error: status review. '.htmlspecialchars(print_r(sqlsrv_errors(), true))); }
+        while ($r = sqlsrv_fetch_array($resStatus, SQLSRV_FETCH_ASSOC)) {
             $code   = trim((string)$r['code']);
             $status = trim((string)($r['status_bonorder'] ?? ''));
             $cnt    = $pairsPerCode[$code] ?? 0;
@@ -154,7 +155,7 @@ if ($codesLab) {
             // kamu bisa kosongkan $pairsPerCode[$code] setelah dihitung pertama kali:
             $pairsPerCode[$code] = 0;
         }
-        mysqli_free_result($resStatus);
+        sqlsrv_free_stmt($resStatus);
     }
 }
 

@@ -11,8 +11,7 @@
 // H: AKUMULASI SISA BON ORDER BELUM REVIEW         => $H
 
 declare(strict_types=1);
-include "../../koneksi.php"; // mysqli $con, DB2 $conn1
-mysqli_set_charset($con, "utf8mb4");
+include "../../koneksi.php"; // sqlsrv $con, DB2 $conn1
 
 /* ===== 0) Tanggal ===== */
 $todays  = (int)date('N');
@@ -24,22 +23,22 @@ $today   = date('Y-m-d');
 
 $sqlRevCode = "
     SELECT DISTINCT code 
-    FROM approval_bon_order
+    FROM db_laborat.approval_bon_order
     WHERE is_revision = 1 
-      AND DATE(approvalrmpdatetime) >= '2025-11-17'
+      AND CONVERT(date, approvalrmpdatetime) >= '2025-11-17'
 ";
-$resRev = mysqli_query($con, $sqlRevCode);
+$resRev = sqlsrv_query($con, $sqlRevCode);
 if (!$resRev) {
     http_response_code(500);
-    die('MySQL error: ambil kode revisi. ' . htmlspecialchars(mysqli_error($con)));
+    die('SQL Server error: ambil kode revisi. ' . htmlspecialchars(print_r(sqlsrv_errors(), true)));
 }
 $excludeRevCodes = [];
-while ($r = mysqli_fetch_assoc($resRev)) {
+while ($r = sqlsrv_fetch_array($resRev, SQLSRV_FETCH_ASSOC)) {
     if (!empty($r['code'])) {
         $excludeRevCodes[] = "'" . str_replace("'", "''", $r['code']) . "'";
     }
 }
-mysqli_free_result($resRev);
+sqlsrv_free_stmt($resRev);
 
 /* ===== 1) B: RMP-approved kemarin (DB2) EXCLUDE semua code di MySQL ===== */
 $sqlCodesKemarin = "SELECT DISTINCT 
@@ -67,12 +66,12 @@ while ($row = db2_fetch_assoc($resDB2)) {
   if ($c !== '') $codesKemarin[] = "'" . str_replace("'", "''", $c) . "'";
 }
 $excludeCodes = [];
-$resEx = mysqli_query($con, "SELECT code FROM approval_bon_order");
-if (!$resEx) { http_response_code(500); die('MySQL error: exclude list. '.htmlspecialchars(mysqli_error($con))); }
-while ($r = mysqli_fetch_assoc($resEx)) {
+$resEx = sqlsrv_query($con, "SELECT code FROM db_laborat.approval_bon_order");
+if (!$resEx) { http_response_code(500); die('SQL Server error: exclude list. '.htmlspecialchars(print_r(sqlsrv_errors(), true))); }
+while ($r = sqlsrv_fetch_array($resEx, SQLSRV_FETCH_ASSOC)) {
   if (!empty($r['code'])) $excludeCodes[] = "'" . str_replace("'", "''", $r['code']) . "'";
 }
-mysqli_free_result($resEx);
+sqlsrv_free_stmt($resEx);
 
 $B = 0; // kolom A (H-1)
 if (!empty($codesKemarin)) {
@@ -141,13 +140,13 @@ if (!empty($codesToday)) {
 
 /* ===== 3) Ambil daftar PIC (urut tbl_user.pic_bonorder=1) ===== */
 $picList = [];
-$resPIC = mysqli_query($con, "SELECT username FROM tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC");
-if (!$resPIC) { http_response_code(500); die('MySQL error: ambil PIC. '.htmlspecialchars(mysqli_error($con))); }
-while ($r = mysqli_fetch_assoc($resPIC)) {
+$resPIC = sqlsrv_query($con, "SELECT username FROM db_laborat.tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC");
+if (!$resPIC) { http_response_code(500); die('SQL Server error: ambil PIC. '.htmlspecialchars(print_r(sqlsrv_errors(), true))); }
+while ($r = sqlsrv_fetch_array($resPIC, SQLSRV_FETCH_ASSOC)) {
   $u = trim((string)($r['username'] ?? ''));
   if ($u !== '') $picList[] = $u;
 }
-mysqli_free_result($resPIC);
+sqlsrv_free_stmt($resPIC);
 
 /* Tambah PIC dari tbl_log_history_matching (kalau belum ada di picList)
    dan samakan dengan case-insensitive */
@@ -158,17 +157,17 @@ foreach ($picList as $p) {
 
 $sqlLogUsers = "
   SELECT DISTINCT user_update
-  FROM tbl_log_history_matching
+  FROM db_laborat.tbl_log_history_matching
   WHERE process = 'input'
-    AND DATE(date_update) = '$today'
+    AND CONVERT(date, date_update) = '$today'
 ";
-$resLogUsers = mysqli_query($con, $sqlLogUsers);
+$resLogUsers = sqlsrv_query($con, $sqlLogUsers);
 if (!$resLogUsers) {
     http_response_code(500);
-    die('MySQL error: ambil user_update log history. ' . htmlspecialchars(mysqli_error($con)));
+    die('SQL Server error: ambil user_update log history. ' . htmlspecialchars(print_r(sqlsrv_errors(), true)));
 }
 
-while ($r = mysqli_fetch_assoc($resLogUsers)) {
+while ($r = sqlsrv_fetch_array($resLogUsers, SQLSRV_FETCH_ASSOC)) {
     $uLog = trim((string)($r['user_update'] ?? ''));
     if ($uLog === '') continue;
 
@@ -181,7 +180,7 @@ while ($r = mysqli_fetch_assoc($resLogUsers)) {
     $picList[] = $uLog;
     $picLowerMap[$key] = $uLog;
 }
-mysqli_free_result($resLogUsers);
+sqlsrv_free_stmt($resLogUsers);
 
 if (!$picList) $picList = ['(tidak ada PIC)'];
 
@@ -195,27 +194,27 @@ $D_per = [];
 $E_per = [];
 
 foreach ($picList as $picName) {
-  $picEsc = mysqli_real_escape_string($con, $picName);
+  $picEsc = str_replace("'", "''", $picName);
 
   // 4a) Kode MySQL Approved Lab today untuk PIC ini
   $codesForPic = [];
   $sqlCodesPic = "
     SELECT DISTINCT code
-    FROM approval_bon_order
-    WHERE DATE(tgl_approve_rmp) = '$today'
+    FROM db_laborat.approval_bon_order
+    WHERE CONVERT(date, tgl_approve_rmp) = '$today'
       AND status = 'Approved'
       AND pic_lab = '$picEsc'
   ";
-  $resCodesPic = mysqli_query($con, $sqlCodesPic);
-  if (!$resCodesPic) { http_response_code(500); die('MySQL error (codes per PIC): '.htmlspecialchars(mysqli_error($con))); }
-  while ($r = mysqli_fetch_assoc($resCodesPic)) {
+  $resCodesPic = sqlsrv_query($con, $sqlCodesPic);
+  if (!$resCodesPic) { http_response_code(500); die('SQL Server error (codes per PIC): '.htmlspecialchars(print_r(sqlsrv_errors(), true))); }
+  while ($r = sqlsrv_fetch_array($resCodesPic, SQLSRV_FETCH_ASSOC)) {
     if (!empty($r['code'])) $codesForPic[] = "'" . str_replace("'", "''", $r['code']) . "'";
 
     if (!empty($excludeRevCodes)) {
         $codesForPic = array_diff($codesForPic, $excludeRevCodes);
     }
   }
-  mysqli_free_result($resCodesPic);
+  sqlsrv_free_stmt($resCodesPic);
 
   // 4b) D per PIC = DISTINCT pair dari DB2 untuk kode-kode Approved Lab today
   $D_val = 0;
@@ -239,17 +238,20 @@ foreach ($picList as $picName) {
   $D_per[] = $D_val;
 
   // 4c) E per PIC = BON ORDER SELESAI REVIEW (dari log history matching)
-  $picEscLower = mysqli_real_escape_string($con, strtolower($picName));
+  $picEscLower = str_replace("'", "''", strtolower($picName));
   $sqlEpic = "
     SELECT COUNT(*) AS CNT
-    FROM tbl_log_history_matching lhm
+    FROM db_laborat.tbl_log_history_matching lhm
     WHERE lhm.process = 'insert'
-      AND DATE(lhm.date_update) = '$today'
+      AND CONVERT(date, lhm.date_update) = '$today'
       AND LOWER(lhm.user_update) = '$picEscLower'
   ";
-  $resEpic = mysqli_query($con, $sqlEpic);
-  $E_per[] = (int) (mysqli_fetch_assoc($resEpic)['CNT'] ?? 0);
-  mysqli_free_result($resEpic);
+  $resEpic = sqlsrv_query($con, $sqlEpic);
+  $rowEpic = $resEpic ? sqlsrv_fetch_array($resEpic, SQLSRV_FETCH_ASSOC) : null;
+  $E_per[] = (int) ($rowEpic['CNT'] ?? 0);
+  if ($resEpic) {
+    sqlsrv_free_stmt($resEpic);
+  }
 }
 
 /* Totals */
@@ -296,26 +298,26 @@ while ($row = db2_fetch_assoc($resDB2I)) {
 $exSet = [];
 $sqlEx = "
   SELECT DISTINCT smbo.salesorder, smbo.orderline
-  FROM status_matching_bon_order smbo
+  FROM db_laborat.status_matching_bon_order smbo
   WHERE smbo.status_bonorder IN ('OK','Matching Ulang')
 ";
-$resEx2 = mysqli_query($con, $sqlEx);
-if (!$resEx2) { http_response_code(500); die('MySQL error (exclude kolom H): '.htmlspecialchars(mysqli_error($con))); }
-while ($r = mysqli_fetch_assoc($resEx2)) {
+$resEx2 = sqlsrv_query($con, $sqlEx);
+if (!$resEx2) { http_response_code(500); die('SQL Server error (exclude kolom H): '.htmlspecialchars(print_r(sqlsrv_errors(), true))); }
+while ($r = sqlsrv_fetch_array($resEx2, SQLSRV_FETCH_ASSOC)) {
   $so = trim((string)($r['salesorder'] ?? ''));
   $ol = (string)(isset($r['orderline']) ? (int)$r['orderline'] : 0);
   if ($so !== '') $exSet[$so.'|'.$ol] = true;
 }
-mysqli_free_result($resEx2);
+sqlsrv_free_stmt($resEx2);
 
 // 6c) Irisan dengan Approved (MySQL)
 $codesApprovedMy = [];
-$resAp = mysqli_query($con, "SELECT DISTINCT code FROM approval_bon_order WHERE status = 'Approved' AND code NOT LIKE 'RFD%'");
-if (!$resAp) { http_response_code(500); die('MySQL error: ambil codes Approved. '.htmlspecialchars(mysqli_error($con))); }
-while ($r = mysqli_fetch_assoc($resAp)) {
+$resAp = sqlsrv_query($con, "SELECT DISTINCT code FROM db_laborat.approval_bon_order WHERE status = 'Approved' AND code NOT LIKE 'RFD%'");
+if (!$resAp) { http_response_code(500); die('SQL Server error: ambil codes Approved. '.htmlspecialchars(print_r(sqlsrv_errors(), true))); }
+while ($r = sqlsrv_fetch_array($resAp, SQLSRV_FETCH_ASSOC)) {
   if (!empty($r['code'])) $codesApprovedMy[] = "'" . str_replace("'", "''", $r['code']) . "'";
 }
-mysqli_free_result($resAp);
+sqlsrv_free_stmt($resAp);
 
 if (!empty($excludeRevCodes)) {
     $codesApprovedMy = array_diff($codesApprovedMy, $excludeRevCodes);
