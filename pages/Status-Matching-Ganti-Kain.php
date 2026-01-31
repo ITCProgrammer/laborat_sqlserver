@@ -4,7 +4,17 @@
     $Order	= isset($_POST['order']) ? $_POST['order'] : '';
     $Hanger	= isset($_POST['hanger']) ? $_POST['hanger'] : '';
     $Masalah= isset($_POST['masalah']) ? $_POST['masalah'] : '';
-    $Dept	= isset($_POST['dept']) ? $_POST['dept'] : '';	
+    $Dept	= isset($_POST['dept']) ? $_POST['dept'] : '';
+
+    if (!function_exists('formatSqlsrvDate')) {
+        function formatSqlsrvDate($value, $format = 'Y-m-d')
+        {
+            if ($value instanceof DateTimeInterface) {
+                return $value->format($format);
+            }
+            return $value ?? '';
+        }
+    }
 ?>
 
 <div class="box">
@@ -88,7 +98,7 @@
     <div class="box">
       <div class="box-header with-border">
         <h3 class="box-title">Data Ganti Kain</h3><br>
-        <?php if($_POST['awal']!="") { ?><b>Periode: <?php echo $_POST['awal']." to ".$_POST['akhir']; ?></b>
+        <?php if(isset($_POST['awal']) && $_POST['awal']!="") { ?><b>Periode: <?php echo $_POST['awal']." to ".$_POST['akhir']; ?></b>
 		<?php } ?>
       <div class="box-body">
       <table class="table table-bordered table-hover table-striped nowrap" id="tableSMGK" style="width:100%">
@@ -153,9 +163,9 @@
         <tbody>
           <?php
 	$no=1;
-			if($Awal!="" and $Dept!=""){ $Where =" WHERE DATE_FORMAT( tgl_buat, '%Y-%m-%d' ) BETWEEN '$Awal' AND '$Akhir' AND (dept= '$Dept' OR t_jawab='$Dept' OR t_jawab1='$Dept' OR t_jawab2='$Dept' OR t_jawab3='$Dept' OR t_jawab4='$Dept') "; }
+			if($Awal!="" and $Dept!=""){ $Where =" WHERE CONVERT(date, tgl_buat) BETWEEN '$Awal' AND '$Akhir' AND (dept= '$Dept' OR t_jawab='$Dept' OR t_jawab1='$Dept' OR t_jawab2='$Dept' OR t_jawab3='$Dept' OR t_jawab4='$Dept') "; }
 			else
-			if($Awal!=""){ $Where =" WHERE DATE_FORMAT( tgl_buat, '%Y-%m-%d' ) BETWEEN '$Awal' AND '$Akhir' "; }
+			if($Awal!=""){ $Where =" WHERE CONVERT(date, tgl_buat) BETWEEN '$Awal' AND '$Akhir' "; }
 			else
 			if($Dept!=""){ $Where =" WHERE dept= '$Dept' OR t_jawab='$Dept' OR t_jawab1='$Dept' OR t_jawab2='$Dept' OR t_jawab3='$Dept' OR t_jawab4='$Dept'"; }
 			else
@@ -165,20 +175,26 @@
 			else
 			if($Masalah!=""){ $Where =" WHERE masalah LIKE '%$Masalah%' "; }
 			else
-			if($Awal=="" and $Order=="" and $Hanger=="" and $Masalah=="" and $Dept==""){ $Where =" WHERE DATE_FORMAT( tgl_buat, '%Y-%m-%d' ) BETWEEN '$Awal' AND '$Akhir' "; }
-			$qry1=mysqli_query($cona,"SELECT * FROM tbl_gantikain $Where ORDER BY id ASC");
-			while($row1=mysqli_fetch_array($qry1)){
-			$sqlgk=mysqli_query($cona," SELECT * FROM tbl_bonkain WHERE id_nsp='$row1[id]' ORDER BY no_bon ASC");
-  			$rgk=mysqli_num_rows($sqlgk);
-			$rg=mysqli_fetch_array($sqlgk);	
-			$qty1 = $rg['kg_bruto']*($row1['persen']/100);
-			$qty2 = $rg['kg_bruto']*($row1['persen1']/100);	
-			$qty3 = $rg['kg_bruto']*($row1['persen2']/100);	
-			$qty4 = $rg['kg_bruto']*($row1['persen3']/100);	
-			$qty5 = $rg['kg_bruto']*($row1['persen4']/100);	
+			if($Awal=="" and $Order=="" and $Hanger=="" and $Masalah=="" and $Dept==""){ $Where =" WHERE CONVERT(date, tgl_buat) BETWEEN '$Awal' AND '$Akhir' "; }
+			$qry1 = sqlsrv_query($cona, "SELECT * FROM db_adm.tbl_gantikain $Where ORDER BY id ASC");
+			while($row1 = sqlsrv_fetch_array($qry1, SQLSRV_FETCH_ASSOC)){
+			$sqlgk = sqlsrv_query(
+				$cona,
+				"SELECT * FROM db_adm.tbl_bonkain WHERE id_nsp = '$row1[id]' ORDER BY no_bon ASC",
+				[],
+				["Scrollable" => SQLSRV_CURSOR_KEYSET]
+			);
+  			$rgk = ($sqlgk) ? sqlsrv_num_rows($sqlgk) : 0;
+			$rg = ($sqlgk) ? sqlsrv_fetch_array($sqlgk, SQLSRV_FETCH_ASSOC) : null;
+			$kgBruto = $rg['kg_bruto'] ?? 0;
+			$qty1 = $kgBruto*($row1['persen']/100);
+			$qty2 = $kgBruto*($row1['persen1']/100);	
+			$qty3 = $kgBruto*($row1['persen2']/100);	
+			$qty4 = $kgBruto*($row1['persen3']/100);	
+			$qty5 = $kgBruto*($row1['persen4']/100);	
 
-            $getStatus = mysqli_query($con, "SELECT * FROM status_matching_ganti_kain WHERE id_gantikain = '$row1[id]'");
-            $statusRow = mysqli_fetch_assoc($getStatus);
+            $getStatus = sqlsrv_query($con, "SELECT * FROM db_laborat.status_matching_ganti_kain WHERE id_gantikain = '$row1[id]'");
+            $statusRow = $getStatus ? sqlsrv_fetch_array($getStatus, SQLSRV_FETCH_ASSOC) : null;
 
             $selectedPicLab = $statusRow['pic_lab'] ?? '';
             $selectedStatus = $statusRow['status_lab'] ?? '';
@@ -192,20 +208,20 @@
 			}else if($row1['kategori']=="2"){
 				$kategori = " <span class='label label-danger'>FOC</span> ";
 			}	
-			$dtArr=$row1['sebab'];
-			$data = explode(",",$dtArr);
-			if(in_array("Man",$data)){$sebab.=" <span class='label label-info'>Man</span> ";}
-			if(in_array("Methode",$data)){$sebab.=" <span class='label label-warning'>Methode</span> ";}
-			if(in_array("Machine",$data)){$sebab.=" <span class='label label-danger'>Machine</span> ";}
-			if(in_array("Material",$data)){$sebab.=" <span class='label label-primary'>Material</span> ";}
-			if(in_array("Environment",$data)){$sebab.=" <span class='label label-success'>Environment</span> ";}	
+			$dtArr = $row1['sebab'] ?? "";
+			$data = explode(",", $dtArr);
+			if(in_array("Man",$data)){$sebab = ($sebab ?? '') . " <span class='label label-info'>Man</span> ";}
+			if(in_array("Methode",$data)){$sebab = ($sebab ?? '') . " <span class='label label-warning'>Methode</span> ";}
+			if(in_array("Machine",$data)){$sebab = ($sebab ?? '') . " <span class='label label-danger'>Machine</span> ";}
+			if(in_array("Material",$data)){$sebab = ($sebab ?? '') . " <span class='label label-primary'>Material</span> ";}
+			if(in_array("Environment",$data)){$sebab = ($sebab ?? '') . " <span class='label label-success'>Environment</span> ";}
 		 ?>
-          <tr bgcolor="<?php echo $bgcolor; ?>">
+          <tr>
             <td align="center"><?php echo $no; ?></td>
             <!-- <td align="center"><div class="btn-group"><a href="index1.php?p=input-bon-kain&id=<?php echo $row1['id']; ?>" class="btn btn-warning btn-xs <?php if($_SESSION['akses']=='biasa'){ echo "disabled"; } ?>" target="_blank"><i class="fa fa-plus"></i> </a>
      <a href="EditBon-<?php echo $row1['id']; ?>" class="btn btn-info btn-xs <?php if($_SESSION['akses10']=='biasa'){ echo "disabled"; }else{ echo "disabled"; } ?>" target="_blank"><i class="fa fa-edit"></i> </a>
      <a href="#" class="btn btn-danger btn-xs <?php if($_SESSION['akses']=='biasa' or $rgk>0){ echo "disabled"; } ?>" onclick="confirm_delete('index1.php?p=hapusdatagantikain&id=<?php echo $row1['id']; ?>');"><i class="fa fa-trash"></i> </a></div></td> -->
-            <td align="center"><?php echo $row1['tgl_buat'];?></td>
+            <td align="center"><?php echo formatSqlsrvDate($row1['tgl_buat']);?></td>
             <td align="center"><?php echo $kategori;?></td>
             <td><?php echo $row1['nokk'];?></td>
             <td><?php echo $row1['nodemand'];?></td>
@@ -216,7 +232,7 @@
             <td><?php echo $row1['jenis_kain'];?></td>
             <td align="center"><?php echo $row1['lebar']."x".$row1['gramasi'];?></td>
             <td align="center"><?php echo $row1['lot'];?></td>
-            <td align="center"><?php echo $row1['tgl_delivery'];?></td>
+            <td align="center"><?php echo formatSqlsrvDate($row1['tgl_delivery']);?></td>
             <td align="center"><?php echo $row1['warna'];?></td>
             <td align="right"><?php echo $row1['qty_order'];?></td>
             <td align="right"><?php echo $row1['qty_kirim'];?></td>
@@ -231,12 +247,12 @@
             <td align="right"><?php echo $qty4;?></td>
             <td align="center"><?php echo $row1['t_jawab4'];?></td>
             <td align="right"><?php echo $qty5;?></td>
-            <td align="center"><?php echo $sebab;?></td>
+            <td align="center"><?php echo isset($sebab) ? $sebab : ''; ?></td>
             <td><?php echo $row1['masalah'];?></td>
             <td><?php echo $row1['ket'];?></td>
             <?php 
-                $qStatus = mysqli_query($con, "SELECT pic_lab, status_lab FROM status_matching_ganti_kain WHERE id_gantikain = '$row1[id]' LIMIT 1");
-                $rStatus = mysqli_fetch_assoc($qStatus);
+                $qStatus = sqlsrv_query($con, "SELECT TOP 1 pic_lab, status_lab FROM db_laborat.status_matching_ganti_kain WHERE id_gantikain = '$row1[id]'");
+                $rStatus = $qStatus ? sqlsrv_fetch_array($qStatus, SQLSRV_FETCH_ASSOC) : null;
                 $selectedPicLab = isset($rStatus['pic_lab']) ? $rStatus['pic_lab'] : '';
                 $selectedStatus = isset($rStatus['status_lab']) ? $rStatus['status_lab'] : '';
             ?>
