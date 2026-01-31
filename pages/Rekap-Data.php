@@ -3,30 +3,35 @@
 
     $sql = "
     SELECT 
-        DATE_FORMAT(ab.tgl_approve_lab, '%Y-%m') AS bulan,
+        CONVERT(char(7), ab.tgl_approve_lab, 120) AS bulan,
         COUNT(DISTINCT ab.id) AS jumlah_bon,
         SUM(CASE WHEN smbo.status_bonorder = 'OK' THEN 1 ELSE 0 END) AS status_ok,
         SUM(CASE WHEN smbo.status_bonorder = 'Matching Ulang' THEN 1 ELSE 0 END) AS status_matching
-    FROM approval_bon_order ab
-    LEFT JOIN status_matching_bon_order smbo
+    FROM db_laborat.approval_bon_order ab
+    LEFT JOIN db_laborat.status_matching_bon_order smbo
         ON ab.code = smbo.salesorder
     WHERE ab.tgl_approve_lab IS NOT NULL
-    GROUP BY bulan
-    ORDER BY bulan ASC;
+    GROUP BY CONVERT(char(7), ab.tgl_approve_lab, 120)
+    ORDER BY CONVERT(char(7), ab.tgl_approve_lab, 120) ASC;
     ";
 
-    $res = mysqli_query($con, $sql);
+    $res = sqlsrv_query($con, $sql);
+    if ($res === false) {
+        error_log(print_r(sqlsrv_errors(), true));
+    }
 
     $data = [];
     $no = 1;
-    while ($r = mysqli_fetch_assoc($res)) {
-        $data[] = [
-            'no'       => $no++,
-            'bulan'    => date("F Y", strtotime($r['bulan'] . "-01")),
-            'bon'      => (int) $r['jumlah_bon'],
-            'ok'       => (int) $r['status_ok'],
-            'matching' => (int) $r['status_matching']
-        ];
+    if ($res) {
+        while ($r = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC)) {
+            $data[] = [
+                'no'       => $no++,
+                'bulan'    => date("F Y", strtotime($r['bulan'] . "-01")),
+                'bon'      => (int) $r['jumlah_bon'],
+                'ok'       => (int) $r['status_ok'],
+                'matching' => (int) $r['status_matching']
+            ];
+        }
     }
 ?>
 
