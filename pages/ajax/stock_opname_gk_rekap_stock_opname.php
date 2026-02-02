@@ -4,11 +4,11 @@
 include "../../koneksi.php";
 include "../../includes/Penomoran_helper.php";
 
-$tgl_tutup = $_POST['tgl_tutup'];
-$tgl_stk_op = $_POST['tgl_stk_op'];
-$jam_stk_op = $_POST['jam_stk_op'];
-$kategori = $_POST['kategori'];
-$jenis_data = $_POST['jenis_data']??"web";
+$tgl_tutup = $_POST['tgl_tutup'] ?? '';
+$tgl_stk_op = $_POST['tgl_stk_op'] ?? '';
+$jam_stk_op = $_POST['jam_stk_op'] ?? '';
+$kategori = $_POST['kategori'] ?? '';
+$jenis_data = $_POST['jenis_data'] ?? "web";
 
 $kemarin = date('Y-m-d',strtotime($tgl_stk_op  . "-1 days"));
 $tanggal1= date('Y-m-01',strtotime($tgl_stk_op));
@@ -64,18 +64,18 @@ if($kategori=="DYESTUFF"){
 		            BASEPRIMARYQUANTITYUNIT,
 		            BASEPRIMARYUNITCODE,
                     WAREHOUSELOCATIONCODE
-		        FROM tblopname_11
-		            WHERE  tgl_tutup = '$tgl_tutup' 
+		        FROM db_laborat.tblopname_11
+		            WHERE  tgl_tutup = ? 
                     AND NOT kode_obat = 'E-1-000'
                     AND (
-                        SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'C'
-                        OR SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'D'
-                        OR SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'R'
+                        LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'C'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'D'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'R'
                     )
     	    ) d
     GROUP BY tgl_tutup, KODE_OBAT ";
-    $stmt_blc = mysqli_query($con, $query_get_balance);
-    while ($row = mysqli_fetch_assoc($stmt_blc)) {
+    $stmt_blc = sqlsrv_query($con, $query_get_balance, [$tgl_tutup]);
+    while ($row = sqlsrv_fetch_array($stmt_blc, SQLSRV_FETCH_ASSOC)) {
         $kode_obat=trim($row["KODE_OBAT"]," ");
         $data_blc[$kode_obat]['kode_obat']=$kode_obat;
         $data_blc[$kode_obat]['balance']=$row["total_balance"];
@@ -83,17 +83,17 @@ if($kategori=="DYESTUFF"){
 
     $query_get_total_stk_opn = "SELECT  o.KODE_OBAT, tgl_tutup, SUM(o.total_stock) as total_stock
     FROM 
-        tbl_stock_opname_gk o
+        db_laborat.tbl_stock_opname_gk o
     WHERE 
-        o.tgl_tutup = '$tgl_tutup'
+        o.tgl_tutup = ?
         AND (
-            SUBSTRING_INDEX(o.KODE_OBAT, '-', 1)  = 'C'
-            OR SUBSTRING_INDEX(o.KODE_OBAT, '-', 1)  = 'D'
-            OR SUBSTRING_INDEX(o.KODE_OBAT, '-', 1)  = 'R'
+            LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'C'
+            OR LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'D'
+            OR LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'R'
         )
     GROUP BY tgl_tutup, KODE_OBAT ";
-    $stmt_opn = mysqli_query($con, $query_get_total_stk_opn);
-    while ($row = mysqli_fetch_assoc($stmt_opn)) {
+    $stmt_opn = sqlsrv_query($con, $query_get_total_stk_opn, [$tgl_tutup]);
+    while ($row = sqlsrv_fetch_array($stmt_opn, SQLSRV_FETCH_ASSOC)) {
         $kode_obat=trim($row["KODE_OBAT"]," ");
         $data_opn[$kode_obat]['kode_obat']=$kode_obat;
         $data_opn[$kode_obat]['total_stock']=$row["total_stock"];
@@ -112,18 +112,18 @@ if($kategori=="DYESTUFF"){
 		            BASEPRIMARYQUANTITYUNIT,
 		            BASEPRIMARYUNITCODE,
                     WAREHOUSELOCATIONCODE
-		        FROM tblopname_11
-		            WHERE  tgl_tutup = '$akhir' 
+		        FROM db_laborat.tblopname_11
+		            WHERE  tgl_tutup = ? 
                     AND NOT kode_obat = 'E-1-000'
                     AND (
-                        SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'C'
-                        OR SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'D'
-                        OR SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'R'
+                        LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'C'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'D'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'R'
                     )
     	    ) d
     GROUP BY tgl_tutup, KODE_OBAT ";
-    $stmt_saldo = mysqli_query($con, $query_saldo_awal);
-    while ($row = mysqli_fetch_assoc($stmt_saldo)) {
+    $stmt_saldo = sqlsrv_query($con, $query_saldo_awal, [$akhir]);
+    while ($row = sqlsrv_fetch_array($stmt_saldo, SQLSRV_FETCH_ASSOC)) {
         $kode_obat=trim($row["KODE_OBAT"]," ");
         $data_saldo[$kode_obat]['kode_obat']=$kode_obat;
         $data_saldo[$kode_obat]['saldo_awal']=$row["total_balance"];
@@ -160,14 +160,14 @@ else if($kategori=="CHEMICAL"){
 		            BASEPRIMARYQUANTITYUNIT,
 		            BASEPRIMARYUNITCODE,
                     WAREHOUSELOCATIONCODE
-		        FROM tblopname_11
-		            WHERE  tgl_tutup = '$tgl_tutup' 
+		        FROM db_laborat.tblopname_11
+		            WHERE  tgl_tutup = ? 
 		            AND NOT kode_obat = 'E-1-000'
-    			    AND SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'E'
+    			    AND LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'E'
     	) d
     GROUP BY tgl_tutup, KODE_OBAT ";
-    $stmt_blc = mysqli_query($con, $query_get_balance);
-    while ($row = mysqli_fetch_assoc($stmt_blc)) {
+    $stmt_blc = sqlsrv_query($con, $query_get_balance, [$tgl_tutup]);
+    while ($row = sqlsrv_fetch_array($stmt_blc, SQLSRV_FETCH_ASSOC)) {
         $kode_obat=trim($row["KODE_OBAT"]," ");
         $data_blc[$kode_obat]['kode_obat']=$kode_obat;
         $data_blc[$kode_obat]['balance']=$row["total_balance"];
@@ -175,13 +175,13 @@ else if($kategori=="CHEMICAL"){
 
     $query_get_total_stk_opn = "SELECT  o.KODE_OBAT, tgl_tutup, SUM(o.total_stock) as total_stock
     FROM 
-        tbl_stock_opname_gk o
+        db_laborat.tbl_stock_opname_gk o
     WHERE 
-        o.tgl_tutup = '$tgl_tutup'
-        AND SUBSTRING_INDEX(o.KODE_OBAT, '-', 1)  = 'E'
+        o.tgl_tutup = ?
+        AND LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'E'
     GROUP BY tgl_tutup, KODE_OBAT ";
-    $stmt_opn = mysqli_query($con, $query_get_total_stk_opn);
-    while ($row = mysqli_fetch_assoc($stmt_opn)) {
+    $stmt_opn = sqlsrv_query($con, $query_get_total_stk_opn, [$tgl_tutup]);
+    while ($row = sqlsrv_fetch_array($stmt_opn, SQLSRV_FETCH_ASSOC)) {
         $kode_obat=trim($row["KODE_OBAT"]," ");
         $data_opn[$kode_obat]['kode_obat']=$kode_obat;
         $data_opn[$kode_obat]['total_stock']=$row["total_stock"];
@@ -200,14 +200,14 @@ else if($kategori=="CHEMICAL"){
 		            BASEPRIMARYQUANTITYUNIT,
 		            BASEPRIMARYUNITCODE,
                     WAREHOUSELOCATIONCODE
-		        FROM tblopname_11
-		            WHERE  tgl_tutup = '$akhir' 
+		        FROM db_laborat.tblopname_11
+		            WHERE  tgl_tutup = ? 
                     AND NOT kode_obat = 'E-1-000'
-                    AND SUBSTRING_INDEX(KODE_OBAT, '-', 1)  = 'E'
+                    AND LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'E'
     	) d
     GROUP BY tgl_tutup, KODE_OBAT ";
-    $stmt_saldo = mysqli_query($con, $query_saldo_awal);
-    while ($row = mysqli_fetch_assoc($stmt_saldo)) {
+    $stmt_saldo = sqlsrv_query($con, $query_saldo_awal, [$akhir]);
+    while ($row = sqlsrv_fetch_array($stmt_saldo, SQLSRV_FETCH_ASSOC)) {
         $kode_obat=trim($row["KODE_OBAT"]," ");
         $data_saldo[$kode_obat]['kode_obat']=$kode_obat;
         $data_saldo[$kode_obat]['saldo_awal']=$row["total_balance"];
@@ -425,7 +425,7 @@ if (count($data_now) > 0) {
                 <td class='number'>" . round($TOTAL_SLS_ABS,0). "</td>
                 <td class='number'>" . round($TOTAL_SLS_PLUSMIN,0). "</td>
                 <td class='number'>" . round($TOTAL_SD,0). "</td>
-                <td class='duadigit'>" . round(($TOTAL_PERSEN_SLS*100),2). "</td>
+                <td class='duadigit'>" . round(((is_numeric($TOTAL_PERSEN_SLS) ? $TOTAL_PERSEN_SLS : 0) * 100),2). "</td>
                 <td class='number'>" . round($TOTAL_SALDO,0). "</td>
             </tr>
         </tfoot>
@@ -444,7 +444,7 @@ if (count($data_now) > 0) {
                 <td>" . Penomoran_helper::nilaiKeRibuan(round($TOTAL_SLS_ABS,0),',','.')  . "</td>
                 <td>" . Penomoran_helper::nilaiKeRibuan(round($TOTAL_SLS_PLUSMIN,0),',','.')  . "</td>
                 <td>" . Penomoran_helper::nilaiKeRibuan(round($TOTAL_SD,0),',','.') . "</td>
-                <td>" . Penomoran_helper::nilaiKeRibuan(round(($TOTAL_PERSEN_SLS*100),2),',','.') . "%</td>
+                <td>" . Penomoran_helper::nilaiKeRibuan(round(((is_numeric($TOTAL_PERSEN_SLS) ? $TOTAL_PERSEN_SLS : 0) * 100),2),',','.') . "%</td>
                 <td>" . Penomoran_helper::nilaiKeRibuan(round($TOTAL_SALDO,0),',','.'). "</td>
             </tr>
         </tfoot>
