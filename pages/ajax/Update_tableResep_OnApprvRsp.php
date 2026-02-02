@@ -94,189 +94,69 @@ if (!empty($_POST['conc9'])) {
     $doby9 = "";
 }
 
-$sql = mysqli_query($con,"SELECT * from `tbl_matching_detail` where `id_matching` = '$_POST[id_matching]' and `id_status`= '$_POST[id_status]' and `flag` = '$_POST[flag]' LIMIT 1");
-$count = mysqli_num_rows($sql);
-$data = mysqli_fetch_array($sql);
-if ($count > 0) {
+$sql = sqlsrv_query(
+    $con,
+    "SELECT TOP (1) * FROM db_laborat.tbl_matching_detail WHERE id_matching = ? AND id_status = ? AND flag = ?",
+    [$_POST['id_matching'], $_POST['id_status'], $_POST['flag']]
+);
+$data = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
+if ($data) {
     if ($data['kode'] != $_POST['code']) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `kode`= '$_POST[code]',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET kode = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$_POST['code'], $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['nama'] != $_POST['desc_code']) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `nama` = '$_POST[desc_code]',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET nama = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$_POST['desc_code'], $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc1'] != $conc) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc1` = '$conc',
-        `time_1` = now(),
-        `doby1` = '$_SESSION[userLAB]',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc1 = ?, time_1 = GETDATE(), doby1 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc, $_SESSION['userLAB'], $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc2'] != $conc1) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc2` = '$conc1',
-        `time_2` = '$dt1',
-        `doby2` = '$doby1',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc2 = ?, time_2 = ?, doby2 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc1, $dt1, $doby1, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc3'] != $conc2) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc3` = '$conc2',
-        `time_3` = '$dt2',
-        `doby3` = '$doby2',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc3 = ?, time_3 = ?, doby3 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc2, $dt2, $doby2, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc4'] != $conc3) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc4` = '$conc3',
-        `time_4` = '$dt3',
-        `doby4` = '$doby3',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc4 = ?, time_4 = ?, doby4 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc3, $dt3, $doby3, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc5'] != $conc4) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc5` = '$conc4',
-        `time_5` = '$dt4',
-        `doby5` = '$doby4',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc5 = ?, time_5 = ?, doby5 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc4, $dt4, $doby4, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc6'] != $conc5) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc6` = '$conc5',
-        `time_6` = '$dt5',
-        `doby6` = '$doby5',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc6 = ?, time_6 = ?, doby6 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc5, $dt5, $doby5, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc7'] != $conc6) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc7` = '$conc6',
-        `time_7` = '$dt6',
-        `doby7` = '$doby6',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc7 = ?, time_7 = ?, doby7 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc6, $dt6, $doby6, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc8'] != $conc7) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc8` = '$conc7',
-        `time_8` = '$dt7',
-        `doby8` = '$doby7',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc8 = ?, time_8 = ?, doby8 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc7, $dt7, $doby7, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc9'] != $conc8) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc9` = '$conc8',
-        `time_9` = '$dt8',
-        `doby9` = '$doby8',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc9 = ?, time_9 = ?, doby9 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc8, $dt8, $doby8, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['conc10'] != $conc9) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `conc10` = '$conc9',
-        `time_10` = '$dt9',
-        `doby10` = '$doby9',
-        `last_edit_at` = '$time',
-        `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET conc10 = ?, time_10 = ?, doby10 = ?, last_edit_at = ?, last_edit_by = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$conc9, $dt9, $doby9, $time, $_SESSION['userLAB'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     if ($data['remark'] != $_POST['keterangan']) {
-        mysqli_query($con,"UPDATE `tbl_matching_detail` SET
-        `remark` = '$_POST[keterangan]'
-        -- `last_edit_at` = '$time',
-        -- `last_edit_by` = '$_SESSION[userLAB]'
-        where `id_matching` = '$_POST[id_matching]' 
-        and `id_status` = '$_POST[id_status]' 
-        and `flag` = '$_POST[flag]'");
+        sqlsrv_query($con, "UPDATE db_laborat.tbl_matching_detail SET remark = ? WHERE id_matching = ? AND id_status = ? AND flag = ?", [$_POST['keterangan'], $_POST['id_matching'], $_POST['id_status'], $_POST['flag']]);
     }
     $LIB_SUCCSS = "LIB_SUCCSS";
 } else {
-    mysqli_query($con,"INSERT INTO `tbl_matching_detail` SET
-                `flag` = '$_POST[flag]',
-                `id_matching`= '$_POST[id_matching]',
-                `id_status` = '$_POST[id_status]',
-                `kode`= '$_POST[code]',
-                `nama` = '$_POST[desc_code]',
-                `conc1` = '$conc',
-                `conc2` = '$conc1',
-                `conc3` = '$conc2',
-                `conc4` = '$conc3',
-                `conc5` = '$conc4',
-                `conc6` = '$conc5',
-                `conc7` = '$conc6',
-                `conc8` = '$conc7',
-                `conc9` = '$conc8',
-                `conc10` = '$conc9',
-                `time_1` = '$dt',
-                `time_2` = '$dt1',
-                `time_3` = '$dt2',
-                `time_4` = '$dt3',
-                `time_5` = '$dt4',
-                `time_6` = '$dt5',
-                `time_7` = '$dt6',
-                `time_8` = '$dt7',
-                `time_9` = '$dt8',
-                `time_10` = '$dt9',
-                `doby1` = '$doby',
-                `doby2` = '$doby1',
-                `doby3` = '$doby2',
-                `doby4` = '$doby3',
-                `doby5` = '$doby4',
-                `doby6` = '$doby5',
-                `doby7` = '$doby6',
-                `doby8` = '$doby7',
-                `doby9` = '$doby8',
-                `doby10` = '$doby9',
-                `remark` = '$_POST[keterangan]',
-                `inserted_at` = '$time',
-                `inserted_by` = '$_SESSION[userLAB]'
-                ");
+    sqlsrv_query(
+        $con,
+        "INSERT INTO db_laborat.tbl_matching_detail
+            (flag, id_matching, id_status, kode, nama, conc1, conc2, conc3, conc4, conc5, conc6, conc7, conc8, conc9, conc10,
+             time_1, time_2, time_3, time_4, time_5, time_6, time_7, time_8, time_9, time_10,
+             doby1, doby2, doby3, doby4, doby5, doby6, doby7, doby8, doby9, doby10,
+             remark, inserted_at, inserted_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [$_POST['flag'], $_POST['id_matching'], $_POST['id_status'], $_POST['code'], $_POST['desc_code'],
+            $conc, $conc1, $conc2, $conc3, $conc4, $conc5, $conc6, $conc7, $conc8, $conc9,
+            $dt, $dt1, $dt2, $dt3, $dt4, $dt5, $dt6, $dt7, $dt8, $dt9,
+            $doby, $doby1, $doby2, $doby3, $doby4, $doby5, $doby6, $doby7, $doby8, $doby9,
+            $_POST['keterangan'], $time, $_SESSION['userLAB']
+        ]
+    );
     $LIB_SUCCSS = "LIB_SUCCSS";
 }
 

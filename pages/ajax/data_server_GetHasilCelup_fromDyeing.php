@@ -63,31 +63,28 @@ $sql = "SELECT
             c.target,
             b.no_resep as resep1_dye,
             b.no_resep2 as resep2_dye
-        FROM db_laborat.tbl_status_matching a
-        JOIN db_laborat.tbl_matching x ON a.idm = x.no_resep
-        JOIN db_dying.tbl_hasilcelup b ON a.idm = b.rcode
-        JOIN db_dying.tbl_montemp d ON b.id_montemp = d.id
-        JOIN db_dying.tbl_schedule c ON d.id_schedule = c.id
-        LEFT JOIN db_laborat.tbl_note_celup z ON b.nokk = z.kk
+        FROM db_laborat.db_laborat.tbl_status_matching a
+            JOIN db_laborat.db_laborat.tbl_matching x ON a.idm = x.no_resep
+            JOIN db_dying.db_dying.tbl_hasilcelup b ON a.idm = b.rcode
+            JOIN db_dying.db_dying.tbl_montemp d ON b.id_montemp = d.id
+            JOIN db_dying.db_dying.tbl_schedule c ON d.id_schedule = c.id
+            LEFT JOIN db_laborat.db_laborat.tbl_note_celup z ON b.nokk = z.kk
         WHERE a.idm = ? AND b.rcode = ?
         ORDER BY b.id DESC";
 
-// tbl_hasilcelup dkk ada di MySQL (db_dying), jadi pakai koneksi mysqli ($con_db_dyeing)
-$stmt = mysqli_prepare($con_db_dyeing, $sql);
-mysqli_stmt_bind_param($stmt, 'ss', $rcode, $rcode);
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
-if (!$result) {
+// db_dye di SQL Server, pakai sqlsrv
+$stmt = sqlsrv_query($con_db_dyeing, $sql, [$rcode, $rcode]);
+if (!$stmt) {
     http_response_code(500);
     echo json_encode([
-        'error' => mysqli_error($con_db_dyeing),
+        'error' => sqlsrv_errors(),
         'sql'   => $sql,
         'params'=> [$rcode, $rcode]
     ]);
     exit;
 }
 $rows = [];
-while ($r = mysqli_fetch_assoc($result)) {
+while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
     $rows[] = $r;
 }
 

@@ -2,8 +2,13 @@
 ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
-$data_note_sql = mysqli_query($con,"SELECT * from tbl_note_celup where kk = '$_GET[kk]'");
-$count_note = mysqli_num_rows($data_note_sql);
+$data_note_sql = sqlsrv_query(
+    $con,
+    "SELECT TOP (1) * FROM db_laborat.tbl_note_celup WHERE kk = ? ORDER BY id DESC",
+    [$_GET['kk']]
+);
+$data_note = $data_note_sql ? sqlsrv_fetch_array($data_note_sql, SQLSRV_FETCH_ASSOC) : null;
+$count_note = is_array($data_note) ? 1 : 0;
 ?>
 <?php if ($count_note == 0) : ?>
     <div class="modal-content">
@@ -80,7 +85,6 @@ $count_note = mysqli_num_rows($data_note_sql);
         })
     </script>
 <?php else : ?>
-    <?php $data_note = mysqli_fetch_array($data_note_sql); ?>
     <div class="modal-content">
         <div class="modal-body">
             <form action="#" class="form-horizontal" id="form-note">

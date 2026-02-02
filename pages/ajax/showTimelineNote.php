@@ -2,10 +2,18 @@
 ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
-$data_status_sql = mysqli_query($con,"SELECT * from tbl_status_matching where id = '$_GET[id_status]' LIMIT 1");
-$data_status = mysqli_fetch_array($data_status_sql);
+$data_status_sql = sqlsrv_query(
+    $con,
+    "SELECT TOP (1) * FROM db_laborat.tbl_status_matching WHERE id = ?",
+    [$_GET['id_status']]
+);
+$data_status = sqlsrv_fetch_array($data_status_sql, SQLSRV_FETCH_ASSOC);
 $i = 1;
-$sql_note = mysqli_query($con,"SELECT * from tbl_note_celup where id_status = '$_GET[id_status]' order by id desc");
+$sql_note = sqlsrv_query(
+    $con,
+    "SELECT * FROM db_laborat.tbl_note_celup WHERE id_status = ? ORDER BY id DESC",
+    [$_GET['id_status']]
+);
 ?>
 <style>
     .timeline {
@@ -198,7 +206,7 @@ $sql_note = mysqli_query($con,"SELECT * from tbl_note_celup where id_status = '$
                 Note Timeline <?php echo $data_status['idm'] ?></strong></h4>
         <div class="container">
             <ul class="timeline">
-                <?php while ($li = mysqli_fetch_array($sql_note)) : ?>
+                <?php while ($li = sqlsrv_fetch_array($sql_note, SQLSRV_FETCH_ASSOC)) : ?>
                     <li <?php if (($i % 2) == 0) echo 'class="timeline-inverted"' ?>>
                         <?php if ($li['jenis_note'] == 'Catatan') : ?>
                             <div class="timeline-badge success"><i class="glyphicon glyphicon-tag"></i></div>
@@ -210,7 +218,7 @@ $sql_note = mysqli_query($con,"SELECT * from tbl_note_celup where id_status = '$
                         <div class="timeline-panel">
                             <div class="timeline-heading">
                                 <h4 class="timeline-title">NOTE <?php echo $li['jenis_note'] ?> DARI <?php echo strtoupper($li['created_by']) ?></h4>
-                                <p><small class="text-muted"><i class="glyphicon glyphicon-time"></i> <?php echo date('Y F l H:i:s', strtotime($li['created_at'])); ?></small></p>
+                                <p><small class="text-muted"><i class="glyphicon glyphicon-time"></i> <?php echo date('Y F l H:i:s', strtotime($li['created_at'] instanceof DateTime ? $li['created_at']->format('Y-m-d H:i:s') : $li['created_at'])); ?></small></p>
                             </div>
                             <div class="timeline-body">
                                 <p><?php echo $li['note'] ?></p>

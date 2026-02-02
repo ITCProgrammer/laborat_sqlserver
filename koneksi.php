@@ -17,7 +17,14 @@ if (defined('LAB_KONEKSI_INITIALIZED')) {
 }
 define('LAB_KONEKSI_INITIALIZED', true);
 
-$con_db_dyeing    = mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
+// $con_db_dyeing    = mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
+
+$hostDbDyeing = "10.0.0.221";
+$usernameDbDyeing = "sa";
+$passwordDbDyeing = "Ind@taichen2024";
+$dye = "db_dying";
+$db_dye = array("Database" => $dye, "UID" => $usernameDbDyeing, "PWD" => $passwordDbDyeing);
+$con_db_dyeing = sqlsrv_connect($hostDbDyeing, $db_dye);
 
 $hostSVR19     = "10.0.0.221";
 $usernameSVR19 = "sa";
@@ -62,17 +69,9 @@ if (! $con) {
 
 // Tutup koneksi saat eksekusi selesai (tidak wajib, tapi eksplisit).
 register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$con_nowprd) {
-    foreach ([$con_db_dyeing] as $mysqliConn) {
-        if ($mysqliConn instanceof mysqli) {
-            // Tutup hanya jika masih aktif (mysqli_ping true)
-            if (@mysqli_ping($mysqliConn)) {
-                $mysqliConn->close();
-            }
-        } elseif ($mysqliConn) {
-            @mysqli_close($mysqliConn);
-        }
+    if (is_resource($con_db_dyeing) && get_resource_type($con_db_dyeing) === 'SQL Server Connection') {
+        sqlsrv_close($con_db_dyeing);
     }
-
     if (is_resource($cona) && get_resource_type($cona) === 'SQL Server Connection') {
         sqlsrv_close($cona);
     }

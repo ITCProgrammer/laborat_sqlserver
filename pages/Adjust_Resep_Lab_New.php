@@ -2,20 +2,32 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
-$sql = mysqli_query($con, "SELECT a.id as id_status, a.idm, b.id AS id_tblmatching, a.flag, a.grp, a.matcher, a.cek_warna, a.cek_dye, a.status, a.kt_status, 
+$sql = sqlsrv_query(
+    $con,
+    "SELECT TOP (1) a.id as id_status, a.idm, b.id AS id_tblmatching, a.flag, a.grp, a.matcher, a.cek_warna, a.cek_dye, a.status, a.kt_status, 
 a.koreksi_resep, a.koreksi_resep2,a.koreksi_resep3, a.koreksi_resep4, a.koreksi_resep5, a.koreksi_resep6,a.koreksi_resep7, a.koreksi_resep8,  a.percobaan_ke, a.benang_aktual, a.lebar_aktual, a.gramasi_aktual, a.soaping_sh, a.soaping_tm, a.rc_sh, a.rc_tm, a.lr, a.cie_wi, a.cie_tint, a.yellowness, a.done_matching, a.ph,
 a.spektro_r, a.ket, a.created_at as tgl_buat_status, a.created_by as status_created_by, a.edited_at, a.edited_by, a.target_selesai, a.cside_c,
 a.cside_min, a.tside_c, a.tside_min, a.mulai_by, a.mulai_at, a.selesai_by, a.selesai_at, a.approve_by, a.approve_at, a.approve,
 b.id, b.no_resep, b.no_order, b.no_po, b.langganan, b.no_item, b.jenis_kain, b.benang, b.cocok_warna, b.warna, a.kadar_air,
 b.no_warna, b.lebar, b.gramasi, b.qty_order, b.tgl_in, b.tgl_out,b.recipe_code,
-b.proses, b.buyer, a.final_matcher, a.colorist1, a.colorist2,a.colorist3, a.colorist4,a.colorist5, a.colorist6,a.colorist7, a.colorist8, a.bleaching_tm, a.bleaching_sh, a.second_lr,
+b.proses, b.buyer, a.final_matcher, a.colorist1, a.colorist2,a.colorist3, a.colorist4,a.colorist5, a.colorist6,a.colorist7, a.colorist8, a.bleaching_tm, a.bleaching_sh, a.second_lr, a.howmany_percobaan_ke,
 b.tgl_delivery, b.note, b.jenis_matching, b.tgl_buat, b.tgl_update, b.created_by, a.remark_dye,
 b.suhu_chamber, b.warna_flourescent
-FROM tbl_status_matching a
-INNER JOIN tbl_matching b ON a.idm = b.no_resep
-where a.id = '$_GET[idm]'
-ORDER BY a.id desc limit 1");
-$data = mysqli_fetch_array($sql); ?>
+FROM db_laborat.tbl_status_matching a
+INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+where a.id = ?
+ORDER BY a.id desc",
+    [$_GET['idm']]
+);
+$data = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
+if (is_array($data)) {
+    foreach ($data as $key => $value) {
+        if ($value instanceof DateTime) {
+            $data[$key] = $value->format('Y-m-d H:i:s');
+        }
+    }
+}
+?>
 <style>
     .lookupST {
         font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
@@ -220,8 +232,14 @@ $data = mysqli_fetch_array($sql); ?>
                         </div>
                         <div class="form-group">
                             <label for="lamp" class="col-sm-3 control-label">Lampu :</label>
-                            <?php $sqlLamp = mysqli_query($con, "SELECT * FROM vpot_lampbuy where buyer = '$data[buyer]'"); ?>
-                            <?php while ($lamp = mysqli_fetch_array($sqlLamp)) { ?>
+                            <?php
+                            $sqlLamp = sqlsrv_query(
+                                $con,
+                                "SELECT * FROM db_laborat.vpot_lampbuy WHERE buyer = ?",
+                                [$data['buyer']]
+                            );
+                            ?>
+                            <?php while ($lamp = sqlsrv_fetch_array($sqlLamp, SQLSRV_FETCH_ASSOC)) { ?>
                                 <div class="col-sm-3">
                                     <input type="text" class="form-control input-sm" value="<?php echo $lamp['lampu'] ?>" readonly>
                                 </div>
@@ -631,10 +649,14 @@ $data = mysqli_fetch_array($sql); ?>
                                 </tr>
                             </thead>
                             <?php
-                            $hold_resep = mysqli_query($con, "SELECT * from tbl_matching_detail where `id_matching` = '$data[id]' and `id_status` = '$data[id_status]' AND NOT resep = 'dye' order by flag");
+                            $hold_resep = sqlsrv_query(
+                                $con,
+                                "SELECT * FROM db_laborat.tbl_matching_detail WHERE id_matching = ? AND id_status = ? AND NOT resep = 'dye' ORDER BY flag",
+                                [$data['id'], $data['id_status']]
+                            );
                             ?>
                             <tbody id="tb-lookup1">
-                                <?php while ($hold = mysqli_fetch_array($hold_resep)) : ?>
+                                <?php while ($hold = sqlsrv_fetch_array($hold_resep, SQLSRV_FETCH_ASSOC)) : ?>
                                     <tr id="<?php echo $hold['id'] ?>">
                                         <td align="center" class="nomor"><?php echo $hold['flag'] ?></td>
                                         <td>
@@ -670,7 +692,7 @@ $data = mysqli_fetch_array($sql); ?>
                                     <th id="Adj_7"></th>
                                     <th id="Adj_8"></th>
                                     <th id="Adj_9"></th>
-                                    <th id="keterangan"></th>
+                                    <th id="keterangan_total"></th>
                                 </tr>
                             </tfoot>
                         </table>

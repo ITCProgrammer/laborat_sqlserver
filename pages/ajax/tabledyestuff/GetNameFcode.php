@@ -2,9 +2,17 @@
 ini_set("error_reporting", 1);
 include "../../../koneksi.php";
 
-$code = $_POST['code'];
-$sql = mysqli_query($con,"SELECT Product_Name, Product_Unit, ket from tbl_dyestuff where code = '$code' and `is_active` = 'TRUE'");
-$result = mysqli_fetch_array($sql);
+$code = $_POST['code'] ?? '';
+$sql = sqlsrv_query(
+    $con,
+    "SELECT Product_Name, Product_Unit, ket FROM db_laborat.tbl_dyestuff WHERE code = ? AND is_active = 'TRUE'",
+    [$code]
+);
+$result = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
+if (!is_array($result)) {
+    echo json_encode(['Product_Name' => '']);
+    exit;
+}
 if ($result["Product_Unit"] == 0) {
     $uom = "Gr/L";
 } else {

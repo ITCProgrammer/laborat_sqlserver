@@ -2,8 +2,12 @@
 ini_set("error_reporting", 1);
 include "../../koneksi.php";
 session_start();
-$data_status_sql = mysqli_query($con,"SELECT * from tbl_status_matching where id = '$_GET[idm]' LIMIT 1");
-$data_status = mysqli_fetch_array($data_status_sql);
+$data_status_sql = sqlsrv_query(
+    $con,
+    "SELECT TOP (1) * FROM db_laborat.tbl_status_matching WHERE id = ?",
+    [$_GET['idm']]
+);
+$data_status = sqlsrv_fetch_array($data_status_sql, SQLSRV_FETCH_ASSOC);
 ?>
 <div class="modal-content">
     <div class="modal-body">

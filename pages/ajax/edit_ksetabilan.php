@@ -3,15 +3,27 @@ ini_set("error_reporting", 1);
 session_start();
 include '../../koneksi.php';
 
-mysqli_query($con,"UPDATE db_dying.tbl_hasilcelup SET `k_resep` = '$_POST[value]' where id = '$_POST[pk]'");
+$time = date('Y-m-d H:i:s');
+sqlsrv_query(
+    $con,
+    "UPDATE db_dying.tbl_hasilcelup SET k_resep = ? WHERE id = ?",
+    [$_POST['value'] ?? '', $_POST['pk'] ?? '']
+);
 
-mysqli_query($con,"INSERT into tbl_log SET `what` = '$_POST[pk]',
-        `what_do` = 'UPDATE db_dying.tbl_hasilcelup k_resep',
-        `do_by` = '$_SESSION[userLAB]',
-        `do_at` = '$time',
-        `ip` = '$_SESSION[ip]',
-        `os` = '$_SESSION[os]',
-        `remark`='$_POST[value]'");
+sqlsrv_query(
+    $con,
+    "INSERT INTO db_laborat.tbl_log (what, what_do, do_by, do_at, ip, os, remark)
+     VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+        $_POST['pk'] ?? '',
+        'UPDATE db_dying.tbl_hasilcelup k_resep',
+        $_SESSION['userLAB'] ?? '',
+        $time,
+        $_SESSION['ip'] ?? '',
+        $_SESSION['os'] ?? '',
+        $_POST['value'] ?? ''
+    ]
+);
 
 $response = "LIB_SUCCSS";
 echo json_encode($response);

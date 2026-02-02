@@ -120,18 +120,52 @@ include "koneksi.php";
                 <div class="box-header with-border">
                     <div class="col-lg-12 overflow-auto table-responsive" style="overflow-x: auto;">
                         <?php
-                        if($Nowarna!="" or $Item!="" or $JMatching!="" or $RCode!="" or $Warna!="" or $Order!=""){
-                        $sql = mysqli_query($con,"SELECT a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by,
+                        $baseSql = "SELECT a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by,
                                             b.jenis_matching, a.matcher, a.idm, b.no_order, b.langganan, b.no_warna, b.warna, b.no_item, b.no_po, b.cocok_warna, a.approve_at, a.status, b.benang
-                                            FROM tbl_status_matching a
-                                            JOIN tbl_matching b ON a.idm = b.no_resep
-                                            WHERE a.approve = 'TRUE' AND a.status = 'selesai' AND a.idm LIKE '%$RCode%' AND b.no_warna LIKE '%$Nowarna%' AND b.no_item LIKE '%$Item%' AND b.jenis_matching LIKE '%$JMatching%' AND b.warna LIKE '%$Warna%' AND b.no_order LIKE '%$Order%' ORDER BY a.id DESC");
-                        }else{
-                        $sql = mysqli_query($con,"SELECT a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by,
+                                            FROM db_laborat.tbl_status_matching a
+                                            JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                                            WHERE a.approve = ? AND a.status = ?";
+
+                        $params = ["TRUE", "selesai"];
+                        $filters = [];
+
+                        if ($RCode !== "") {
+                            $filters[] = "a.idm LIKE ?";
+                            $params[] = "%" . $RCode . "%";
+                        }
+                        if ($Nowarna !== "") {
+                            $filters[] = "b.no_warna LIKE ?";
+                            $params[] = "%" . $Nowarna . "%";
+                        }
+                        if ($Item !== "") {
+                            $filters[] = "b.no_item LIKE ?";
+                            $params[] = "%" . $Item . "%";
+                        }
+                        if ($JMatching !== "") {
+                            $filters[] = "b.jenis_matching LIKE ?";
+                            $params[] = "%" . $JMatching . "%";
+                        }
+                        if ($Warna !== "") {
+                            $filters[] = "b.warna LIKE ?";
+                            $params[] = "%" . $Warna . "%";
+                        }
+                        if ($Order !== "") {
+                            $filters[] = "b.no_order LIKE ?";
+                            $params[] = "%" . $Order . "%";
+                        }
+
+                        if (!empty($filters)) {
+                            $baseSql .= " AND " . implode(" AND ", $filters);
+                            $baseSql .= " ORDER BY a.id DESC";
+                            $sql = sqlsrv_query($con, $baseSql, $params);
+                        } else {
+                            $baseSql = "SELECT TOP (100) a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by,
                                             b.jenis_matching, a.matcher, a.idm, b.no_order, b.langganan, b.no_warna, b.warna, b.no_item, b.no_po, b.cocok_warna, a.approve_at, a.status, b.benang
-                                            FROM tbl_status_matching a
-                                            JOIN tbl_matching b ON a.idm = b.no_resep
-                                            WHERE a.approve = 'TRUE' AND a.status = 'selesai' ORDER BY a.id DESC LIMIT 100");    
+                                            FROM db_laborat.tbl_status_matching a
+                                            JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                                            WHERE a.approve = ? AND a.status = ?
+                                            ORDER BY a.id DESC";
+                            $sql = sqlsrv_query($con, $baseSql, $params);
                         }
                         ?>
                         <table id="Table-sm" class="table table-sm display compact" style="width: 100%;">
@@ -153,7 +187,7 @@ include "koneksi.php";
                             <tbody>
                                 <?php 
                                 $no = 1;
-                                while ($row = mysqli_fetch_array($sql)) { ?>
+                                while ($row = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) { ?>
                                     <tr>
                                         <td align="center">
                                             <?php echo $no;  
@@ -187,7 +221,16 @@ include "koneksi.php";
                                         <td><?php echo $row['no_item'] ?></td>
                                         <td><?php echo $row['benang'] ?></td>
                                         <td><?php echo $row['cocok_warna'] ?></td>
-                                        <td><?php echo substr($row['approve_at'], 0, 10) ?></td>
+                                        <td>
+                                            <?php
+                                            $approveAt = $row['approve_at'];
+                                            if ($approveAt instanceof DateTime) {
+                                                echo $approveAt->format('Y-m-d');
+                                            } else {
+                                                echo substr($approveAt, 0, 10);
+                                            }
+                                            ?>
+                                        </td>
                                     </tr>
                                 <?php $no++; } ?>
                             </tbody>
