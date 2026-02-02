@@ -1,11 +1,14 @@
 <?php
-    ini_set("error_reporting", 1);
     session_start();
     include "../../koneksi.php";
+    error_reporting(E_ALL & ~E_DEPRECATED);
+    ini_set('display_errors', 1);
+    $_GET['frm'] = $_GET['frm'] ?? '';
     $ids = $_GET['ids'];
     $idm = $_GET['idm'];
     $ip_num = $_SERVER['REMOTE_ADDR'];
     $substr_idm = substr($idm, 0,2);
+    $time = date('Y-m-d H:i:s');
     
     if($_GET['frm'] == 'bresep'){
         if (empty($_GET['created_by'])) {
@@ -13,16 +16,19 @@
             exit;
         }
         if($substr_idm == 'R2'){
-            mysqli_query($con, "UPDATE tbl_matching SET suhu_chamber = 'none' WHERE no_resep = '$idm'");
+            sqlsrv_query(
+                $con,
+                "UPDATE db_laborat.tbl_matching SET suhu_chamber = ? WHERE no_resep = ?",
+                ['none', $idm]
+            );
         }
     }else{
-        mysqli_query($con, "INSERT INTO log_status_matching SET
-                `ids` = '$idm', 
-                `status` = 'print', 
-                `info` = 'cetak resep', 
-                `do_by` = '".$_SESSION['userLAB']."', 
-                `do_at` = '$time', 
-                `ip_address` = '$ip_num'");
+        sqlsrv_query(
+            $con,
+            "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+             VALUES (?, ?, ?, ?, ?, ?)",
+            [$idm, 'print', 'cetak resep', $_SESSION['userLAB'] ?? '', $time, $ip_num]
+        );
     }
 ?>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -515,14 +521,33 @@
 
 <body>
     <?php
-        $qry = mysqli_query($con,"SELECT * , a.id as id_status, b.id as id_matching, 
-                                    SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 1), ' ', -1) as recipe_code_1, 
-	                                SUBSTRING_INDEX(SUBSTRING_INDEX(b.recipe_code, ' ', 2), ' ', -1) as recipe_code_2
-                                FROM tbl_status_matching a 
-                                join tbl_matching b on a.idm = b.no_resep 
-                                where a.id = '$ids'
-                                ORDER BY a.id desc limit 1");
-        $data = mysqli_fetch_array($qry);
+        $qry = sqlsrv_query(
+            $con,
+            "SELECT *, a.id as id_status, b.id as id_matching
+             FROM db_laborat.tbl_status_matching a 
+             JOIN db_laborat.tbl_matching b on a.idm = b.no_resep 
+             WHERE a.id = ?
+             ORDER BY a.id desc",
+            [$ids]
+        );
+        $data = sqlsrv_fetch_array($qry, SQLSRV_FETCH_ASSOC);
+        if (!is_array($data)) {
+            $data = [];
+        }
+        $recipeCode = trim((string)($data['recipe_code'] ?? ''));
+        $recipeParts = preg_split('/\\s+/', $recipeCode);
+        $data['recipe_code_1'] = $recipeParts[0] ?? '';
+        $data['recipe_code_2'] = $recipeParts[1] ?? '';
+        $dateFields = [
+            'tgl_buat_status','edited_at','target_selesai','mulai_at','selesai_at',
+            'approve_at','tgl_in','tgl_out','tgl_delivery','tgl_buat','tgl_selesai',
+            'done_matching','tutup_at','revisi_at'
+        ];
+        foreach ($dateFields as $f) {
+            if (isset($data[$f]) && $data[$f] instanceof DateTimeInterface) {
+                $data[$f] = $data[$f]->format('Y-m-d H:i:s');
+            }
+        }
     ?>
     <?php
         // if (substr(strtoupper($data['no_resep']), 0, 2) == 'R2' or substr(strtoupper($data['no_resep']), 0, 2) == 'A2' or substr(strtoupper($data['no_resep']), 0, 2) == 'D2' or substr(strtoupper($data['no_resep']), 0, 2) == 'C2') {
@@ -637,15 +662,14 @@
                 $sqlEditor    = "SELECT
                                     do_by 
                                 FROM
-                                    `log_status_matching` 
+                                    db_laborat.log_status_matching 
                                 WHERE
-                                    ids = '{$suffix}'
-                                    AND info = 'modifikasi resep'
+                                    ids = ?
+                                    AND info = ?
                                 ORDER BY 
-                                    do_at DESC
-                                LIMIT 1";
-                $stmtEditor = mysqli_query($con, $sqlEditor);
-                $rowEditor  = mysqli_fetch_assoc($stmtEditor);
+                                    do_at DESC";
+                $stmtEditor = sqlsrv_query($con, $sqlEditor, [$suffix, 'modifikasi resep']);
+                $rowEditor  = sqlsrv_fetch_array($stmtEditor, SQLSRV_FETCH_ASSOC);
                 if ($rowEditor) {
                     $rawEditor = $rowEditor['do_by'];
                     return $rawEditor;
@@ -657,9 +681,9 @@
             function getCommentAdj($con, $adjNo) {
                 $ids = $_GET['ids'];
                 $idm = $_GET['idm'];
-                $sqlComment = "SELECT * FROM tbl_comment WHERE ids = '$ids' AND idm = '$idm' AND adj = '$adjNo' ORDER BY id DESC LIMIT 1";
-                $resultComment  = mysqli_query($con, $sqlComment);
-                $dataComment    = mysqli_fetch_assoc($resultComment);
+                $sqlComment = "SELECT * FROM db_laborat.tbl_comment WHERE ids = '$ids' AND idm = '$idm' AND adj = '$adjNo' ORDER BY id DESC";
+                $resultComment  = sqlsrv_query($con, $sqlComment);
+                $dataComment    = sqlsrv_fetch_array($resultComment, SQLSRV_FETCH_ASSOC);
 
                 if ($dataComment) {
                     $raw = $dataComment['comment'];
@@ -1798,21 +1822,24 @@
             <!-- BARIS -->
                 <!-- BARIS 1 -->
                     <?php
-                        $resep1 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep1 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
-                                                                            and flag = 1 limit 1");
-                        $rsp1 = mysqli_fetch_array($resep1);
+                                                                            and flag = 1");
+                        $rsp1 = sqlsrv_fetch_array($resep1, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp1)) {
+                                        $rsp1 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp1[kode]' limit 1");
-                        $kdbr = mysqli_fetch_array($KodeBaru);
+                        $KodeBaru = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp1[kode]'");
+                        $kdbr = sqlsrv_fetch_array($KodeBaru, SQLSRV_FETCH_ASSOC);
                         
                         if($kdbr['code_new']){ 
                             $kode_lama = $rsp1['kode'];
                             $kode_baru = $kdbr['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp1[kode]' limit 1");
-                            $kdbr_now = mysqli_fetch_array($KodeBaru_now);
+                            $KodeBaru_now = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp1[kode]'");
+                            $kdbr_now = sqlsrv_fetch_array($KodeBaru_now, SQLSRV_FETCH_ASSOC);
                             if($kdbr_now['code'] && $kdbr_now['code_new']){
                                 $kode_lama = $kdbr_now['code'];
                                 $kode_baru = $kdbr_now['code_new'];
@@ -1852,8 +1879,8 @@
                         <td style="font-weight: bold; <?= $adj7_1 ? 'text-decoration: line-through;' : '' ?>"><?php if (floatval($rsp1['conc7']) != 0) echo floatval($rsp1['conc7']) ?><span style="color: red;"><?= $adj6_1; ?></span></td>
                         <td style="font-weight: bold;"><?php if (floatval($rsp1['conc8']) != 0) echo floatval($rsp1['conc8']) ?><span style="color: red;"><?= $adj7_1; ?></span></td>
                         <?php
-                            $sql_Norder1 = mysqli_query($con,"SELECT `order` from tbl_orderchild 
-                                                                where id_matching = '$data[id_matching]' and id_status = '$data[id_status]' order by flag limit 0,50");
+                            $sql_Norder1 = sqlsrv_query($con,"SELECT [order] FROM db_laborat.tbl_orderchild 
+                                                                where id_matching = '$data[id_matching]' and id_status = '$data[id_status]' order by flag OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY");
                             $iteration = 1;
                         ?>
                         <?php if ($_GET['frm'] == 'bresep') : ?>
@@ -1905,7 +1932,7 @@
                             <td colspan="2" rowspan="5">
                                 <div style="display: flex; justify-content: space-between;">
                                     <div>
-                                        <?php while ($no = mysqli_fetch_array($sql_Norder1)) : ?>
+                                        <?php while ($no = sqlsrv_fetch_array($sql_Norder1, SQLSRV_FETCH_ASSOC)) : ?>
                                             <?= $iteration++ . '.(' . $no['order'] . ')' ?>&nbsp;&nbsp;&nbsp;
                                         <?php endwhile; ?>
                                     </div>
@@ -1944,22 +1971,30 @@
                     </tr>
                 <!-- BARIS 2 -->
                     <?php
-                        $resep2 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep2 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 2 
-                                                                            order by flag asc limit 1");
-                        $rsp2 = mysqli_fetch_array($resep2);
-                        $KodeBaru2 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp2[kode]'
-                                                                            limit 1");
-                        $kdbr2 = mysqli_fetch_array($KodeBaru2);
+                                                                            order by flag asc");
+                        $rsp2 = sqlsrv_fetch_array($resep2, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp2)) {
+                                        $rsp2 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
+                        $KodeBaru2 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp2[kode]'");
+                        $kdbr2 = sqlsrv_fetch_array($KodeBaru2, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr2)) {
+                                        $kdbr2 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr2['code_new']){ 
                             $kode_lama2 = $rsp2['kode'];
                             $kode_baru2 = $kdbr2['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now2 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp2[kode]' limit 1");
-                            $kdbr_now2 = mysqli_fetch_array($KodeBaru_now2);
+                            $KodeBaru_now2 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp2[kode]'");
+                            $kdbr_now2 = sqlsrv_fetch_array($KodeBaru_now2, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now2)) {
+                                            $kdbr_now2 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now2['code'] && $kdbr_now2['code_new']){
                                 $kode_lama2 = $kdbr_now2['code'];
                                 $kode_baru2 = $kdbr_now2['code_new'];
@@ -2003,23 +2038,31 @@
                     </tr>
                 <!-- BARIS 3 -->
                     <?php
-                        $resep3 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep3 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 3 
-                                                                            order by flag asc limit 1");
-                        $rsp3 = mysqli_fetch_array($resep3);
+                                                                            order by flag asc");
+                        $rsp3 = sqlsrv_fetch_array($resep3, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp3)) {
+                                        $rsp3 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru3 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp3[kode]'
-                                                                            limit 1");
-                        $kdbr3 = mysqli_fetch_array($KodeBaru3);
+                        $KodeBaru3 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp3[kode]'");
+                        $kdbr3 = sqlsrv_fetch_array($KodeBaru3, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr3)) {
+                                        $kdbr3 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr3['code_new']){ 
                             $kode_lama3 = $rsp3['kode'];
                             $kode_baru3 = $kdbr3['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now3 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp3[kode]' limit 1");
-                            $kdbr_now3 = mysqli_fetch_array($KodeBaru_now3);
+                            $KodeBaru_now3 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp3[kode]'");
+                            $kdbr_now3 = sqlsrv_fetch_array($KodeBaru_now3, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now3)) {
+                                            $kdbr_now3 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now3['code'] && $kdbr_now3['code_new']){
                                 $kode_lama3 = $kdbr_now3['code'];
                                 $kode_baru3 = $kdbr_now3['code_new'];
@@ -2061,23 +2104,31 @@
                     </tr>
                 <!-- BARIS 4 -->
                     <?php
-                        $resep4 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep4 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 4 
-                                                                            order by flag asc limit 1");
-                        $rsp4 = mysqli_fetch_array($resep4);
+                                                                            order by flag asc");
+                        $rsp4 = sqlsrv_fetch_array($resep4, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp4)) {
+                                        $rsp4 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru4 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp4[kode]'
-                                                                            limit 1");
-                        $kdbr4 = mysqli_fetch_array($KodeBaru4);	
+                        $KodeBaru4 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp4[kode]'");
+                        $kdbr4 = sqlsrv_fetch_array($KodeBaru4, SQLSRV_FETCH_ASSOC);	
+                                    if (!is_array($kdbr4)) {
+                                        $kdbr4 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr4['code_new']){ 
                             $kode_lama4 = $rsp4['kode'];
                             $kode_baru4 = $kdbr4['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now4 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp4[kode]' limit 1");
-                            $kdbr_now4 = mysqli_fetch_array($KodeBaru_now4);
+                            $KodeBaru_now4 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp4[kode]'");
+                            $kdbr_now4 = sqlsrv_fetch_array($KodeBaru_now4, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now4)) {
+                                            $kdbr_now4 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now4['code'] && $kdbr_now4['code_new']){
                                 $kode_lama4 = $kdbr_now4['code'];
                                 $kode_baru4 = $kdbr_now4['code_new'];
@@ -2119,23 +2170,31 @@
                     </tr>
                 <!-- BARIS 5 -->
                     <?php
-                        $resep5 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep5 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 5 
-                                                                            order by flag asc limit 1");
-                        $rsp5 = mysqli_fetch_array($resep5);
+                                                                            order by flag asc");
+                        $rsp5 = sqlsrv_fetch_array($resep5, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp5)) {
+                                        $rsp5 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru5 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp5[kode]'
-                                                                            limit 1");
-                        $kdbr5 = mysqli_fetch_array($KodeBaru5);	
+                        $KodeBaru5 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp5[kode]'");
+                        $kdbr5 = sqlsrv_fetch_array($KodeBaru5, SQLSRV_FETCH_ASSOC);	
+                                    if (!is_array($kdbr5)) {
+                                        $kdbr5 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr5['code_new']){ 
                             $kode_lama5 = $rsp5['kode'];
                             $kode_baru5 = $kdbr5['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now5 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp5[kode]' limit 1");
-                            $kdbr_now5 = mysqli_fetch_array($KodeBaru_now5);
+                            $KodeBaru_now5 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp5[kode]'");
+                            $kdbr_now5 = sqlsrv_fetch_array($KodeBaru_now5, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now5)) {
+                                            $kdbr_now5 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now5['code'] && $kdbr_now5['code_new']){
                                 $kode_lama5 = $kdbr_now5['code'];
                                 $kode_baru5 = $kdbr_now5['code_new'];
@@ -2177,23 +2236,31 @@
                     </tr>
                 <!-- BARIS 6 -->
                     <?php
-                        $resep6 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep6 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 6 
-                                                                            order by flag asc limit 1");
-                        $rsp6 = mysqli_fetch_array($resep6);
+                                                                            order by flag asc");
+                        $rsp6 = sqlsrv_fetch_array($resep6, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp6)) {
+                                        $rsp6 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru6 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp6[kode]'
-                                                                            limit 1");
-                        $kdbr6 = mysqli_fetch_array($KodeBaru6);
+                        $KodeBaru6 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp6[kode]'");
+                        $kdbr6 = sqlsrv_fetch_array($KodeBaru6, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr6)) {
+                                        $kdbr6 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr6['code_new']){ 
                             $kode_lama6 = $rsp6['kode'];
                             $kode_baru6 = $kdbr6['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now6 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp6[kode]' limit 1");
-                            $kdbr_now6 = mysqli_fetch_array($KodeBaru_now6);
+                            $KodeBaru_now6 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp6[kode]'");
+                            $kdbr_now6 = sqlsrv_fetch_array($KodeBaru_now6, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now6)) {
+                                            $kdbr_now6 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now6['code'] && $kdbr_now6['code_new']){
                                 $kode_lama6 = $kdbr_now6['code'];
                                 $kode_baru6 = $kdbr_now6['code_new'];
@@ -2237,23 +2304,31 @@
                     </tr>
                 <!-- BARIS 7 -->
                     <?php
-                        $resep7 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep7 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 7 
-                                                                            order by flag asc limit 1");
-                        $rsp7 = mysqli_fetch_array($resep7);
+                                                                            order by flag asc");
+                        $rsp7 = sqlsrv_fetch_array($resep7, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp7)) {
+                                        $rsp7 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru7 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp7[kode]'
-                                                                            limit 1");
-                        $kdbr7 = mysqli_fetch_array($KodeBaru7);		
+                        $KodeBaru7 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp7[kode]'");
+                        $kdbr7 = sqlsrv_fetch_array($KodeBaru7, SQLSRV_FETCH_ASSOC);		
+                                    if (!is_array($kdbr7)) {
+                                        $kdbr7 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr7['code_new']){ 
                             $kode_lama7 = $rsp7['kode'];
                             $kode_baru7 = $kdbr7['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now7 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp7[kode]' limit 1");
-                            $kdbr_now7 = mysqli_fetch_array($KodeBaru_now7);
+                            $KodeBaru_now7 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp7[kode]'");
+                            $kdbr_now7 = sqlsrv_fetch_array($KodeBaru_now7, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now7)) {
+                                            $kdbr_now7 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now7['code'] && $kdbr_now7['code_new']){
                                 $kode_lama7 = $kdbr_now7['code'];
                                 $kode_baru7 = $kdbr_now7['code_new'];
@@ -2297,23 +2372,31 @@
                     </tr>
                 <!-- BARIS 8 -->
                     <?php
-                        $resep8 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep8 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 8 
-                                                                            order by flag asc limit 1");
-                        $rsp8 = mysqli_fetch_array($resep8);
+                                                                            order by flag asc");
+                        $rsp8 = sqlsrv_fetch_array($resep8, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp8)) {
+                                        $rsp8 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru8 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp8[kode]'
-                                                                            limit 1");
-                        $kdbr8 = mysqli_fetch_array($KodeBaru8);	
+                        $KodeBaru8 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp8[kode]'");
+                        $kdbr8 = sqlsrv_fetch_array($KodeBaru8, SQLSRV_FETCH_ASSOC);	
+                                    if (!is_array($kdbr8)) {
+                                        $kdbr8 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr8['code_new']){ 
                             $kode_lama8 = $rsp8['kode'];
                             $kode_baru8 = $kdbr8['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now8 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp8[kode]' limit 1");
-                            $kdbr_now8 = mysqli_fetch_array($KodeBaru_now8);
+                            $KodeBaru_now8 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp8[kode]'");
+                            $kdbr_now8 = sqlsrv_fetch_array($KodeBaru_now8, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now8)) {
+                                            $kdbr_now8 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now8['code'] && $kdbr_now8['code_new']){
                                 $kode_lama8 = $kdbr_now8['code'];
                                 $kode_baru8 = $kdbr_now8['code_new'];
@@ -2357,23 +2440,31 @@
                     </tr>
                 <!-- BARIS 9 -->
                     <?php
-                        $resep9 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep9 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 9 
-                                                                            order by flag asc limit 1");
-                        $rsp9 = mysqli_fetch_array($resep9);
+                                                                            order by flag asc");
+                        $rsp9 = sqlsrv_fetch_array($resep9, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp9)) {
+                                        $rsp9 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru9 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp9[kode]'
-                                                                            limit 1");
-                        $kdbr9 = mysqli_fetch_array($KodeBaru9);	
+                        $KodeBaru9 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp9[kode]'");
+                        $kdbr9 = sqlsrv_fetch_array($KodeBaru9, SQLSRV_FETCH_ASSOC);	
+                                    if (!is_array($kdbr9)) {
+                                        $kdbr9 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr9['code_new']){ 
                             $kode_lama9 = $rsp9['kode'];
                             $kode_baru9 = $kdbr9['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now9 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp9[kode]' limit 1");
-                            $kdbr_now9 = mysqli_fetch_array($KodeBaru_now9);
+                            $KodeBaru_now9 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp9[kode]'");
+                            $kdbr_now9 = sqlsrv_fetch_array($KodeBaru_now9, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now9)) {
+                                            $kdbr_now9 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now9['code'] && $kdbr_now9['code_new']){
                                 $kode_lama9 = $kdbr_now9['code'];
                                 $kode_baru9 = $kdbr_now9['code_new'];
@@ -2416,23 +2507,31 @@
                     </tr>
                 <!-- BARIS 10 -->
                     <?php
-                        $resep10 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep10 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 10 
-                                                                            order by flag asc limit 1");
-                        $rsp10 = mysqli_fetch_array($resep10);
+                                                                            order by flag asc");
+                        $rsp10 = sqlsrv_fetch_array($resep10, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp10)) {
+                                        $rsp10 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru10 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp10[kode]'
-                                                                            limit 1");
-                        $kdbr10 = mysqli_fetch_array($KodeBaru10);
+                        $KodeBaru10 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp10[kode]'");
+                        $kdbr10 = sqlsrv_fetch_array($KodeBaru10, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr10)) {
+                                        $kdbr10 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr10['code_new']){ 
                             $kode_lama10 = $rsp10['kode'];
                             $kode_baru10 = $kdbr10['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now10 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp10[kode]' limit 1");
-                            $kdbr_now10 = mysqli_fetch_array($KodeBaru_now10);
+                            $KodeBaru_now10 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp10[kode]'");
+                            $kdbr_now10 = sqlsrv_fetch_array($KodeBaru_now10, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now10)) {
+                                            $kdbr_now10 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now10['code'] && $kdbr_now10['code_new']){
                                 $kode_lama10 = $kdbr_now10['code'];
                                 $kode_baru10 = $kdbr_now10['code_new'];
@@ -2474,23 +2573,31 @@
                     </tr>
                 <!-- BARIS 11 -->
                     <?php
-                        $resep11 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep11 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 11 
-                                                                            order by flag asc limit 1");
-                        $rsp11 = mysqli_fetch_array($resep11);
+                                                                            order by flag asc");
+                        $rsp11 = sqlsrv_fetch_array($resep11, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp11)) {
+                                        $rsp11 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru11 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp11[kode]'
-                                                                            limit 1");
-                        $kdbr11 = mysqli_fetch_array($KodeBaru11);		
+                        $KodeBaru11 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp11[kode]'");
+                        $kdbr11 = sqlsrv_fetch_array($KodeBaru11, SQLSRV_FETCH_ASSOC);		
+                                    if (!is_array($kdbr11)) {
+                                        $kdbr11 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr11['code_new']){ 
                             $kode_lama11 = $rsp11['kode'];
                             $kode_baru11 = $kdbr11['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now11 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp11[kode]' limit 1");
-                            $kdbr_now11 = mysqli_fetch_array($KodeBaru_now11);
+                            $KodeBaru_now11 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp11[kode]'");
+                            $kdbr_now11 = sqlsrv_fetch_array($KodeBaru_now11, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now11)) {
+                                            $kdbr_now11 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now11['code'] && $kdbr_now11['code_new']){
                                 $kode_lama11 = $kdbr_now11['code'];
                                 $kode_baru11 = $kdbr_now11['code_new'];
@@ -2530,12 +2637,12 @@
                         <td style="font-weight: bold; <?= $adj7_11 ? 'text-decoration: line-through;' : '' ?>"><?php if (floatval($rsp11['conc7']) != 0) echo floatval($rsp11['conc7']) ?><span style="color: red;"><?= $adj6_11; ?></span></td>
                         <td style="font-weight: bold;"><?php if (floatval($rsp11['conc8']) != 0) echo floatval($rsp11['conc8']) ?><span style="color: red;"><?= $adj7_11; ?></span></td>
                         <?php
-                        $sql_Norder1 = mysqli_query($con,"SELECT `order` from tbl_orderchild 
-                        where id_matching = '$data[id_matching]' and id_status = '$data[id_status]' order by flag limit 51,100");
+                        $sql_Norder1 = sqlsrv_query($con,"SELECT [order] FROM db_laborat.tbl_orderchild 
+                        where id_matching = '$data[id_matching]' and id_status = '$data[id_status]' order by flag OFFSET 51 ROWS FETCH NEXT 100 ROWS ONLY");
                         $iteration = 1;
                         ?>
                         <td colspan="2" rowspan="10" valign="top">
-                            <?php while ($no = mysqli_fetch_array($sql_Norder1)) { ?>
+                            <?php while ($no = sqlsrv_fetch_array($sql_Norder1, SQLSRV_FETCH_ASSOC)) { ?>
                                 <?php echo $iteration++ . '.(' . $no['order']; ?>)&nbsp;&nbsp;&nbsp;
                             <?php } ?>
                             <?php
@@ -2573,23 +2680,31 @@
                     </tr>
                 <!-- BARIS 12 -->
                     <?php
-                        $resep12 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep12 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 12
-                                                                            order by flag asc limit 1");
-                        $rsp12 = mysqli_fetch_array($resep12);
+                                                                            order by flag asc");
+                        $rsp12 = sqlsrv_fetch_array($resep12, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp12)) {
+                                        $rsp12 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru12 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp12[kode]'
-                                                                            limit 1");
-                        $kdbr12 = mysqli_fetch_array($KodeBaru12);
+                        $KodeBaru12 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp12[kode]'");
+                        $kdbr12 = sqlsrv_fetch_array($KodeBaru12, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr12)) {
+                                        $kdbr12 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr12['code_new']){ 
                             $kode_lama12 = $rsp12['kode'];
                             $kode_baru12 = $kdbr12['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now12 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp12[kode]' limit 1");
-                            $kdbr_now12 = mysqli_fetch_array($KodeBaru_now12);
+                            $KodeBaru_now12 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp12[kode]'");
+                            $kdbr_now12 = sqlsrv_fetch_array($KodeBaru_now12, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now12)) {
+                                            $kdbr_now12 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now12['code'] && $kdbr_now12['code_new']){
                                 $kode_lama12 = $kdbr_now12['code'];
                                 $kode_baru12 = $kdbr_now12['code_new'];
@@ -2631,23 +2746,31 @@
                     </tr>
                 <!-- BARIS 13 -->
                     <?php
-                        $resep13 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep13 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 13 
-                                                                            order by flag asc limit 1");
-                        $rsp13 = mysqli_fetch_array($resep13);
+                                                                            order by flag asc");
+                        $rsp13 = sqlsrv_fetch_array($resep13, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp13)) {
+                                        $rsp13 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru13 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp13[kode]'
-                                                                            limit 1");
-                        $kdbr13 = mysqli_fetch_array($KodeBaru13);
+                        $KodeBaru13 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp13[kode]'");
+                        $kdbr13 = sqlsrv_fetch_array($KodeBaru13, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr13)) {
+                                        $kdbr13 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr13['code_new']){ 
                             $kode_lama13 = $rsp13['kode'];
                             $kode_baru13 = $kdbr13['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now13 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp13[kode]' limit 1");
-                            $kdbr_now13 = mysqli_fetch_array($KodeBaru_now13);
+                            $KodeBaru_now13 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp13[kode]'");
+                            $kdbr_now13 = sqlsrv_fetch_array($KodeBaru_now13, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now13)) {
+                                            $kdbr_now13 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now13['code'] && $kdbr_now13['code_new']){
                                 $kode_lama13 = $kdbr_now13['code'];
                                 $kode_baru13 = $kdbr_now13['code_new'];
@@ -2689,23 +2812,31 @@
                     </tr>
                 <!-- BARIS 14 -->
                     <?php
-                        $resep14 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep14 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 14 
-                                                                            order by flag asc limit 1");
-                        $rsp14 = mysqli_fetch_array($resep14);
+                                                                            order by flag asc");
+                        $rsp14 = sqlsrv_fetch_array($resep14, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp14)) {
+                                        $rsp14 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru14 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp14[kode]'
-                                                                            limit 1");
-                        $kdbr14 = mysqli_fetch_array($KodeBaru14);
+                        $KodeBaru14 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp14[kode]'");
+                        $kdbr14 = sqlsrv_fetch_array($KodeBaru14, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr14)) {
+                                        $kdbr14 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr14['code_new']){ 
                             $kode_lama14 = $rsp14['kode'];
                             $kode_baru14 = $kdbr14['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now14 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp14[kode]' limit 1");
-                            $kdbr_now14 = mysqli_fetch_array($KodeBaru_now14);
+                            $KodeBaru_now14 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp14[kode]'");
+                            $kdbr_now14 = sqlsrv_fetch_array($KodeBaru_now14, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now14)) {
+                                            $kdbr_now14 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now14['code'] && $kdbr_now14['code_new']){
                                 $kode_lama14 = $kdbr_now14['code'];
                                 $kode_baru14 = $kdbr_now14['code_new'];
@@ -2747,23 +2878,31 @@
                     </tr>
                 <!-- BARIS 15 -->
                     <?php
-                        $resep15 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep15 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 15 
-                                                                            order by flag asc limit 1");
-                        $rsp15 = mysqli_fetch_array($resep15);
+                                                                            order by flag asc");
+                        $rsp15 = sqlsrv_fetch_array($resep15, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp15)) {
+                                        $rsp15 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru15 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp15[kode]'
-                                                                            limit 1");
-                        $kdbr15 = mysqli_fetch_array($KodeBaru15);
+                        $KodeBaru15 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp15[kode]'");
+                        $kdbr15 = sqlsrv_fetch_array($KodeBaru15, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr15)) {
+                                        $kdbr15 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr15['code_new']){ 
                             $kode_lama15 = $rsp15['kode'];
                             $kode_baru15 = $kdbr15['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now15 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp15[kode]' limit 1");
-                            $kdbr_now15 = mysqli_fetch_array($KodeBaru_now15);
+                            $KodeBaru_now15 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp15[kode]'");
+                            $kdbr_now15 = sqlsrv_fetch_array($KodeBaru_now15, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now15)) {
+                                            $kdbr_now15 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now15['code'] && $kdbr_now15['code_new']){
                                 $kode_lama15 = $kdbr_now15['code'];
                                 $kode_baru15 = $kdbr_now15['code_new'];
@@ -2805,23 +2944,31 @@
                     </tr>
                 <!-- BARIS 16 -->
                     <?php
-                        $resep16 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep16 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 16 
-                                                                            order by flag asc limit 1");
-                        $rsp16 = mysqli_fetch_array($resep16);
+                                                                            order by flag asc");
+                        $rsp16 = sqlsrv_fetch_array($resep16, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp16)) {
+                                        $rsp16 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru16 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp16[kode]'
-                                                                            limit 1");
-                        $kdbr16 = mysqli_fetch_array($KodeBaru16);	
+                        $KodeBaru16 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp16[kode]'");
+                        $kdbr16 = sqlsrv_fetch_array($KodeBaru16, SQLSRV_FETCH_ASSOC);	
+                                    if (!is_array($kdbr16)) {
+                                        $kdbr16 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr16['code_new']){ 
                             $kode_lama16 = $rsp16['kode'];
                             $kode_baru16 = $kdbr16['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now16 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp16[kode]' limit 1");
-                            $kdbr_now16 = mysqli_fetch_array($KodeBaru_now16);
+                            $KodeBaru_now16 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp16[kode]'");
+                            $kdbr_now16 = sqlsrv_fetch_array($KodeBaru_now16, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now16)) {
+                                            $kdbr_now16 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now16['code'] && $kdbr_now16['code_new']){
                                 $kode_lama16 = $kdbr_now16['code'];
                                 $kode_baru16 = $kdbr_now16['code_new'];
@@ -2863,23 +3010,31 @@
                     </tr>
                 <!-- BARIS 17 -->
                     <?php
-                        $resep17 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep17 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 17 
-                                                                            order by flag asc limit 1");
-                        $rsp17 = mysqli_fetch_array($resep17);
+                                                                            order by flag asc");
+                        $rsp17 = sqlsrv_fetch_array($resep17, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp17)) {
+                                        $rsp17 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru17 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp17[kode]'
-                                                                            limit 1");
-                        $kdbr17 = mysqli_fetch_array($KodeBaru17);
+                        $KodeBaru17 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp17[kode]'");
+                        $kdbr17 = sqlsrv_fetch_array($KodeBaru17, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr17)) {
+                                        $kdbr17 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr17['code_new']){ 
                             $kode_lama17 = $rsp17['kode'];
                             $kode_baru17 = $kdbr17['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now17 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp17[kode]' limit 1");
-                            $kdbr_now17 = mysqli_fetch_array($KodeBaru_now17);
+                            $KodeBaru_now17 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp17[kode]'");
+                            $kdbr_now17 = sqlsrv_fetch_array($KodeBaru_now17, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now17)) {
+                                            $kdbr_now17 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now17['code'] && $kdbr_now17['code_new']){
                                 $kode_lama17 = $kdbr_now17['code'];
                                 $kode_baru17 = $kdbr_now17['code_new'];
@@ -2921,23 +3076,31 @@
                     </tr>
                 <!-- BARIS 18 -->
                     <?php
-                        $resep18 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep18 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 18 
-                                                                            order by flag asc limit 1");
-                        $rsp18 = mysqli_fetch_array($resep18);
+                                                                            order by flag asc");
+                        $rsp18 = sqlsrv_fetch_array($resep18, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp18)) {
+                                        $rsp18 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru18 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp18[kode]'
-                                                                            limit 1");
-                        $kdbr18 = mysqli_fetch_array($KodeBaru18);
+                        $KodeBaru18 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp18[kode]'");
+                        $kdbr18 = sqlsrv_fetch_array($KodeBaru18, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr18)) {
+                                        $kdbr18 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr18['code_new']){ 
                             $kode_lama18 = $rsp18['kode'];
                             $kode_baru18 = $kdbr18['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now18 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp18[kode]' limit 1");
-                            $kdbr_now18 = mysqli_fetch_array($KodeBaru_now18);
+                            $KodeBaru_now18 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp18[kode]'");
+                            $kdbr_now18 = sqlsrv_fetch_array($KodeBaru_now18, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now18)) {
+                                            $kdbr_now18 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now18['code'] && $kdbr_now18['code_new']){
                                 $kode_lama18 = $kdbr_now18['code'];
                                 $kode_baru18 = $kdbr_now18['code_new'];
@@ -2979,23 +3142,31 @@
                     </tr>
                 <!-- BARIS 19 -->
                     <?php
-                        $resep19 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep19 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 19 
-                                                                            order by flag asc limit 1");
-                        $rsp19 = mysqli_fetch_array($resep19);
+                                                                            order by flag asc");
+                        $rsp19 = sqlsrv_fetch_array($resep19, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp19)) {
+                                        $rsp19 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru19 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp19[kode]'
-                                                                            limit 1");
-                        $kdbr19 = mysqli_fetch_array($KodeBaru19);
+                        $KodeBaru19 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp19[kode]'");
+                        $kdbr19 = sqlsrv_fetch_array($KodeBaru19, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr19)) {
+                                        $kdbr19 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr19['code_new']){ 
                             $kode_lama19 = $rsp19['kode'];
                             $kode_baru19 = $kdbr19['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now19 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp19[kode]' limit 1");
-                            $kdbr_now19 = mysqli_fetch_array($KodeBaru_now19);
+                            $KodeBaru_now19 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp19[kode]'");
+                            $kdbr_now19 = sqlsrv_fetch_array($KodeBaru_now19, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now19)) {
+                                            $kdbr_now19 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now19['code'] && $kdbr_now19['code_new']){
                                 $kode_lama19 = $kdbr_now19['code'];
                                 $kode_baru19 = $kdbr_now19['code_new'];
@@ -3037,23 +3208,31 @@
                     </tr>
                 <!-- BARIS 20 -->
                     <?php
-                        $resep20 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep20 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 20 
-                                                                            order by flag asc limit 1");
-                        $rsp20 = mysqli_fetch_array($resep20);
+                                                                            order by flag asc");
+                        $rsp20 = sqlsrv_fetch_array($resep20, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp20)) {
+                                        $rsp20 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru20 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp20[kode]'
-                                                                            limit 1");
-                        $kdbr20 = mysqli_fetch_array($KodeBaru20);
+                        $KodeBaru20 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp20[kode]'");
+                        $kdbr20 = sqlsrv_fetch_array($KodeBaru20, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr20)) {
+                                        $kdbr20 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr20['code_new']){ 
                             $kode_lama20 = $rsp20['kode'];
                             $kode_baru20 = $kdbr20['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now20 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp20[kode]' limit 1");
-                            $kdbr_now20 = mysqli_fetch_array($KodeBaru_now20);
+                            $KodeBaru_now20 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp20[kode]'");
+                            $kdbr_now20 = sqlsrv_fetch_array($KodeBaru_now20, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now20)) {
+                                            $kdbr_now20 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now20['code'] && $kdbr_now20['code_new']){
                                 $kode_lama20 = $kdbr_now20['code'];
                                 $kode_baru20 = $kdbr_now20['code_new'];
@@ -3095,23 +3274,31 @@
                     </tr>
                 <!-- BARIS 21 -->
                     <?php
-                        $resep21 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep21 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 21 
-                                                                            order by flag asc limit 1");
-                        $rsp21 = mysqli_fetch_array($resep21);
+                                                                            order by flag asc");
+                        $rsp21 = sqlsrv_fetch_array($resep21, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp21)) {
+                                        $rsp21 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru21 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp21[kode]'
-                                                                            limit 1");
-                        $kdbr21 = mysqli_fetch_array($KodeBaru21);
+                        $KodeBaru21 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp21[kode]'");
+                        $kdbr21 = sqlsrv_fetch_array($KodeBaru21, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr21)) {
+                                        $kdbr21 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr21['code_new']){ 
                             $kode_lama21 = $rsp21['kode'];
                             $kode_baru21 = $kdbr21['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now21 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp21[kode]' limit 1");
-                            $kdbr_now21 = mysqli_fetch_array($KodeBaru_now21);
+                            $KodeBaru_now21 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp21[kode]'");
+                            $kdbr_now21 = sqlsrv_fetch_array($KodeBaru_now21, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now21)) {
+                                            $kdbr_now21 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now21['code'] && $kdbr_now21['code_new']){
                                 $kode_lama21 = $kdbr_now21['code'];
                                 $kode_baru21 = $kdbr_now21['code_new'];
@@ -3155,23 +3342,31 @@
                     </tr>
                 <!-- BARIS 22 -->
                     <?php
-                        $resep22 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep22 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 22 
-                                                                            order by flag asc limit 1");
-                        $rsp22 = mysqli_fetch_array($resep22);
+                                                                            order by flag asc");
+                        $rsp22 = sqlsrv_fetch_array($resep22, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp22)) {
+                                        $rsp22 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru22 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp22[kode]'
-                                                                            limit 1");
-                        $kdbr22 = mysqli_fetch_array($KodeBaru22);
+                        $KodeBaru22 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp22[kode]'");
+                        $kdbr22 = sqlsrv_fetch_array($KodeBaru22, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr22)) {
+                                        $kdbr22 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr22['code_new']){ 
                             $kode_lama22 = $rsp22['kode'];
                             $kode_baru22 = $kdbr22['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now22 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp22[kode]' limit 1");
-                            $kdbr_now22 = mysqli_fetch_array($KodeBaru_now22);
+                            $KodeBaru_now22 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp22[kode]'");
+                            $kdbr_now22 = sqlsrv_fetch_array($KodeBaru_now22, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now22)) {
+                                            $kdbr_now22 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now22['code'] && $kdbr_now22['code_new']){
                                 $kode_lama22 = $kdbr_now22['code'];
                                 $kode_baru22 = $kdbr_now22['code_new'];
@@ -3213,23 +3408,31 @@
                     </tr>
                 <!-- BARIS 23 -->
                     <?php
-                        $resep23 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep23 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 23 
-                                                                            order by flag asc limit 1");
-                        $rsp23 = mysqli_fetch_array($resep23);
+                                                                            order by flag asc");
+                        $rsp23 = sqlsrv_fetch_array($resep23, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp23)) {
+                                        $rsp23 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru23 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp23[kode]'
-                                                                            limit 1");
-                        $kdbr23 = mysqli_fetch_array($KodeBaru23);
+                        $KodeBaru23 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp23[kode]'");
+                        $kdbr23 = sqlsrv_fetch_array($KodeBaru23, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr23)) {
+                                        $kdbr23 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr23['code_new']){ 
                             $kode_lama23 = $rsp23['kode'];
                             $kode_baru23 = $kdbr23['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now23 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp23[kode]' limit 1");
-                            $kdbr_now23 = mysqli_fetch_array($KodeBaru_now23);
+                            $KodeBaru_now23 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp23[kode]'");
+                            $kdbr_now23 = sqlsrv_fetch_array($KodeBaru_now23, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now23)) {
+                                            $kdbr_now23 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now23['code'] && $kdbr_now23['code_new']){
                                 $kode_lama23 = $kdbr_now23['code'];
                                 $kode_baru23 = $kdbr_now23['code_new'];
@@ -3299,23 +3502,31 @@
                     </tr>
                 <!-- BARIS 24 -->
                     <?php
-                        $resep24 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep24 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 24 
-                                                                            order by flag asc limit 1");
-                        $rsp24 = mysqli_fetch_array($resep24);
+                                                                            order by flag asc");
+                        $rsp24 = sqlsrv_fetch_array($resep24, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp24)) {
+                                        $rsp24 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru24 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp24[kode]'
-                                                                            limit 1");
-                        $kdbr24 = mysqli_fetch_array($KodeBaru24);
+                        $KodeBaru24 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp24[kode]'");
+                        $kdbr24 = sqlsrv_fetch_array($KodeBaru24, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr24)) {
+                                        $kdbr24 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr24['code_new']){ 
                             $kode_lama24 = $rsp24['kode'];
                             $kode_baru24 = $kdbr24['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now24 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp24[kode]' limit 1");
-                            $kdbr_now24 = mysqli_fetch_array($KodeBaru_now24);
+                            $KodeBaru_now24 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp24[kode]'");
+                            $kdbr_now24 = sqlsrv_fetch_array($KodeBaru_now24, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now24)) {
+                                            $kdbr_now24 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now24['code'] && $kdbr_now24['code_new']){
                                 $kode_lama24 = $kdbr_now24['code'];
                                 $kode_baru24 = $kdbr_now24['code_new'];
@@ -3357,23 +3568,31 @@
                     </tr>
                 <!-- BARIS 25 -->
                     <?php
-                        $resep25 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep25 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 25 
-                                                                            order by flag asc limit 1");
-                        $rsp25 = mysqli_fetch_array($resep25);
+                                                                            order by flag asc");
+                        $rsp25 = sqlsrv_fetch_array($resep25, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp25)) {
+                                        $rsp25 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru25 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp25[kode]'
-                                                                            limit 1");
-                        $kdbr25 = mysqli_fetch_array($KodeBaru25);
+                        $KodeBaru25 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp25[kode]'");
+                        $kdbr25 = sqlsrv_fetch_array($KodeBaru25, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr25)) {
+                                        $kdbr25 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
                         
                         if($kdbr25['code_new']){ 
                             $kode_lama25 = $rsp25['kode'];
                             $kode_baru25 = $kdbr25['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now25 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp25[kode]' limit 1");
-                            $kdbr_now25 = mysqli_fetch_array($KodeBaru_now25);
+                            $KodeBaru_now25 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp25[kode]'");
+                            $kdbr_now25 = sqlsrv_fetch_array($KodeBaru_now25, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now25)) {
+                                            $kdbr_now25 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now25['code'] && $kdbr_now25['code_new']){
                                 $kode_lama25 = $kdbr_now25['code'];
                                 $kode_baru25 = $kdbr_now25['code_new'];
@@ -3415,23 +3634,31 @@
                     </tr>
                 <!-- BARIS 26 -->
                     <?php
-                        $resep26 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep26 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 26 
-                                                                            order by flag asc limit 1");
-                        $rsp26 = mysqli_fetch_array($resep26);
+                                                                            order by flag asc");
+                        $rsp26 = sqlsrv_fetch_array($resep26, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp26)) {
+                                        $rsp26 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                         
-                        $KodeBaru26 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp26[kode]'
-                                                                            limit 1");
-                        $kdbr26 = mysqli_fetch_array($KodeBaru26);
+                        $KodeBaru26 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp26[kode]'");
+                        $kdbr26 = sqlsrv_fetch_array($KodeBaru26, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr26)) {
+                                        $kdbr26 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr26['code_new']){ 
                             $kode_lama26 = $rsp26['kode'];
                             $kode_baru26 = $kdbr26['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now26 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp26[kode]' limit 1");
-                            $kdbr_now26 = mysqli_fetch_array($KodeBaru_now26);
+                            $KodeBaru_now26 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp26[kode]'");
+                            $kdbr_now26 = sqlsrv_fetch_array($KodeBaru_now26, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now26)) {
+                                            $kdbr_now26 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now26['code'] && $kdbr_now26['code_new']){
                                 $kode_lama26 = $kdbr_now26['code'];
                                 $kode_baru26 = $kdbr_now26['code_new'];
@@ -3476,23 +3703,31 @@
                     </tr>
                 <!-- BARIS 27 -->
                     <?php
-                        $resep27 = mysqli_query($con,"SELECT * FROM tbl_matching_detail where id_matching = '$data[id_matching]'
+                        $resep27 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_matching_detail where id_matching = '$data[id_matching]'
                                                                             and id_status = '$data[id_status]' 
                                                                             and flag = 27 
-                                                                            order by flag asc limit 1");
-                        $rsp27 = mysqli_fetch_array($resep27);
+                                                                            order by flag asc");
+                        $rsp27 = sqlsrv_fetch_array($resep27, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($rsp27)) {
+                                        $rsp27 = ['kode' => '', 'conc1' => 0, 'conc2' => 0, 'conc3' => 0, 'conc4' => 0, 'conc5' => 0, 'conc6' => 0, 'conc7' => 0, 'conc8' => 0];
+                                    }
                                 
-                        $KodeBaru27 = mysqli_query($con,"SELECT * FROM tbl_dyestuff where code = '$rsp27[kode]'
-                                                                            limit 1");
-                        $kdbr27 = mysqli_fetch_array($KodeBaru27);
+                        $KodeBaru27 = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp27[kode]'");
+                        $kdbr27 = sqlsrv_fetch_array($KodeBaru27, SQLSRV_FETCH_ASSOC);
+                                    if (!is_array($kdbr27)) {
+                                        $kdbr27 = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                                    }
 
                         if($kdbr27['code_new']){ 
                             $kode_lama27 = $rsp27['kode'];
                             $kode_baru27 = $kdbr27['code_new'];
                         // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
                         }else{
-                            $KodeBaru_now27 = mysqli_query($con,"SELECT `code`, code_new FROM tbl_dyestuff where code_new = '$rsp27[kode]' limit 1");
-                            $kdbr_now27 = mysqli_fetch_array($KodeBaru_now27);
+                            $KodeBaru_now27 = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp27[kode]'");
+                            $kdbr_now27 = sqlsrv_fetch_array($KodeBaru_now27, SQLSRV_FETCH_ASSOC);
+                                        if (!is_array($kdbr_now27)) {
+                                            $kdbr_now27 = ['code' => '', 'code_new' => ''];
+                                        }
                             if($kdbr_now27['code'] && $kdbr_now27['code_new']){
                                 $kode_lama27 = $kdbr_now27['code'];
                                 $kode_baru27 = $kdbr_now27['code_new'];
@@ -3603,11 +3838,11 @@
             <?php else : ?>
                 <td valign="top"><strong>PROSES</strong> : <?php echo $data['proses'] ?></td>
             <?php endif; ?>
-            <?php $sqlLampu =  mysqli_query($con,"SELECT lampu from vpot_lampbuy where buyer = '$data[buyer]' order by flag"); ?>
+            <?php $sqlLampu =  sqlsrv_query($con,"SELECT lampu from db_laborat.vpot_lampbuy where buyer = '$data[buyer]' order by flag"); ?>
             <td valign="top">
                 <strong>LAMPU : </strong>
                 <?php $ii = 1;
-                while ($lampu = mysqli_fetch_array($sqlLampu)) {
+                while ($lampu = sqlsrv_fetch_array($sqlLampu, SQLSRV_FETCH_ASSOC)) {
                     echo $ii++ . '(' . $lampu['lampu'] . '), ';
                 } ?>
             </td>
@@ -3786,8 +4021,8 @@
         td.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         currentCell = this;
-        contextMenu.style.top = `${e.pageY}px`;
-        contextMenu.style.left = `${e.pageX}px`;
+        contextMenu.style.top = [${e.pageY}px];
+        contextMenu.style.left = [${e.pageX}px];
         contextMenu.style.display = 'block';
         });
     });
@@ -3816,11 +4051,11 @@
             if (data.length > 0) {
                 let html = '';
                 data.forEach(row => {
-                    html += `<tr>
+                    html += [<tr>
                                 <td>${row.username}</td>
                                 <td>${row.created_at}</td>
                                 <td>${row.comment}</td>
-                            </tr>`;
+                            </tr>];
                 });
                 tbody.innerHTML = html;
             } else {

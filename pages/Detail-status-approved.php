@@ -15,7 +15,7 @@ $fmtNum = function($v){
 };
 // Compat wrappers removed: seluruh kode sudah memakai sqlsrv_*
 $sql = sqlsrv_query($con, "SELECT TOP 1 a.id as id_status, a.idm, a.flag, a.grp, a.matcher, a.cek_warna, a.cek_dye, a.status, a.kt_status, a.koreksi_resep, a.koreksi_resep2,a.koreksi_resep3, a.koreksi_resep4,
-    a.koreksi_resep5, a.koreksi_resep6,a.koreksi_resep7, a.koreksi_resep8, a.create_resep, a.acc_ulang_ok, a.acc_resep1, a.acc_resep2, a.percobaan_ke, a.benang_aktual, a.lebar_aktual, a.gramasi_aktual, a.soaping_sh, a.soaping_tm, a.rc_sh, a.rc_tm, a.lr, a.cie_wi, a.cie_tint, a.yellowness, a.done_matching, a.ph,
+    a.koreksi_resep5, a.koreksi_resep6,a.koreksi_resep7, a.koreksi_resep8, a.create_resep, a.acc_ulang_ok, a.acc_resep1, a.acc_resep2, a.percobaan_ke, a.howmany_percobaan_ke, a.benang_aktual, a.lebar_aktual, a.gramasi_aktual, a.soaping_sh, a.soaping_tm, a.rc_sh, a.rc_tm, a.lr, a.cie_wi, a.cie_tint, a.yellowness, a.done_matching, a.ph,
     a.spektro_r, a.ket, a.created_at as tgl_buat_status, a.created_by as status_created_by, a.edited_at, a.edited_by, a.target_selesai, a.cside_c,
     a.cside_min, a.tside_c, a.tside_min, a.mulai_by, a.mulai_at, a.selesai_by, a.selesai_at, a.approve_by, a.approve_at, a.approve,
     b.id, b.no_resep, b.no_order, b.no_po, b.langganan, b.no_item, b.jenis_kain, b.benang, b.cocok_warna, b.warna, a.kadar_air,
@@ -1247,16 +1247,17 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                         <p class="text-center" style="text-shadow: black; font-weight: bold;">Export Recipe and Recipe Component</p>
                     </h4>
                     <h4>
-                        <?php if ($_GET['upload'] == '1') : ?>
+                        <?php $upload = $_GET['upload'] ?? ''; ?>
+                        <?php if ($upload == '1') : ?>
                             <p class="text-center" style="color: blue; font-weight: bold;">Exported Success</p>
-                            <p class="text-center" style="color: blue; font-weight: bold;"><?= $_GET['available']; ?></p>
-                        <?php elseif ($_GET['upload'] == '2') : ?>
+                            <p class="text-center" style="color: blue; font-weight: bold;"><?= $_GET['available'] ?? ''; ?></p>
+                        <?php elseif ($upload == '2') : ?>
                             <p class="text-center" style="color: blue; font-weight: bold;">Export Recipe Has Success!</p>
-                            <p class="text-center" style="color: blue; font-weight: bold;"><?= $_GET['available']; ?></p>
-                        <?php elseif ($_GET['upload'] == '3') : ?>
+                            <p class="text-center" style="color: blue; font-weight: bold;"><?= $_GET['available'] ?? ''; ?></p>
+                        <?php elseif ($upload == '3') : ?>
                             <p class="text-center" style="color: blue; font-weight: bold;">Export Recipe Component Has Success!</p>
-                            <p class="text-center" style="color: blue; font-weight: bold;"><?= $_GET['available']; ?></p>
-                        <?php elseif ($_GET['upload'] == '0') : ?>
+                            <p class="text-center" style="color: blue; font-weight: bold;"><?= $_GET['available'] ?? ''; ?></p>
+                        <?php elseif ($upload == '0') : ?>
                             <p class="text-center" style="color: red; font-weight: bold;">Exported FAILED!</p>
                         <?php else : ?>
                             <p class="text-center" style="color: red; font-weight: bold;"></p>
@@ -1296,7 +1297,7 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                                 <?php
                                 $q_dbrecipebean = db2_exec($conn1, "SELECT COUNT(*) AS jumlahrecipe FROM RECIPEBEAN WHERE TRIM(SUBCODE01) = '$data[recipe_code_1]'");
                                 $d_dbrecipebean = db2_fetch_assoc($q_dbrecipebean);
-                                if ($d_dbrecipebean['jumlahrecipe'] >= "1") :
+                                if (($d_dbrecipebean['jumlahrecipe'] ?? 0) >= 1) :
                                 ?>
                                     <td>
                                         <i class="fa fa-check text-blue" aria-hidden="true"></i> <span style="background-color:rgb(151, 170, 212)">Available in recipe</span>

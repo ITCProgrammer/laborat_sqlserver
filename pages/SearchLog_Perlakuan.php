@@ -62,13 +62,10 @@
     }
 </style>
 <?php
-    $f_date1   =   date_create($_POST['date1']);
-    $f_date2   =   date_create($_POST['date2']);
-
     $nama   = isset($_POST['nama']) ? $_POST['nama'] : '';
-    $date1  = isset($_POST['date1']) ? date_format($f_date1,"Y-m-d") : '';
+    $date1  = isset($_POST['date1']) && $_POST['date1'] !== '' ? date_format(date_create($_POST['date1']),"Y-m-d") : '';
     $time1  = isset($_POST['time1']) ? $_POST['time1'] : '';
-    $date2  = isset($_POST['date2']) ? date_format($f_date2,"Y-m-d") : '';
+    $date2  = isset($_POST['date2']) && $_POST['date2'] !== '' ? date_format(date_create($_POST['date2']),"Y-m-d") : '';
     $time2  = isset($_POST['time2']) ? $_POST['time2'] : '';
 ?>
 <body>
@@ -122,16 +119,15 @@
                                         <select name="nama" class="form-control input-sm">
                                             <option value="" selected>All</option>
                                             <?php
-                                                $q_createdby    = mysqli_query($con, "SELECT
-                                                                                            created_by 
-                                                                                        FROM
-                                                                                            tbl_orderchild 
-                                                                                        WHERE
-                                                                                            NOT created_by = '' 
-                                                                                        GROUP BY
-                                                                                            created_by");
+                                                $q_createdby = sqlsrv_query(
+                                                    $con,
+                                                    "SELECT created_by
+                                                     FROM db_laborat.tbl_orderchild
+                                                     WHERE created_by <> ''
+                                                     GROUP BY created_by"
+                                                );
                                             ?>
-                                            <?php while ($row_createdby = mysqli_fetch_array($q_createdby)) { ?>
+                                            <?php while ($row_createdby = sqlsrv_fetch_array($q_createdby, SQLSRV_FETCH_ASSOC)) { ?>
                                                 <option value="<?= $row_createdby['created_by']; ?>" <?php if($nama == $row_createdby['created_by']) { echo "SELECTED"; } ?>><?= $row_createdby['created_by']; ?></option>
                                             <?php } ?>
                                         </select>
@@ -156,19 +152,22 @@
                     <div class="box-header with-border">
                         <div class="col-lg-12 overflow-auto table-responsive" style="overflow-x: auto;">
                             <?php
-                                if($nama != "" OR $date1 != "" OR $time1 != "" OR $date2 != "" OR $time2 != ""){
-                                    $where_date     = "AND c.created_at BETWEEN '$date1 $time1' AND '$date2 $time2'";
-                                }else{
-                                    $where_date     = "";
+                                $params = [];
+                                $where = "c.created_by LIKE ?";
+                                $params[] = '%' . $nama . '%';
+                                if($date1 !== "" OR $time1 !== "" OR $date2 !== "" OR $time2 !== ""){
+                                    $where .= " AND c.created_at BETWEEN ? AND ?";
+                                    $params[] = trim($date1 . ' ' . $time1);
+                                    $params[] = trim($date2 . ' ' . $time2);
                                 }
-                                $sql = mysqli_query($con, "SELECT
+                                $sql = sqlsrv_query($con, "SELECT
                                                             a.id,
                                                             a.idm,
                                                             b.no_order,
                                                             c.flag,
                                                             a.grp,
                                                             b.jenis_kain,
-                                                            c.`order`,
+                                                            c.[order],
                                                             c.lot,
                                                             b.no_item,
                                                             b.no_po,
@@ -178,15 +177,14 @@
                                                             c.created_by,
                                                             b.langganan 
                                                         FROM
-                                                            tbl_status_matching a
-                                                            JOIN tbl_matching b ON b.no_resep = a.idm
-                                                            JOIN tbl_orderchild c ON c.id_status = a.id 
+                                                            db_laborat.tbl_status_matching a
+                                                            JOIN db_laborat.tbl_matching b ON b.no_resep = a.idm
+                                                            JOIN db_laborat.tbl_orderchild c ON c.id_status = a.id 
                                                             AND c.id_matching = b.id 
                                                         WHERE
-                                                            c.created_by LIKE '%$nama%'
-                                                            $where_date
+                                                            $where
                                                         ORDER BY
-                                                            a.id DESC");
+                                                            a.id DESC", $params);
                             ?>
                             <table id="Table-sm" class="table table-sm display compact" style="width: 100%;">
                                 <thead>
@@ -201,7 +199,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php while ($row = mysqli_fetch_array($sql)) { ?>
+                                    <?php while ($row = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) { ?>
                                         <tr>
                                             <td>
                                                 <b>▕ Rcode > <?php echo $row['idm'] ?> &nbsp;&nbsp;▕&nbsp;&nbsp;J.kain > <?php echo $row['jenis_kain'] ?> <br />
@@ -220,7 +218,16 @@
                                             <td><?php echo $row['order'] ?></td>
                                             <td><?php echo $row['lot'] ?></td>
                                             <td><?php echo $row['created_by'] ?></td>
-                                            <td><?php echo $row['created_at'] ?></td>
+                                            <td>
+                                                <?php
+                                                $createdAt = $row['created_at'];
+                                                if ($createdAt instanceof DateTimeInterface) {
+                                                    echo $createdAt->format('Y-m-d H:i:s');
+                                                } else {
+                                                    echo $createdAt;
+                                                }
+                                                ?>
+                                            </td>
                                         </tr>
                                     <?php } ?>
                                 </tbody>
