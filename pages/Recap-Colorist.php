@@ -34,13 +34,13 @@
                                     <div class="form-group">
                                         <div class="col-sm-8 text-center">
                                             <label>Tanggal Awal</label>
-                                            <input style="text-align: center;" value="<?php echo $_POST['start'] ?>" type="text" class="form-control input-sm datepicker" required id="start" name="start" placeholder="Start" autocomplete="off">
+                                            <input style="text-align: center;" value="<?php echo $_POST['start'] ?? '' ?>" type="text" class="form-control input-sm datepicker" required id="start" name="start" placeholder="Start" autocomplete="off">
 
                                         </div>
                                         <div class="col-sm-4 text-center">
                                             <label>Jam Awal</label>
                                             <input type="text" class="form-control input-sm time-picker" name="time_start" id="time_start" value="<?php
-                                                                                                                                                    if ($_POST['submit']) {
+                                                                                                                                                    if (!empty($_POST['submit'])) {
                                                                                                                                                         echo $_POST['time_start'];
                                                                                                                                                     } else {
                                                                                                                                                         echo "23:00";
@@ -59,12 +59,12 @@
                                     <div class="form-group">
                                         <div class="col-sm-8 text-center">
                                             <label>Tanggal Akhir</label>
-                                            <input style="text-align: center;" type="text" value="<?php echo $_POST['end'] ?>" class="form-control input-sm datepicker" required id="end" name="end" placeholder="End" autocomplete="off">
+                                            <input style="text-align: center;" type="text" value="<?php echo $_POST['end'] ?? '' ?>" class="form-control input-sm datepicker" required id="end" name="end" placeholder="End" autocomplete="off">
                                         </div>
                                         <div class="col-sm-4 text-center">
                                             <label>Jam Akhir</label>
                                             <input type="text" class="form-control input-sm time-picker" name="time_end" id="time_end" value="<?php
-                                                                                                                                                if ($_POST['submit']) {
+                                                                                                                                                if (!empty($_POST['submit'])) {
                                                                                                                                                     echo $_POST['time_end'];
                                                                                                                                                 } else {
                                                                                                                                                     echo "23:00";
@@ -85,7 +85,7 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="box-header text-center">
-                                    <h4 class="box-title" style="font-weight: bolder;">Recap Data Colorist <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " . $_POST['end'] . " " . $_POST['time_end']; ?></h4>
+                                    <h4 class="box-title" style="font-weight: bolder;">Recap Data Colorist <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " . ($_POST['end'] ?? '') . " " . ($_POST['time_end'] ?? ''); ?></h4>
                                 </div>
                                 <table class="table table-bordered table-hover" id="table_hasil">
                                     <thead class="bg-green">
@@ -101,48 +101,54 @@
                                     <?php
                                     ini_set("error_reporting", 1);
                                     session_start();
+                                    include "koneksi.php";
                                     global $con;
                                     function get_value($start, $end, $jenis, $colorist)
                                     {
                                         global $con;
-                                        $sql = mysqli_query($con, "SELECT
-                                                                        SUM(IF(a.colorist1 = '$colorist', 0.5, 0 ) + 
-                                                                            IF(a.colorist2 = '$colorist', 0.5, 0 ) +
-                                                                            IF(a.colorist3 = '$colorist', 0.5, 0 ) +
-                                                                            IF(a.colorist4 = '$colorist', 0.5, 0 ) +
-                                                                            IF(a.colorist5 = '$colorist', 0.5, 0 ) +
-                                                                            IF(a.colorist6 = '$colorist', 0.5, 0 ) +
-                                                                            IF(a.colorist7 = '$colorist', 0.5, 0 ) +
-                                                                            IF(a.colorist8 = '$colorist', 0.5, 0 )) AS total_value 
+                                        $sql = sqlsrv_query($con, "SELECT
+                                                                        SUM(
+                                                                            CASE WHEN a.colorist1 = ? THEN 0.5 ELSE 0 END +
+                                                                            CASE WHEN a.colorist2 = ? THEN 0.5 ELSE 0 END +
+                                                                            CASE WHEN a.colorist3 = ? THEN 0.5 ELSE 0 END +
+                                                                            CASE WHEN a.colorist4 = ? THEN 0.5 ELSE 0 END +
+                                                                            CASE WHEN a.colorist5 = ? THEN 0.5 ELSE 0 END +
+                                                                            CASE WHEN a.colorist6 = ? THEN 0.5 ELSE 0 END +
+                                                                            CASE WHEN a.colorist7 = ? THEN 0.5 ELSE 0 END +
+                                                                            CASE WHEN a.colorist8 = ? THEN 0.5 ELSE 0 END
+                                                                        ) AS total_value 
                                                                     FROM
-                                                                        tbl_status_matching a
-                                                                        JOIN tbl_matching b ON a.idm = b.no_resep 
+                                                                        db_laborat.tbl_status_matching a
+                                                                        JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep 
                                                                     WHERE
-                                                                        a.approve_at >= '$start'
-                                                                        AND a.approve_at < '$end'
-                                                                        AND b.jenis_matching = '$jenis'
-                                                                        AND ('$colorist' IN (a.colorist1, a.colorist2, a.colorist3, a.colorist4,
+                                                                        a.approve_at >= ?
+                                                                        AND a.approve_at < ?
+                                                                        AND b.jenis_matching = ?
+                                                                        AND (? IN (a.colorist1, a.colorist2, a.colorist3, a.colorist4,
                                                                                             a.colorist5, a.colorist6, a.colorist7, a.colorist8))
-                                                                        AND a.status = 'selesai'");
-                                        $data = mysqli_fetch_array($sql);
+                                                                        AND a.status = 'selesai'", [
+                                                                        $colorist, $colorist, $colorist, $colorist, $colorist, $colorist, $colorist, $colorist,
+                                                                        $start, $end, $jenis, $colorist
+                                                                    ]);
+                                        $data = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
 
-                                        return $data['total_value'];
+                                        return $data['total_value'] ?? 0;
                                     }
-                                    $colorist = mysqli_query($con, "SELECT * FROM tbl_colorist WHERE is_active = 'TRUE'");
-                                    if ($_POST['submit']) {
-                                        $start = $_POST['start'] . " " . $_POST['time_start'];
-                                        $end = $_POST['end'] . " " . $_POST['time_end'];
+                                    $colorist = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_colorist WHERE is_active = 'TRUE'");
+                                    if (!empty($_POST['submit'])) {
+                                        $start = ($_POST['start'] ?? '') . " " . ($_POST['time_start'] ?? '');
+                                        $end = ($_POST['end'] ?? '') . " " . ($_POST['time_end'] ?? '');
                                     }
                                     ?>
-                                    <?php if ($_POST['submit']) { ?>
+                                    <?php if (!empty($_POST['submit'])) { ?>
                                         <tbody>
                                             <?php
                                             $all = 0;
-                                            $start = $_POST['start'] . " " . $_POST['time_start'];
-                                            $end = $_POST['end'] . " " . $_POST['time_end'];
-                                            while ($clrst = mysqli_fetch_array($colorist)) { ?>
+                                            $start = ($_POST['start'] ?? '') . " " . ($_POST['time_start'] ?? '');
+                                            $end = ($_POST['end'] ?? '') . " " . ($_POST['time_end'] ?? '');
+                                            while ($clrst = sqlsrv_fetch_array($colorist, SQLSRV_FETCH_ASSOC)) { ?>
                                                 <tr>
-                                                    <td><?php echo $clrst['nama'] ?></td>
+                                                    <td><?php echo $clrst['nama'] ?? '' ?></td>
                                                     <td><?php $mu = get_value($start, $end, 'Matching Ulang', $clrst['nama']) + get_value($start, $end, 'Matching Ulang NOW', $clrst['nama']);
                                                         echo $mu; ?> </td>
                                                     <td><?php $mp = get_value($start, $end, 'Perbaikan', $clrst['nama']) + get_value($start, $end, 'Perbaikan NOW', $clrst['nama']);
@@ -176,7 +182,7 @@
 
                             <div class="col-md-6">
                                 <div class="box-header text-center">
-                                    <h4 class="box-title" style="font-weight: bolder;">Recap Data Koreksi Resep <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " . $_POST['end'] . " " . $_POST['time_end']; ?></h4>
+                                    <h4 class="box-title" style="font-weight: bolder;">Recap Data Koreksi Resep <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " . ($_POST['end'] ?? '') . " " . ($_POST['time_end'] ?? ''); ?></h4>
                                 </div>
                                 <table class="table table-bordered table-hover" id="table_hasil_koreksi">
                                     <thead class="bg-yellow">
@@ -194,45 +200,48 @@
                                     {
                                         global $con;
 
-                                        $sql = mysqli_query($con, "SELECT
+                                        $sql = sqlsrv_query($con, "SELECT
                                         SUM(
-                                            IF(a.koreksi_resep = '$colorist', 0.5, 0) +
-                                            IF(a.koreksi_resep2 = '$colorist', 0.5, 0) +
-                                            IF(a.koreksi_resep3 = '$colorist', 0.5, 0) +
-                                            IF(a.koreksi_resep4 = '$colorist', 0.5, 0) +
-                                            IF(a.koreksi_resep5 = '$colorist', 0.5, 0) +
-                                            IF(a.koreksi_resep6 = '$colorist', 0.5, 0) +
-                                            IF(a.koreksi_resep7 = '$colorist', 0.5, 0) +
-                                            IF(a.koreksi_resep8 = '$colorist', 0.5, 0)
+                                            CASE WHEN a.koreksi_resep = ? THEN 0.5 ELSE 0 END +
+                                            CASE WHEN a.koreksi_resep2 = ? THEN 0.5 ELSE 0 END +
+                                            CASE WHEN a.koreksi_resep3 = ? THEN 0.5 ELSE 0 END +
+                                            CASE WHEN a.koreksi_resep4 = ? THEN 0.5 ELSE 0 END +
+                                            CASE WHEN a.koreksi_resep5 = ? THEN 0.5 ELSE 0 END +
+                                            CASE WHEN a.koreksi_resep6 = ? THEN 0.5 ELSE 0 END +
+                                            CASE WHEN a.koreksi_resep7 = ? THEN 0.5 ELSE 0 END +
+                                            CASE WHEN a.koreksi_resep8 = ? THEN 0.5 ELSE 0 END
                                         ) AS total_value 
                                     FROM
-                                        tbl_status_matching a
-                                        JOIN tbl_matching b ON a.idm = b.no_resep 
+                                        db_laborat.tbl_status_matching a
+                                        JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep 
                                     WHERE
-                                        a.approve_at >= '$start'
-                                        AND a.approve_at < '$end'
-                                        AND b.jenis_matching = '$jenis'
-                                        AND ('$colorist' IN (a.koreksi_resep, a.koreksi_resep2, a.koreksi_resep3, a.koreksi_resep4,
+                                        a.approve_at >= ?
+                                        AND a.approve_at < ?
+                                        AND b.jenis_matching = ?
+                                        AND (? IN (a.koreksi_resep, a.koreksi_resep2, a.koreksi_resep3, a.koreksi_resep4,
                                                              a.koreksi_resep5, a.koreksi_resep6, a.koreksi_resep7, a.koreksi_resep8))
-                                        AND a.status = 'selesai'");
-                                        $data = mysqli_fetch_array($sql);
+                                        AND a.status = 'selesai'", [
+                                            $colorist, $colorist, $colorist, $colorist, $colorist, $colorist, $colorist, $colorist,
+                                            $start, $end, $jenis, $colorist
+                                        ]);
+                                        $data = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC);
 
-                                        return $data['total_value'];
+                                        return $data['total_value'] ?? 0;
                                     }
 
                                     if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['submit'])) {
-                                        $start = $_POST['start'] . " " . $_POST['time_start'];
-                                        $end = $_POST['end'] . " " . $_POST['time_end'];
+                                        $start = ($_POST['start'] ?? '') . " " . ($_POST['time_start'] ?? '');
+                                        $end = ($_POST['end'] ?? '') . " " . ($_POST['time_end'] ?? '');
 
-                                        $colorist = mysqli_query($con, "SELECT * FROM tbl_colorist WHERE is_active = 'TRUE' ");
+                                        $colorist = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_colorist WHERE is_active = 'TRUE' ");
                                     ?>
                                         <tbody>
                                             <?php
                                             $alll = 0;
-                                            while ($clrst = mysqli_fetch_array($colorist)) {
+                                            while ($clrst = sqlsrv_fetch_array($colorist, SQLSRV_FETCH_ASSOC)) {
                                             ?>
                                                 <tr>
-                                                    <td><?php echo $clrst['nama'] ?></td>
+                                                    <td><?php echo $clrst['nama'] ?? '' ?></td>
                                                     <td><?php $mu2 = get_val($start, $end, 'Matching Ulang', $clrst['nama']) + get_val($start, $end, 'Matching Ulang NOW', $clrst['nama']);
                                                         echo $mu2; ?> </td>
                                                     <td><?php $mp2 = get_val($start, $end, 'Perbaikan', $clrst['nama']) + get_val($start, $end, 'Perbaikan NOW', $clrst['nama']);
@@ -248,23 +257,26 @@
                                             <?php } ?>
                                         </tbody>
                                         <?php
-                                        $avg = mysqli_query($con, "SELECT SUM(percobaan_ke) AS summary, COUNT(jenis_matching) AS `row`, jenis_matching
-                                FROM tbl_status_matching a 
-                                JOIN tbl_matching b ON a.idm = b.no_resep
-                                WHERE a.approve_at >= '" . $_POST['start'] . " " . $_POST['time_start'] . "' 
-                                AND a.approve_at < '" . $_POST['end'] . " " . $_POST['time_end'] . "' 
-                                GROUP BY jenis_matching");
+                                        $avg = sqlsrv_query($con, "SELECT SUM(percobaan_ke) AS summary, COUNT(jenis_matching) AS [row], jenis_matching
+                                FROM db_laborat.tbl_status_matching a 
+                                JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                                WHERE a.approve_at >= ? 
+                                AND a.approve_at < ? 
+                                GROUP BY jenis_matching", [
+                                            ($_POST['start'] ?? '') . " " . ($_POST['time_start'] ?? ''),
+                                            ($_POST['end'] ?? '') . " " . ($_POST['time_end'] ?? '')
+                                        ]);
                                         ?>
                                         <tfoot class="bg-yellow">
                                             <tr>
                                                 <th class="text-center" colspan="6"> TOTAL = <?php echo $alll; ?> </th>
                                             </tr>
-                                            <?php while ($li = mysqli_fetch_array($avg)) { ?>
+                                            <?php while ($li = sqlsrv_fetch_array($avg, SQLSRV_FETCH_ASSOC)) { ?>
                                                 <tr>
-                                                    <th colspan="1"><?php echo $li['jenis_matching'] ?></th>
-                                                    <th colspan="2"> Total Percobaan = <?php echo $li['summary'] ?> X</th>
-                                                    <th colspan="2"> Hasil Matching = <?php echo $li['row'] ?> Match</th>
-                                                    <th class="text-center">Efisiensi > <?php echo number_format($li['summary'] / $li['row'], 2); ?></th>
+                                                    <th colspan="1"><?php echo $li['jenis_matching'] ?? '' ?></th>
+                                                    <th colspan="2"> Total Percobaan = <?php echo $li['summary'] ?? 0 ?> X</th>
+                                                    <th colspan="2"> Hasil Matching = <?php echo $li['row'] ?? 0 ?> Match</th>
+                                                    <th class="text-center">Efisiensi > <?php echo number_format(($li['summary'] ?? 0) / max(1, ($li['row'] ?? 0)), 2); ?></th>
                                                 </tr>
                                             <?php } ?>
                                         </tfoot>
@@ -305,14 +317,14 @@
             dom: 'Bfrtip',
             buttons: [{
                     extend: 'excelHtml5',
-                    title: 'Recap Data Colorist <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " . $_POST['end'] . " " . $_POST['end_start']; ?>'
+                    title: 'Recap Data Colorist <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " . ($_POST['end'] ?? '') . " " . ($_POST['end_start'] ?? ''); ?>'
                 },
                 {
                     extend: 'pdfHtml5',
-                    title: 'Recap Data Colorist <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " . $_POST['end'] . " " . $_POST['end_start']; ?>'
+                    title: 'Recap Data Colorist <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " . ($_POST['end'] ?? '') . " " . ($_POST['end_start'] ?? ''); ?>'
                 }, {
                     extend: 'csvHtml5',
-                    title: 'Recap Data Colorist <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " . $_POST['end'] . " " . $_POST['end_start']; ?>'
+                    title: 'Recap Data Colorist <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " . ($_POST['end'] ?? '') . " " . ($_POST['end_start'] ?? ''); ?>'
                 }
             ]
             // 'rowsGroup': [0, 1]
@@ -331,14 +343,14 @@
             dom: 'Bfrtip',
             buttons: [{
                     extend: 'excelHtml5',
-                    title: 'Recap Data Koreksi Resep <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " .  $_POST['end'] . " " . $_POST['end_start']; ?>'
+                    title: 'Recap Data Koreksi Resep <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " .  ($_POST['end'] ?? '') . " " . ($_POST['end_start'] ?? ''); ?>'
                 },
                 {
                     extend: 'pdfHtml5',
-                    title: 'Recap Data Koreksi Resep <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " .  $_POST['end'] . " " . $_POST['end_start']; ?>'
+                    title: 'Recap Data Koreksi Resep <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " .  ($_POST['end'] ?? '') . " " . ($_POST['end_start'] ?? ''); ?>'
                 }, {
                     extend: 'csvHtml5',
-                    title: 'Recap Data Koreksi Resep <?php if ($_POST['start']) echo $_POST['start'] . " " . $_POST['time_start'] . " S/d " .  $_POST['end'] . " " . $_POST['end_start']; ?>'
+                    title: 'Recap Data Koreksi Resep <?php if (!empty($_POST['start'])) echo $_POST['start'] . " " . ($_POST['time_start'] ?? '') . " S/d " .  ($_POST['end'] ?? '') . " " . ($_POST['end_start'] ?? ''); ?>'
                 }
             ]
             // 'rowsGroup': [0, 1]
