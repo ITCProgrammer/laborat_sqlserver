@@ -24,17 +24,25 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
-if ($_POST['submit'] == 'submit') {
-    if ($_POST['oldpw'] == $_SESSION['passLAB']) {
-        if ($_POST['newpw'] == $_POST['newpw2']) {
-            mysqli_query($con,"UPDATE tbl_user SET `password` = '$_POST[newpw]' where id = '$_SESSION[id]'");
-            mysqli_query($con,"INSERT into tbl_log SET `what` = '$_SESSION[id]',
-            `what_do` = 'Update tbl_user',
-            `do_by` = '$_SESSION[userLAB]',
-            `do_at` = '$time',
-            `ip` = '$_SESSION[ip]',
-            `os` = '$_SESSION[os]',
-            `remark`='Change Password'");
+$time = date('Y-m-d H:i:s');
+$submit = $_POST['submit'] ?? '';
+if ($submit == 'submit') {
+    $oldpw = $_POST['oldpw'] ?? '';
+    $newpw = $_POST['newpw'] ?? '';
+    $newpw2 = $_POST['newpw2'] ?? '';
+    if ($oldpw == ($_SESSION['passLAB'] ?? '')) {
+        if ($newpw == $newpw2) {
+            sqlsrv_query(
+                $con,
+                "UPDATE db_laborat.tbl_user SET [password] = ? WHERE id = ?",
+                [$newpw, $_SESSION['id'] ?? '']
+            );
+            sqlsrv_query(
+                $con,
+                "INSERT INTO db_laborat.tbl_log ([what], [what_do], [do_by], [do_at], [ip], [os], [remark])
+                 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [$_SESSION['id'] ?? '', 'Update tbl_user', $_SESSION['userLAB'] ?? '', $time, $_SESSION['ip'] ?? '', $_SESSION['os'] ?? '', 'Change Password']
+            );
             echo '<script>window.location.href = "logout"</script>';
         } else {
             echo '<script>alert("Password tidak sesuai !")</script>';
