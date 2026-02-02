@@ -11,7 +11,7 @@
     ini_set("error_reporting", 1);
     session_start();
     include "koneksi.php";
-    if ($_GET['idk'] != "") {
+    if (!empty($_GET['idk'])) {
         
     }
     ?>
@@ -128,15 +128,18 @@
                             </thead>
                             <tbody>
                                 <?php
-                                $con1=mysqli_connect("10.0.1.91","dit","4dm1n");
+                                $con1 = $con_db_dyeing;
                                 $i = 1;
-                                $sql_celup = mysqli_query($con1,"SELECT b.id, c.no_order, b.rcode, b.nokk, c.lot, b.k_resep, b.proses, b.lama_proses, b.status , c.no_resep, d.l_r, c.no_mesin, d.bruto, c.loading, b.tgl_buat
-                                FROM db_dying.tbl_hasilcelup b
-                                join db_laborat.tbl_status_matching a on a.idm = b.rcode
-                                join db_dying.tbl_schedule c on b.nokk = c.nokk and b.proses = c.proses
-                                join db_dying.tbl_montemp d on c.nokk = d.nokk
-                                where b.rcode != '' and b.rcode is not null group by b.nokk order by b.tgl_update desc limit 512 "); ?>
-                                <?php while ($row = mysqli_fetch_array($sql_celup)) { ?>
+                                $sql_celup = sqlsrv_query($con1, "SELECT TOP (512)
+                                    b.id, c.no_order, b.rcode, b.nokk, c.lot, b.k_resep, b.proses, b.lama_proses, b.status, c.no_resep, d.l_r, c.no_mesin, d.bruto, c.loading, b.tgl_buat
+                                    FROM db_dying.db_dying.tbl_hasilcelup b
+                                    JOIN db_laborat.db_laborat.tbl_status_matching a ON a.idm = b.rcode
+                                    JOIN db_dying.db_dying.tbl_schedule c ON b.nokk = c.nokk AND b.proses = c.proses
+                                    JOIN db_dying.db_dying.tbl_montemp d ON c.nokk = d.nokk
+                                    WHERE b.rcode != '' AND b.rcode IS NOT NULL
+                                    GROUP BY b.nokk, b.id, c.no_order, b.rcode, c.lot, b.k_resep, b.proses, b.lama_proses, b.status, c.no_resep, d.l_r, c.no_mesin, d.bruto, c.loading, b.tgl_buat, b.tgl_update
+                                    ORDER BY b.tgl_update DESC"); ?>
+                                <?php while ($row = sqlsrv_fetch_array($sql_celup, SQLSRV_FETCH_ASSOC)) { ?>
                                     <tr>
                                         <td><?php echo $i; ?></td>
                                         <td><?php echo $row['no_order'] ?></td>
