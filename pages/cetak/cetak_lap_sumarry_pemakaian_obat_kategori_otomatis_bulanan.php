@@ -9,6 +9,7 @@ $awal = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
 // Tanggal akhir = tanggal terakhir bulan berjalan jam 23:00:00
 $akhir = date('Y-m-d 23:00:00');
 // $akhir = '2025-11-30';
+$akhir_ = date('Y-m-d');
 
 $awalParam = $_GET['awal'] ?? '';
 $Bln2 = (new DateTime($awalParam))->format('m');
@@ -337,41 +338,41 @@ if (file_exists($logoPath)) {
                                             SATUAN");
                                     $row_qty_pakai = db2_fetch_assoc($qty_pakai) ?: [];
 
-                                    $Balance_stock = db2_exec($conn1, "SELECT 
-                                        ITEMTYPECODE,
-                                        DECOSUBCODE01,
-                                        round(SUM(STOCK_BALANCE)) AS STOCK_BALANCE,
-                                        BASEPRIMARYUNITCODE
-                                        FROM
-                                        (SELECT 	TRIM(DECOSUBCODE01) || '-' || TRIM(DECOSUBCODE02) || '-' || TRIM(DECOSUBCODE03) AS KODE_OBAT,
-                                                    b.ITEMTYPECODE,
-                                                    b.DECOSUBCODE01,
-                                                    CASE 
-                                                        WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN b.BASEPRIMARYQUANTITYUNIT*1000
-                                                        WHEN b.BASEPRIMARYUNITCODE = 't' THEN b.BASEPRIMARYQUANTITYUNIT*1000000
-                                                        ELSE b.BASEPRIMARYQUANTITYUNIT
-                                                    END  AS STOCK_BALANCE,
-                                                    CASE 
-                                                        WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN 'g'
-                                                        WHEN b.BASEPRIMARYUNITCODE = 't' THEN 'g'
-                                                        ELSE b.BASEPRIMARYUNITCODE
-                                                    END  AS BASEPRIMARYUNITCODE
-                                                    FROM 
-                                                    BALANCE b 
-                                                    WHERE 
-                                                    ITEMTYPECODE ='DYC'
-                                                    AND LOGICALWAREHOUSECODE IN ('M510', 'M101')
-                                                    AND DETAILTYPE = 1)
-                                                    WHERE 
-                                                    DECOSUBCODE01 = '$row[DECOSUBCODE01]' 
-                                                    AND NOT KODE_OBAT ='E-1-000' 
-                                                    GROUP BY
-                                                    ITEMTYPECODE,
-                                                    DECOSUBCODE01,
-                                                    BASEPRIMARYUNITCODE ");
-                                    $row_balance = db2_fetch_assoc($Balance_stock) ?: [];
-
-                                    $stock_minimum = db2_exec($conn1, " SELECT 
+                                    // $Balance_stock = db2_exec($conn1, "SELECT 
+                                    //     ITEMTYPECODE,
+                                    //     DECOSUBCODE01,
+                                    //     round(SUM(STOCK_BALANCE)) AS STOCK_BALANCE,
+                                    //     BASEPRIMARYUNITCODE
+                                    //     FROM
+                                    //     (SELECT 	TRIM(DECOSUBCODE01) || '-' || TRIM(DECOSUBCODE02) || '-' || TRIM(DECOSUBCODE03) AS KODE_OBAT,
+                                    //                 b.ITEMTYPECODE,
+                                    //                 b.DECOSUBCODE01,
+                                    //                 CASE 
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN b.BASEPRIMARYQUANTITYUNIT*1000
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 't' THEN b.BASEPRIMARYQUANTITYUNIT*1000000
+                                    //                     ELSE b.BASEPRIMARYQUANTITYUNIT
+                                    //                 END  AS STOCK_BALANCE,
+                                    //                 CASE 
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 'kg' THEN 'g'
+                                    //                     WHEN b.BASEPRIMARYUNITCODE = 't' THEN 'g'
+                                    //                     ELSE b.BASEPRIMARYUNITCODE
+                                    //                 END  AS BASEPRIMARYUNITCODE
+                                    //                 FROM 
+                                    //                 BALANCE b 
+                                    //                 WHERE 
+                                    //                 ITEMTYPECODE ='DYC'
+                                    //                 AND LOGICALWAREHOUSECODE IN ('M510', 'M101')
+                                    //                 AND DETAILTYPE = 1)
+                                    //                 WHERE 
+                                    //                 DECOSUBCODE01 = '$row[DECOSUBCODE01]' 
+                                    //                 AND NOT KODE_OBAT ='E-1-000' 
+                                    //                 GROUP BY
+                                    //                 ITEMTYPECODE,
+                                    //                 DECOSUBCODE01,
+                                    //                 BASEPRIMARYUNITCODE ");
+                                    // $row_balance = db2_fetch_assoc($Balance_stock) ?: [];   
+            
+                            $stock_minimum = db2_exec($conn1, " SELECT 
                                             i.ITEMTYPECODE,
                                             i.SUBCODE01,
                                             i.SUBCODE02, 
@@ -505,6 +506,59 @@ if (file_exists($logoPath)) {
                                             GROUP BY tgl_tutup, DECOSUBCODE01");
                                     }                                
                                     $row_qty_awal = mysqli_fetch_array($q_qty_awal) ?: [];
+
+            $sql = "SELECT
+                                                sub.tgl_tutup,
+                                                FORMAT(DATEADD(MONTH, -1, sub.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
+                                                sub.KODE_OBAT,
+                                                sub.DECOSUBCODE01,
+                                                sub.DECOSUBCODE02,
+                                                sub.DECOSUBCODE03,
+                                                SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS STOCK_BALANCE
+                                            FROM
+                                            (
+                                                SELECT DISTINCT
+                                                    t.tgl_tutup,
+                                                    t.KODE_OBAT,
+                                                    t.LONGDESCRIPTION,
+                                                    t.DECOSUBCODE01,
+                                                    t.DECOSUBCODE02,
+                                                    t.DECOSUBCODE03,
+                                                    t.LOGICALWAREHOUSECODE,
+                                                    t.WAREHOUSELOCATIONCODE,
+                                                    t.WHSLOCATIONWAREHOUSEZONECODE,
+                                                    t.LOTCODE,
+                                                    t.BASEPRIMARYQUANTITYUNIT
+                                                FROM db_laborat.tblopname_11 t
+                                                WHERE
+                                                    t.KODE_OBAT = ?
+                                                    AND t.LOGICALWAREHOUSECODE $where_warehouse
+                                                    AND t.tgl_tutup =
+                                                    (
+                                                        SELECT MAX(t2.tgl_tutup)
+                                                        FROM db_laborat.tblopname_11 t2
+                                                        WHERE
+                                                            t2.KODE_OBAT = ?
+                                                            AND t2.LOGICALWAREHOUSECODE $where_warehouse
+                                                            AND t2.tgl_tutup = ?
+                                                    )
+                                            ) AS sub
+                                            GROUP BY
+                                                sub.tgl_tutup,
+                                                sub.KODE_OBAT,
+                                                sub.DECOSUBCODE01,
+                                                sub.DECOSUBCODE02,
+                                                sub.DECOSUBCODE03
+                                            ";
+
+            $params = [$kode_obat, $kode_obat, $akhir_];
+
+            $Balance_stock = sqlsrv_query($con, $sql, $params);
+            if ($Balance_stock === false) {
+                die(print_r(sqlsrv_errors(), true));
+            }
+
+            $row_balance = sqlsrv_fetch_array($Balance_stock, SQLSRV_FETCH_ASSOC);
 
             // hitung sebagai float (TANPA formatting)
             $qty_awal = fmt2($row_qty_awal['qty_awal'] ?? 0);
