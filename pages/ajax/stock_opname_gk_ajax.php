@@ -5,7 +5,7 @@
   include "../../includes/Penomoran_helper.php";
   include('Response.php');
 
-  $username = $_SESSION['userLAB'];
+  $username = $_SESSION['userLAB']??"";
   $tanggal=date('Y-m-d H:i:s');
 
   $sudahKonfirm="<button class='btn btn-warning btn-sm detail' title='Detail' data-toggle='tooltip' ><i class='fa fa-info'></i></button> <span style='margin-left:5px;min-width:35px'><i class='fa fa-check' aria-hidden='true'></i> OK</span>";
@@ -15,7 +15,7 @@
   $response->setHTTPStatusCode(201);
   if (isset($_SESSION['userLAB'])) {
     if (isset($_POST['status'])) {
-        $id = intval($_POST['id_dt']);
+        $id = intval($_POST['id_dt']??0);
         if($_POST['status']=="konfirmasi" && $id != 0){
             $konfirm="1";
             $update = "UPDATE TOP (1) db_laborat.tbl_stock_opname_gk
@@ -344,7 +344,7 @@
     }
   }
   if(isset($_SESSION['opname'])&&$_SESSION['opname']=="gk"){
-    $id = intval($_POST['id_dt']);
+    $id = intval($_POST['id_dt']??0);
     if($_POST['check']=="check_transaksi_multiple"){
         $tgl_tutup = $_POST['tgl_tutup'];
         $warehouse = $_POST['warehouse'];
@@ -647,7 +647,7 @@
             $_POST['qty_scan'],
             $_POST['pakingan_standar'],
             $_POST['kategori'],
-            $_POST['total_scan'],
+            floatval($_POST['total_scan']),
             $ip
         ];
 
