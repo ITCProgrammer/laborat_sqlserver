@@ -19,9 +19,14 @@ function uncheckAll() {
 		ini_set("error_reporting", 1);
 		session_start();
 		include "koneksi.php";
-		$sqlData 	= mysqli_query($con,"SELECT * FROM tbl_test_qc where id = '$_GET[id]' LIMIT 1");
-		$dataT 		= mysqli_fetch_array($sqlData);
-		$detail2=explode(",",$dataT['permintaan_testing']);	
+		$sqlData = sqlsrv_query(
+			$con,
+			"SELECT TOP (1) * FROM db_laborat.tbl_test_qc WHERE id = ?",
+			[$_GET['id'] ?? '']
+		);
+		$dataT = sqlsrv_fetch_array($sqlData, SQLSRV_FETCH_ASSOC) ?: [];
+		$permintaanTesting = $dataT['permintaan_testing'] ?? '';
+		$detail2=explode(",",$permintaanTesting);	
 
 	?>	
 	<div class="row">
@@ -44,8 +49,8 @@ function uncheckAll() {
 										<select value="<?php echo $_GET['Dystf'] ?>" type="text" class="form-control select2" id="Dyestuff" name="Dyestuff"  required>
 											<option value="" selected disabled>Pilih Jenis Testing</option>
 											<?php
-											$sqlmstrcd = mysqli_query($con, "SELECT kode, `value` from tbl_mstrjnstesting;");
-											while ($li = mysqli_fetch_array($sqlmstrcd)) { ?>
+											$sqlmstrcd = sqlsrv_query($con, "SELECT kode, [value] from db_laborat.tbl_mstrjnstesting;");
+											while ($li = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC)) { ?>
 												<option value="<?php echo $li['value'] ?>" <?php if ($li['value'] == $dataT['jenis_testing']) {
 																								echo 'selected';
 																							} ?>><?php echo $li['kode'] ?></option>
@@ -145,8 +150,8 @@ function uncheckAll() {
 						<tbody>
 							<?php
 							$i = 1;
-							$sqlmstrcd = mysqli_query($con, "SELECT kode, keterangan from tbl_mstrjnstesting;");
-							while ($title = mysqli_fetch_array($sqlmstrcd)) {
+							$sqlmstrcd = sqlsrv_query($con, "SELECT kode, keterangan from db_laborat.tbl_mstrjnstesting;");
+							while ($title = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC)) {
 								echo '<tr><td>' . $i++ . '.</td>
 									<td>' . $title['kode'] . '</td>
 									<td>' . $title['keterangan'] . '</td></tr>';

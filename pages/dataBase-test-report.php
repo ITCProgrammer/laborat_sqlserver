@@ -134,12 +134,31 @@ include "koneksi.php";
                             <tbody>
                                 <?php
 								$no=1;
+                                $col = 0;
 								if($Nowarna!="" or $Item!="" or $Suffix!="" or $Buyer!="" or $Warna!="" or $Treatment!=""){
-								$sql = mysqli_query($con,"SELECT * FROM tbl_test_qc WHERE sts_laborat ='Approved Full' AND suffix LIKE '%$Suffix%' AND treatment LIKE '%$Treatment%' AND no_warna LIKE '%$Nowarna%' AND warna LIKE '%$Warna%' AND no_item LIKE '%$Item%'");	
+                                    $sqlText = "SELECT * FROM db_laborat.tbl_test_qc
+                                                WHERE sts_laborat = ?
+                                                AND suffix LIKE ?
+                                                AND treatment LIKE ?
+                                                AND no_warna LIKE ?
+                                                AND warna LIKE ?
+                                                AND no_item LIKE ?";
+                                    $params = [
+                                        'Approved Full',
+                                        '%' . $Suffix . '%',
+                                        '%' . $Treatment . '%',
+                                        '%' . $Nowarna . '%',
+                                        '%' . $Warna . '%',
+                                        '%' . $Item . '%'
+                                    ];
+								    $sql = sqlsrv_query($con, $sqlText, $params);
 								}else{
-                                $sql = mysqli_query($con,"SELECT * FROM tbl_test_qc WHERE sts_laborat ='Approved Full' LIMIT 100");
+                                    $sqlText = "SELECT TOP (100) * FROM db_laborat.tbl_test_qc
+                                                WHERE sts_laborat = ?
+                                                ORDER BY id DESC";
+                                    $sql = sqlsrv_query($con, $sqlText, ['Approved Full']);
 								}
-                                while ($r = mysqli_fetch_array($sql)) {                                    
+                                while ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) {                                    
                                     $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
 									$detail2=explode(",",$r['permintaan_testing']);
                                 ?>
