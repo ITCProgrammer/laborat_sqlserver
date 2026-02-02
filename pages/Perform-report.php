@@ -2,6 +2,8 @@
     ini_set("error_reporting", 1);
     session_start();
     include "koneksi.php";
+    $day = date('Y-m-d');
+    $month = date('Y-m');
     if ($_POST['submit']) {
         $start_date = $_POST['start_date']." ".$_POST['time_start'];
         $end_date = $_POST['end_date']." ".$_POST['time_end'];
@@ -14,83 +16,105 @@
 	   //$time_s = '07:00';
        //$time_e = '07:00';	
     }
-    $m_ago = date('Y-m', strtotime($month . ' - 1 month'));
+    $m_ago = date('Y-m', strtotime(($month ?? date('Y-m')) . ' - 1 month'));
+
+    /**
+     * Jalankan query summary dan kembalikan nilai count.
+     */
+    function fetch_summary($sql, array $params = [])
+    {
+        global $con;
+
+        $stmt = sqlsrv_query($con, $sql, $params);
+        if ($stmt === false) {
+            error_log('Perform-report SQL error: ' . print_r(sqlsrv_errors(), true));
+            return 0;
+        }
+        $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+        sqlsrv_free_stmt($stmt);
+        return isset($row['summary']) ? (int)$row['summary'] : 0;
+    }
 
     function sisa_bulan_lalu($head_code, $month_param, $jenis_matching)
     {
-        include "koneksi.php";
-        $sql_ = mysqli_query($con,"SELECT substring(a.no_resep, 1,2) as headcd, a.jenis_matching, count(a.jenis_matching) as summary
-        FROM tbl_matching a 
-        left join tbl_status_matching b on a.no_resep = b.idm
-        where substring(a.no_resep, 1,2) = '$head_code' and DATE_FORMAT(a.tgl_buat ,'%Y-%m') = '$month_param' and jenis_matching = '$jenis_matching'
-        and (b.status in ('buka') or b.status is null) 
-        group by a.jenis_matching, headcd ");
-        $data = mysqli_fetch_array($sql_);
-        return $data['summary'];
+        $sql = "SELECT COUNT(a.jenis_matching) AS summary
+        FROM tbl_matching a
+        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        WHERE substring(a.no_resep, 1, 2) = ?
+          AND CONVERT(varchar(7), a.tgl_buat, 120) = ?
+          AND a.jenis_matching = ?
+          AND (b.[status] = 'buka' OR b.[status] IS NULL)";
+
+        return fetch_summary($sql, [$head_code, $month_param, $jenis_matching]);
     }
 
     function masuk_bulan_ini($head_code, $start, $end, $jenis_matching)
     {
-        include "koneksi.php";
-        $sql_ = mysqli_query($con,"SELECT substring(a.no_resep, 1,2) as headcd, a.jenis_matching, count(a.jenis_matching) as summary
-        FROM tbl_matching a 
-        left join tbl_status_matching b on a.no_resep = b.idm
-        where substring(a.no_resep, 1,2) = '$head_code' and DATE_FORMAT(a.tgl_buat ,'%Y-%m-%d %H:%i') >= '$start' and DATE_FORMAT(a.tgl_buat , '%Y-%m-%d %H:%i') <= '$end' and jenis_matching = '$jenis_matching'
-        group by a.jenis_matching, headcd
-        ORDER BY a.jenis_matching");
-        $data = mysqli_fetch_array($sql_);
-        return $data['summary'];
+        $sql = "SELECT COUNT(a.jenis_matching) AS summary
+        FROM tbl_matching a
+        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        WHERE substring(a.no_resep, 1, 2) = ?
+          AND a.tgl_buat >= ?
+          AND a.tgl_buat <= ?
+          AND a.jenis_matching = ?";
+
+        return fetch_summary($sql, [$head_code, $start, $end, $jenis_matching]);
     }
+
     function belum_keluar_bulan_ini($head_code, $start, $end, $jenis_matching)
     {
-        include "koneksi.php";
-        $sql_ = mysqli_query($con,"SELECT substring(a.no_resep, 1,2) as headcd, a.jenis_matching, count(a.jenis_matching) as summary
-        FROM tbl_matching a 
-        left join tbl_status_matching b on a.no_resep = b.idm
-        where substring(a.no_resep, 1,2) = '$head_code' and DATE_FORMAT(a.tgl_buat ,'%Y-%m-%d %H:%i') >= '$start' and DATE_FORMAT(a.tgl_buat , '%Y-%m-%d %H:%i') <= '$end' 
-        and jenis_matching = '$jenis_matching' and b.approve =  'NONE'
-        group by a.jenis_matching, headcd
-        ORDER BY a.jenis_matching");
-        $data = mysqli_fetch_array($sql_);
-        return $data['summary'];
+        $sql = "SELECT COUNT(a.jenis_matching) AS summary
+        FROM tbl_matching a
+        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        WHERE substring(a.no_resep, 1, 2) = ?
+          AND a.tgl_buat >= ?
+          AND a.tgl_buat <= ?
+          AND a.jenis_matching = ?
+          AND b.approve = 'NONE'";
+
+        return fetch_summary($sql, [$head_code, $start, $end, $jenis_matching]);
     }
 
     function keluar_bulan_ini($head_code, $start, $end, $jenis_matching)
     {
-        include "koneksi.php";
-        $sql_ = mysqli_query($con,"SELECT substring(a.no_resep, 1,2) as headcd, a.jenis_matching, count(a.jenis_matching) as summary
-        FROM tbl_matching a 
-        left join tbl_status_matching b on a.no_resep = b.idm
-        where substring(a.no_resep, 1,2) = '$head_code' and DATE_FORMAT(b.approve_at ,'%Y-%m-%d %H:%i') >= '$start' and DATE_FORMAT(b.approve_at , '%Y-%m-%d %H:%i') <= '$end' 
-        and jenis_matching = '$jenis_matching' and b.approve = 'TRUE' and b.status = 'selesai'
-        group by a.jenis_matching, headcd
-        ORDER BY a.jenis_matching");
-        $data = mysqli_fetch_array($sql_);
-        return $data['summary'];
+        $sql = "SELECT COUNT(a.jenis_matching) AS summary
+        FROM tbl_matching a
+        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        WHERE substring(a.no_resep, 1, 2) = ?
+          AND b.approve_at >= ?
+          AND b.approve_at <= ?
+          AND a.jenis_matching = ?
+          AND b.approve = 'TRUE'
+          AND b.[status] = 'selesai'";
+
+        return fetch_summary($sql, [$head_code, $start, $end, $jenis_matching]);
     }
 
     function get_sum_by_matcher($final_matcher, $head_code, $start, $end, $jenis_matching)
     {
-        include "koneksi.php";
-        $sql_ = mysqli_query($con,"SELECT a.final_matcher, count(a.final_matcher) as summary, substring(b.no_resep, 1,2) as headcd, b.jenis_matching
-        from tbl_status_matching a
-        join tbl_matching b on a.idm = b.no_resep
-        where a.final_matcher = '$final_matcher' and substring(b.no_resep, 1,2) = '$head_code' and DATE_FORMAT(a.approve_at ,'%Y-%m-%d %H:%i') >= '$start' and DATE_FORMAT(a.approve_at , '%Y-%m-%d %H:%i') <= '$end' 
-        and b.jenis_matching = '$jenis_matching' and a.approve = 'TRUE'
-        group by b.jenis_matching, headcd");
-        $data = mysqli_fetch_array($sql_);
-        return $data['summary'];
+        $sql = "SELECT COUNT(a.final_matcher) AS summary
+        FROM tbl_status_matching a
+        JOIN tbl_matching b ON a.idm = b.no_resep
+        WHERE a.final_matcher = ?
+          AND substring(b.no_resep, 1, 2) = ?
+          AND a.approve_at >= ?
+          AND a.approve_at <= ?
+          AND b.jenis_matching = ?
+          AND a.approve = 'TRUE'";
+
+        return fetch_summary($sql, [$final_matcher, $head_code, $start, $end, $jenis_matching]);
     }
 
     function get_summary($start, $end)
     {
-        include "koneksi.php";
-        $sql_ = mysqli_query($con,"SELECT a.final_matcher, count(a.final_matcher) as summary, substring(b.no_resep, 1,2) as headcd, b.jenis_matching
-        from tbl_status_matching a
-        join tbl_matching b on a.idm = b.no_resep
-        where DATE_FORMAT(a.approve_at ,'%Y-%m-%d %H:%i') >= '$start' and DATE_FORMAT(a.approve_at , '%Y-%m-%d %H:%i') <= '$end' and a.approve = 'TRUE'");
-        $data = mysqli_fetch_array($sql_);
-        return $data['summary'];
+        $sql = "SELECT COUNT(a.final_matcher) AS summary
+        FROM tbl_status_matching a
+        JOIN tbl_matching b ON a.idm = b.no_resep
+        WHERE a.approve_at >= ?
+          AND a.approve_at <= ?
+          AND a.approve = 'TRUE'";
+
+        return fetch_summary($sql, [$start, $end]);
     }
 ?>
 
@@ -459,9 +483,15 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <?php $sql_matcher = mysqli_query($con,"SELECT * from tbl_matcher WHERE `status`='Aktif'"); ?>
-                            <?php while ($matcher = mysqli_fetch_array($sql_matcher)) : ?>
-                                <tr>
+                            <?php
+                                $sql_matcher = sqlsrv_query($con, "SELECT * FROM tbl_matcher WHERE [status]='Aktif'");
+                                if ($sql_matcher === false) {
+                                    error_log('Perform-report matcher query failed: ' . print_r(sqlsrv_errors(), true));
+                                }
+                            ?>
+                            <?php if ($sql_matcher): ?>
+                                <?php while ($matcher = sqlsrv_fetch_array($sql_matcher, SQLSRV_FETCH_ASSOC)) : ?>
+                                    <tr>
                                     <td><?php echo $matcher['nama'] ?></td>
                                     <td>D</td>
                                     <td><?php echo get_sum_by_matcher($matcher['nama'], 'D2', $start_date, $end_date, 'L/D') + get_sum_by_matcher($matcher['nama'], 'D2', $start_date, $end_date, 'LD NOW'); ?></td>
@@ -509,7 +539,11 @@
                                     <td><?php echo get_sum_by_matcher($matcher['nama'], 'OB', $start_date, $end_date, 'Perbaikan') + get_sum_by_matcher($matcher['nama'], 'OB', $start_date, $end_date, 'Perbaikan NOW'); ?></td>
                                     <td><?php echo get_sum_by_matcher($matcher['nama'], 'OB', $start_date, $end_date, 'Matching Development') ?></td>
                                 </tr>
-                            <?php endwhile; ?>
+                                <?php endwhile; ?>
+                            <?php endif; ?>
+                            <?php if ($sql_matcher) {
+                                sqlsrv_free_stmt($sql_matcher);
+                            } ?>
                         </tbody>
                         <tfoot>
                             <tr>
