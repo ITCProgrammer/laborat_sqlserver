@@ -31,7 +31,12 @@ $nowprdd       = [
 ];
 $con_nowprd = sqlsrv_connect($hostSVR19, $nowprdd);
 
-$cona = mysqli_connect("10.0.0.10","dit","4dm1n","db_adm");
+$hostDbADM = "10.0.0.221";
+$usernameDbADM = "sa";
+$passwordDbADM = "Ind@taichen2024";
+$adm = "db_adm";
+$db_adm = array("Database" => $adm, "UID" => $usernameDbADM, "PWD" => $passwordDbADM);
+$cona = sqlsrv_connect($hostDbADM, $db_adm);
 
 $hostname="10.0.0.21";
 // $database = "NOWTEST"; // SERVER NOW 20
@@ -57,7 +62,7 @@ if (! $con) {
 
 // Tutup koneksi saat eksekusi selesai (tidak wajib, tapi eksplisit).
 register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$con_nowprd) {
-    foreach ([$con_db_dyeing, $cona] as $mysqliConn) {
+    foreach ([$con_db_dyeing] as $mysqliConn) {
         if ($mysqliConn instanceof mysqli) {
             // Tutup hanya jika masih aktif (mysqli_ping true)
             if (@mysqli_ping($mysqliConn)) {
@@ -68,6 +73,9 @@ register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$co
         }
     }
 
+    if (is_resource($cona) && get_resource_type($cona) === 'SQL Server Connection') {
+        sqlsrv_close($cona);
+    }
     if (is_resource($con_nowprd) && get_resource_type($con_nowprd) === 'SQL Server Connection') {
         sqlsrv_close($con_nowprd);
     }
