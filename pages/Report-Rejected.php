@@ -2,6 +2,12 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
+$fmtDT = function ($v, $format = 'Y-m-d H:i:s') {
+    if ($v instanceof DateTimeInterface) {
+        return $v->format($format);
+    }
+    return $v;
+};
 
 ?>
 
@@ -71,7 +77,7 @@ include "koneksi.php";
                         <form class="form-inline" method="POST" action="">
                             <div class="form-group mb-2">
                                 <input type="text" class="form-control input-sm date-picker" name="date_start" id="date_start" value="<?php
-                                                                                                                                        if ($_POST['submit']) {
+                                                                                                                                        if (!empty($_POST['submit'])) {
                                                                                                                                             echo $_POST['date_start'];
                                                                                                                                         } else {
                                                                                                                                             echo date('Y-m-d');
@@ -82,7 +88,7 @@ include "koneksi.php";
                             </div>
                             <div class="form-group mx-sm-3 mb-2">
                                 <input type="text" class="form-control input-sm date-picker" name="date_end" id="date_end" value="<?php
-                                                                                                                                    if ($_POST['submit']) {
+                                                                                                                                    if (!empty($_POST['submit'])) {
                                                                                                                                         echo $_POST['date_end'];
                                                                                                                                     } else {
                                                                                                                                         echo date('Y-m-d');
@@ -145,24 +151,53 @@ include "koneksi.php";
                             <tbody>
                                 <?php
                                 $date = date('Y-m-d');
-                                $date_s = $_POST['date_start'];
-                                $date_e = $_POST['date_end'];
+                                $date_s = $_POST['date_start'] ?? '';
+                                $date_e = $_POST['date_end'] ?? '';
+                                $no = 0;
+                                $col = 0;
 
                                 if (empty($_POST['submit'])) {
-                                    $sql = mysqli_query($con,"SELECT *,  a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
-                  FROM tbl_status_matching a
-                  INNER JOIN tbl_matching b ON a.idm = b.no_resep
-                  where a.status = 'tutup' and a.approve = 'NONE' AND DATE_FORMAT(a.tutup_at,'%Y-%m-%d') = '$date'
-                  ORDER BY a.id desc limit 20");
+                                    $sql = sqlsrv_query(
+                                        $con,
+                                        "SELECT TOP 20 *, a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
+                                         FROM db_laborat.tbl_status_matching a
+                                         INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                                         WHERE a.status = 'tutup' and a.approve = 'NONE' AND CONVERT(date, a.tutup_at) = ?
+                                         ORDER BY a.id desc",
+                                        [$date]
+                                    );
                                 } else {
-                                    $sql = mysqli_query($con,"SELECT *,  a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
-                  FROM tbl_status_matching a
-                  INNER JOIN tbl_matching b ON a.idm = b.no_resep
-                  where a.status = 'tutup' and a.approve = 'NONE' and
-                  DATE_FORMAT(a.tutup_at,'%Y-%m-%d') >= '$date_s' AND DATE_FORMAT(a.tutup_at,'%Y-%m-%d') <= '$date_e'
-                  ORDER BY a.id desc");
+                                    $sql = sqlsrv_query(
+                                        $con,
+                                        "SELECT *, a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
+                                         FROM db_laborat.tbl_status_matching a
+                                         INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
+                                         WHERE a.status = 'tutup' and a.approve = 'NONE' AND CONVERT(date, a.tutup_at) >= ? AND CONVERT(date, a.tutup_at) <= ?
+                                         ORDER BY a.id desc",
+                                        [$date_s, $date_e]
+                                    );
                                 }
-                                while ($r = mysqli_fetch_array($sql)) {
+                                while ($r = sqlsrv_fetch_array($sql, SQLSRV_FETCH_ASSOC)) {
+                                    if (!is_array($r)) {
+                                        continue;
+                                    }
+                                    $r += [
+                                        'tgl_mulai' => '',
+                                        'ck_d65' => 0,
+                                        'ck_f02' => 0,
+                                        'ck_f11' => 0,
+                                        'ck_u35' => 0,
+                                        'ck_a' => 0,
+                                        'ck_rlight' => 0,
+                                        'ck_tl83' => 0,
+                                        'ck_greige' => 0,
+                                        'ck_bleaching' => 0,
+                                        'ck_bleaching_dye' => 0,
+                                        'ck_preset' => 0,
+                                        'ck_npreset' => 0,
+                                        'ck_nh2o2' => 0,
+                                        'ck_tarik' => 0,
+                                    ];
                                     $no++;
                                     $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
                                 ?>
@@ -199,7 +234,13 @@ include "koneksi.php";
                                             <?php echo $r['grp']; ?>
                                         </td>
                                         <td valign="center">
-                                            <?php echo $r['matcher'] . ' <strong> / </strong> ' . date('Y-m-d', strtotime($r['tutup_at'])) ?>
+                                            <?php
+                                            $tutupAt = $fmtDT($r['tutup_at'] ?? null);
+                                            if ($r['tutup_at'] instanceof DateTimeInterface) {
+                                                $tutupAt = $r['tutup_at']->format('Y-m-d');
+                                            }
+                                            echo $r['matcher'] . ' <strong> / </strong> ' . $tutupAt;
+                                            ?>
                                         </td>
                                         <td valign="center">
                                             <?php echo $r['idm']; ?>
@@ -227,11 +268,11 @@ include "koneksi.php";
                                             ?>
 
                                         </td>
-                                        <td valign="center" class="13"><?php echo $r['tgl_buat'] ?></td>
-                                        <td class="14"><?php echo $r['tgl_buat_status'] ?></td>
+                                        <td valign="center" class="13"><?php echo $fmtDT($r['tgl_buat'] ?? null) ?></td>
+                                        <td class="14"><?php echo $fmtDT($r['tgl_buat_status'] ?? null) ?></td>
                                         <td class="15"><?php echo $r['created_by'] ?></td>
                                         <td class="16"><?php echo $r['status_created_by'] ?></td>
-                                        <td class="17"><?php echo $r['tgl_selesai'] ?></td>
+                                        <td class="17"><?php echo $fmtDT($r['tgl_selesai'] ?? null) ?></td>
                                         <td class="18"><?php echo $r['jenis_matching'] ?></td>
                                         <td class="19"><?php echo $r['no_po'] ?></td>
                                         <td class="20"><?php echo $r['jenis_kain'] ?></td>
@@ -245,7 +286,7 @@ include "koneksi.php";
                                         <td class="28"><?php echo $r['koreksi_resep'] ?></td>
                                         <td class="29"><?php echo $r['cocok_warna'] ?></td>
                                         <td class="30"><?php echo $r['qty_order'] ?></td>
-                                        <td class="31"><?php echo $r['tgl_delivery'] ?></td>
+                                        <td class="31"><?php echo $fmtDT($r['tgl_delivery'] ?? null) ?></td>
                                         <td class="32"><?php echo $r['lr'] ?></td>
                                         <td class="33"><?php echo $r['ph'] ?></td>
                                         <td class="34"><?php echo $r['ket'] ?></td>
