@@ -462,10 +462,13 @@ if (file_exists($logoPath)) {
                                                             -- AND s.TRANSACTIONDATE BETWEEN '$awal' AND '$akhir'
                                                             AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:00'
                                                             AND s.TEMPLATECODE IN ('QCT','304','OPN','204','125')
-                                                            AND NOT COALESCE(TRIM( CASE 
+                                                           AND NOT COALESCE(TRIM( CASE 
                                                                 WHEN s3.TEMPLATECODE IS NOT NULL THEN s3.TEMPLATECODE
                                                                 ELSE s.TEMPLATECODE
-                                                            END), '') || COALESCE(TRIM(s.LOGICALWAREHOUSECODE), '')  IN ('OPNM101','303M101','304M510')
+                                                            END), '') || COALESCE(TRIM(CASE 
+                                                                WHEN  s3.LOGICALWAREHOUSECODE IS NOT NULL THEN  s3.LOGICALWAREHOUSECODE
+                                                                ELSE  s.LOGICALWAREHOUSECODE
+                                                            END), '')  IN ('OPNM101','303M101','304M510')
                                                         AND s.LOGICALWAREHOUSECODE IN ('M510','M101')
                                                             AND s.DECOSUBCODE01 = '$row[DECOSUBCODE01]' 
                                                             AND s.DECOSUBCODE02 = '$row[DECOSUBCODE02]' 
