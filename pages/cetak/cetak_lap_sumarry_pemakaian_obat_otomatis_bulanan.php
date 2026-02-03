@@ -625,22 +625,17 @@ if (file_exists($logoPath)) {
 
             // stok awal SQL
             $code = $row['KODE_OBAT'];
-            $tgl1 = $_POST['tgl'];
-            $tgl2 = $_POST['tgl2'];
-            $time = $_POST['time'];
-            $time2 = $_POST['time2'];
-            $warehouse = $where_warehouse;
             $code1 = $row['DECOSUBCODE01'];
             $code2 = $row['DECOSUBCODE02'];
             $code3 = $row['DECOSUBCODE03'];
 
-            $tahunBulan = date('Y-m', strtotime($tgl1));
+            $tahunBulan = date('Y-m', strtotime($awal));
             $kode_obat = $row['KODE_OBAT'];
 
-            $date = new DateTime($tgl1);
+            $date = new DateTime($awal);
             $date->modify('-1 month');
             $tahunBulan2 = $date->format('Y-m');
-            $tgl_kurang_satu = date('Y-m-d', strtotime($tgl1 . ' -1 day'));
+            $tgl_kurang_satu = date('Y-m-d', strtotime($awal . ' -1 day'));
             // echo $time;
             // echo $tahunBulan2;
         
@@ -654,7 +649,7 @@ if (file_exists($logoPath)) {
                                                             SUM(qty_awal) AS qty_awal
                                                         FROM db_laborat.stock_awal_obat_gdkimia_1
                                                         WHERE kode_obat = ?
-                                                        AND logicalwarehousecode $where_warehouse
+                                                        AND logicalwarehousecode IN ('M510', 'M101') 
                                                         GROUP BY
                                                             kode_obat,
                                                             SUBCODE01,
@@ -693,14 +688,14 @@ if (file_exists($logoPath)) {
                                                             FROM db_laborat.tblopname_11 t
                                                             WHERE
                                                                 t.KODE_OBAT = ?
-                                                                AND t.LOGICALWAREHOUSECODE $where_warehouse
+                                                                AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
                                                                 AND t.tgl_tutup =
                                                                 (
                                                                     SELECT MAX(t2.tgl_tutup)
                                                                     FROM db_laborat.tblopname_11 t2
                                                                     WHERE
                                                                         t2.KODE_OBAT = ?
-                                                                        AND t2.LOGICALWAREHOUSECODE $where_warehouse
+                                                                        AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
                                                                         AND t2.tgl_tutup = ?
                                                                 )
                                                         ) AS sub
@@ -749,14 +744,14 @@ if (file_exists($logoPath)) {
                                                 FROM db_laborat.tblopname_11 t
                                                 WHERE
                                                     t.KODE_OBAT = ?
-                                                    AND t.LOGICALWAREHOUSECODE $where_warehouse
+                                                    AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
                                                     AND t.tgl_tutup =
                                                     (
                                                         SELECT MAX(t2.tgl_tutup)
                                                         FROM db_laborat.tblopname_11 t2
                                                         WHERE
                                                             t2.KODE_OBAT = ?
-                                                            AND t2.LOGICALWAREHOUSECODE $where_warehouse
+                                                            AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
                                                             AND t2.tgl_tutup = ?
                                                     )
                                             ) AS sub

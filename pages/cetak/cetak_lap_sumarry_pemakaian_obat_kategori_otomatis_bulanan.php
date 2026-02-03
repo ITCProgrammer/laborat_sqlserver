@@ -2,13 +2,14 @@
 date_default_timezone_set('Asia/Jakarta');
 // tanggal 1 di bulan berjalan jam 23:00:00
 $awaltanggal = date('Y-m-01 23:01:00');
+// $awaltanggal = date('2026-01-01 23:01:00');
 
 // Tanggal awal = 1 hari sebelum tanggal 1 bulan berjalan
 $awal = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
+$awal_ = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
 
 // Tanggal akhir = tanggal terakhir bulan berjalan jam 23:00:00
 $akhir = date('Y-m-d 23:00:00');
-// $akhir = '2025-11-30';
 $akhir_ = date('Y-m-d');
 
 $awalParam = $_GET['awal'] ?? '';
@@ -453,70 +454,85 @@ if (file_exists($logoPath)) {
                                             BASEPRIMARYUNITCODE");
                                     $row_buka_po = db2_fetch_assoc($buka_po) ?: [];
 
-                                    $tahunBulan = date('Y-m', strtotime($akhir));
-                                    // $tgl_kurang_satu = date('Y-m-d', strtotime($awal . ' -1 day'));
-                                    $date = new DateTime($akhir);
-                                    $date->modify('-1 month');
-                                    $tahunBulan2 = $date->format('Y-m');
+            $date = new DateTime($awal);
+            $date->modify('-1 month');
+            $tahunBulan2 = $date->format('Y-m');
+            $tgl_kurang_satu = date('Y-m-d', strtotime($awal . ' -1 day'));
+            $code1 = $row['DECOSUBCODE01'];
+            // echo $time;
+            // echo $tahunBulan2;
         
-                                    if ($tahunBulan2 == '2025-09') {
-                                        $q_qty_awal = mysqli_query($con, "SELECT
-                                            SUBCODE01,
-                                            round(SUM(qty_awal)) AS qty_awal
-                                                FROM
-                                                (SELECT * 
-                                            FROM stock_awal_obat_gdkimia_1
-                                            WHERE logicalwarehouse IN ('M510', 'M101')                                                          
-                                            and not kode_obat = 'E-1-000'                                                              
-                                            ) as T
-                                            WHERE 
-                                            SUBCODE01 = '$row[DECOSUBCODE01]'
-                                            group by 
-                                            SUBCODE01
-                                            ORDER BY SUBCODE01 ASC");
-                                    } else {
-                                        $q_qty_awal = mysqli_query($con, "SELECT tgl_tutup,
-                                                tahun_bulan,
-                                                DECOSUBCODE01,
-                                                SUM(BASEPRIMARYQUANTITYUNIT*1000) AS qty_awal 
-                                                from(
-                                                SELECT DISTINCT
-                                                tgl_tutup,
-                                                DATE_FORMAT(DATE_SUB(tgl_tutup, INTERVAL 1 MONTH), '%Y-%m') AS tahun_bulan,
-                                                KODE_OBAT,
-                                                LOTCODE,
-                                                DECOSUBCODE01,
-                                                DECOSUBCODE02,
-                                                DECOSUBCODE03,
-                                                LONGDESCRIPTION,
-                                                WAREHOUSELOCATIONCODE,
-                                                WHSLOCATIONWAREHOUSEZONECODE,
-                                                BASEPRIMARYQUANTITYUNIT
-                                            FROM tblopname_11 t
-                                            WHERE 
-                                                DECOSUBCODE01 = '$row[DECOSUBCODE01]'
-                                                AND LOGICALWAREHOUSECODE  IN ('M510', 'M101')  
-                                                AND tgl_tutup = (
-                                                    SELECT MAX(tgl_tutup)
-                                                    FROM tblopname_11
-                                                    WHERE 
-                                                        DECOSUBCODE01  = '$row[DECOSUBCODE01]'
-                                                        and not KODE_OBAT ='E-1-000'
-                                                        AND LOGICALWAREHOUSECODE IN ('M510', 'M101') 
-                                                        AND  tgl_tutup = '$awal'
-                                                ) and not KODE_OBAT ='E-1-000'
-                                                ) as sub
-                                            GROUP BY tgl_tutup, DECOSUBCODE01");
-                                    }                                
-                                    $row_qty_awal = mysqli_fetch_array($q_qty_awal) ?: [];
+            if ($tahunBulan2 == '2025-08') {
+
+                $sql_qty_awal = "SELECT
+                                                            SUBCODE01,
+                                                            SUM(qty_awal) AS qty_awal
+                                                        FROM db_laborat.stock_awal_obat_gdkimia_1
+                                                        WHERE SUBCODE01 = ?
+                                                        AND logicalwarehousecode IN ('M510', 'M101') 
+                                                        and not kode_obat = 'E-1-000'
+                                                        GROUP BY
+                                                            SUBCODE01,
+                                                        ORDER BY SUBCODE01 ASC
+                                                    ";
+
+                $params = [$code1];
+                $q_qty_awal = sqlsrv_query($con, $sql_qty_awal, $params);
+
+            } else {
+
+                $sql_qty_awal = "SELECT
+                                                            FORMAT(DATEADD(MONTH, -1, sub.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
+                                                            sub.DECOSUBCODE01,
+                                                            SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS qty_awal
+                                                        FROM
+                                                        (
+                                                            SELECT DISTINCT
+                                                                t.tgl_tutup,
+                                                                t.KODE_OBAT,
+                                                                t.LONGDESCRIPTION,
+                                                                t.DECOSUBCODE01,
+                                                                t.DECOSUBCODE02,
+                                                                t.DECOSUBCODE03,
+                                                                t.LOGICALWAREHOUSECODE,
+                                                                t.WAREHOUSELOCATIONCODE,
+                                                                t.WHSLOCATIONWAREHOUSEZONECODE,
+                                                                t.LOTCODE,
+                                                                t.BASEPRIMARYQUANTITYUNIT
+                                                            FROM db_laborat.tblopname_11 t
+                                                            WHERE
+                                                                t.DECOSUBCODE01 = ?
+                                                                AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
+                                                                and not t.kode_obat = 'E-1-000'
+                                                                AND t.tgl_tutup =
+                                                                (
+                                                                    SELECT MAX(t2.tgl_tutup)
+                                                                    FROM db_laborat.tblopname_11 t2
+                                                                    WHERE
+                                                                        t2.DECOSUBCODE01 = ?
+                                                                        AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101')
+                                                                         and not t2.kode_obat = 'E-1-000' 
+                                                                        AND t2.tgl_tutup = ?
+                                                                )
+                                                        ) AS sub
+                                                        GROUP BY
+                                                            sub.tgl_tutup,
+                                                            sub.DECOSUBCODE01
+                                                    ";
+
+                $params = [$code1, $code1, $awal_];
+                $q_qty_awal = sqlsrv_query($con, $sql_qty_awal, $params);
+            }
+
+            if ($q_qty_awal === false) {
+                die(print_r(sqlsrv_errors(), true));
+            }
+            $row_qty_awal = sqlsrv_fetch_array($q_qty_awal, SQLSRV_FETCH_ASSOC);
+            // var_dump($row_qty_awal);
 
             $sql = "SELECT
-                                                sub.tgl_tutup,
                                                 FORMAT(DATEADD(MONTH, -1, sub.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
-                                                sub.KODE_OBAT,
                                                 sub.DECOSUBCODE01,
-                                                sub.DECOSUBCODE02,
-                                                sub.DECOSUBCODE03,
                                                 SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS STOCK_BALANCE
                                             FROM
                                             (
@@ -534,27 +550,26 @@ if (file_exists($logoPath)) {
                                                     t.BASEPRIMARYQUANTITYUNIT
                                                 FROM db_laborat.tblopname_11 t
                                                 WHERE
-                                                    t.KODE_OBAT = ?
-                                                    AND t.LOGICALWAREHOUSECODE $where_warehouse
+                                                    t.DECOSUBCODE01 = ?
+                                                    AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
+                                                    and not t.kode_obat = 'E-1-000'
                                                     AND t.tgl_tutup =
                                                     (
                                                         SELECT MAX(t2.tgl_tutup)
                                                         FROM db_laborat.tblopname_11 t2
                                                         WHERE
-                                                            t2.KODE_OBAT = ?
-                                                            AND t2.LOGICALWAREHOUSECODE $where_warehouse
+                                                            t2.DECOSUBCODE01 = ?
+                                                             and not t2.kode_obat = 'E-1-000'
+                                                            AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
                                                             AND t2.tgl_tutup = ?
                                                     )
                                             ) AS sub
                                             GROUP BY
                                                 sub.tgl_tutup,
-                                                sub.KODE_OBAT,
-                                                sub.DECOSUBCODE01,
-                                                sub.DECOSUBCODE02,
-                                                sub.DECOSUBCODE03
+                                                sub.DECOSUBCODE01
                                             ";
 
-            $params = [$kode_obat, $kode_obat, $akhir_];
+            $params = [$code1, $code1, $akhir_];
 
             $Balance_stock = sqlsrv_query($con, $sql, $params);
             if ($Balance_stock === false) {
@@ -584,7 +599,7 @@ if (file_exists($logoPath)) {
                 <td class='number'>" . number_format($qty_Keluar, 0, '.', ',') . "</td>
                 <td class='number'>" . number_format($qty_Transfer, 0, '.', ',') . "</td>
                 <td class='number'>" . number_format($total_out, 0, '.', ',') . "</td>
-                <td class='number'>" . '0' . "</td>
+                <td class='number'>" . number_format($qty_Balance, 0, '.', ',') . "</td>
                 <td  class='number'>" . '0' . "</td>
                 <td  class='number'>" . '0' . "</td>
                 <td>".' '."</td>
