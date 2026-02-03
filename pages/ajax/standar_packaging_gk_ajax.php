@@ -5,7 +5,7 @@
   include "../../includes/Penomoran_helper.php";
   include('Response.php');
 
-  $username = $_SESSION['userLAB'];
+  $username = $_SESSION['userLAB']??"";
   $tanggal=date('Y-m-d H:i:s');
   $button="<button class='btn btn-warning btn-sm edit_sp' title='Edit' data-toggle='tooltip' ><i class='fa fa-pencil'></i></button> 
            <button class='btn btn-danger btn-sm delete_sp' title='Delete' data-toggle='tooltip' ><i class='fa fa-trash'></i></button> 
@@ -15,24 +15,13 @@
   $response->setHTTPStatusCode(201);
   if (isset($_SESSION['userLAB'])) {
     if (isset($_POST['status'])) {
-        $id = intval($_POST['id_dt']);
-        $sp_id = intval($_POST['sp_id']);
+        $id = intval($_POST['id_dt']??0);
+        $sp_id = intval($_POST['sp_id']??"");
         if($_POST['status']=="add_sp" && $_POST['sp_kode_erp'] !="" && $_POST['sp_kode_erp']){
             $konfirm="1";
-            $update = "INSERT tbl_standar_packaging 
-                 SET kode_obat =? ,
-                 kode_erp = ? ,
-                 nama_obat =? ,
-                 pakingan_utuh =? ,
-                 pakingan_utuh_keterangan =? ,
-                 tinggi_pakingan =? ,
-                 bj_pakingan =? ,
-                 berat_pakingan =? ,
-                 berat_pakingan_botol_kecil =? ,
-                 keterangan =? ,
-                 jenis =? ";
-            $confirm=mysqli_prepare( $con, $update );
-            mysqli_stmt_bind_param($confirm, "sssssssssss", 
+            $update =  "INSERT db_laborat.tbl_standar_packaging (kode_obat,kode_erp,nama_obat,pakingan_utuh,pakingan_utuh_keterangan,tinggi_pakingan,bj_pakingan,berat_pakingan,
+            berat_pakingan_botol_kecil,keterangan,jenis) VALUES (? , ? ,? ,? ,? ,? ,? ,? ,? ,? ,?); SELECT @@IDENTITY as id;";
+            $params = [
                 $_POST['sp_kode_obat'],
                 $_POST['sp_kode_erp'],
                 $_POST['sp_nama_obat'],
@@ -43,9 +32,13 @@
                 $_POST['sp_berat_pakingan'],
                 $_POST['sp_berat_pakingan_botol_kecil'],
                 $_POST['sp_keterangan'],
-                $_POST['sp_jenis'] );
-            if(mysqli_stmt_execute($confirm)){ 
-                $last_id = $con->insert_id;
+                $_POST['sp_jenis']
+                ];
+            $confirm = sqlsrv_query($con, $update, $params);
+            if($confirm){ 
+                $next_result = sqlsrv_next_result($confirm);
+                $row_next = sqlsrv_fetch_array($confirm, SQLSRV_FETCH_ASSOC);
+                $last_id = $row_next["id"];
                 $row="<tr id='tr_$last_id' data-id='".$last_id."' data-no='" .$_POST['last_no']. "'>
                         <td class='text-center'>".$_POST['last_no']."</td>
                         <td>" . htmlspecialchars($_POST['sp_kode_erp']) . "</td>
@@ -67,17 +60,15 @@
             }
             else {
                 $response->setSuccess(false);
-                $response->addMessage("Gagal Menambahkan Standar Packaging : ".mysqli_error($con));
+                $response->addMessage("Gagal Menambahkan Standar Packaging : ".sqlsrv_errors());
                 $response->send();
             }
         }
         else if($_POST['status']=="get_sp" && $id != 0){
             $data=array();
-            $get=mysqli_prepare( $con, "select * from tbl_standar_packaging WHERE id = ? LIMIT 1" );
-            mysqli_stmt_bind_param($get, "s", $id );
-            mysqli_stmt_execute($get);
-            $getData = mysqli_stmt_get_result($get);
-            while ($row = mysqli_fetch_assoc($getData)) {
+            $get="SELECT TOP (1) * FROM db_laborat.tbl_standar_packaging WHERE id = ? ";
+            $getData = sqlsrv_query($con, $get, [$id]);
+            while ($row = sqlsrv_fetch_array($getData, SQLSRV_FETCH_ASSOC)) {
                 $data=$row;
             }
             $response->setSuccess(true);
@@ -86,7 +77,7 @@
             $response->send();
         }
         else if($_POST['status']=="edit_sp" && $sp_id != 0 && $_POST['sp_kode_erp'] !="" && $_POST['sp_kode_erp']){
-            $update = "UPDATE tbl_standar_packaging 
+            $update = "UPDATE TOP (1) db_laborat.tbl_standar_packaging 
                  SET kode_obat =? ,
                  kode_erp = ? ,
                  nama_obat =? ,
@@ -98,9 +89,8 @@
                  berat_pakingan_botol_kecil =? ,
                  keterangan =? ,
                  jenis =? 
-                 WHERE id = ? LIMIT 1";
-            $confirm=mysqli_prepare( $con, $update );
-            mysqli_stmt_bind_param($confirm, "ssssssssssss", 
+                 WHERE id = ?";
+            $params = [
                 $_POST['sp_kode_obat'],
                 $_POST['sp_kode_erp'],
                 $_POST['sp_nama_obat'],
@@ -112,8 +102,10 @@
                 $_POST['sp_berat_pakingan_botol_kecil'],
                 $_POST['sp_keterangan'],
                 $_POST['sp_jenis'],
-                $sp_id );
-            if(mysqli_stmt_execute($confirm)){ 
+                $sp_id 
+                ];
+            $confirm = sqlsrv_query($con, $update, $params);
+            if($confirm){ 
                 $last_id = $sp_id;
                 $row="
                         <td class='text-center'>".$_POST['last_no']."</td>
@@ -136,17 +128,15 @@
             } 
             else {
                 $response->setSuccess(false);
-                $response->addMessage("Gagal Mengubah Standar Packaging : ".mysqli_error($con));
+                $response->addMessage("Gagal Mengubah Standar Packaging : ".sqlsrv_errors());
                 $response->send();
             }
         }
-        else if($_POST['status']=="delete_sp" && $id != 0 && intval($_POST['last_no']) != 0){
-            $update = "DELETE FROM tbl_standar_packaging 
-                WHERE id = ? LIMIT 1";
-            $confirm=mysqli_prepare( $con, $update );
-            mysqli_stmt_bind_param($confirm, "s", 
-                $id );
-            if(mysqli_stmt_execute($confirm)){ 
+        else if($_POST['status']=="delete_sp" && $id != 0 && intval($_POST['last_no']??0) != 0){
+            $update = "DELETE TOP (1) FROM db_laborat.tbl_standar_packaging 
+                WHERE id = ? ";
+            $confirm=sqlsrv_query( $con, $update ,[$id]);
+            if($confirm){ 
                 $response->setSuccess(true);
                 $response->addMessage("Berhasil Menghapus Standar Packaging");
                 $response->addMessage($id);
@@ -155,16 +145,16 @@
             }
             else {
                 $response->setSuccess(false);
-                $response->addMessage("Gagal Menghapus Standar Packaging : ".mysqli_error($con));
+                $response->addMessage("Gagal Menghapus Standar Packaging : ".sqlsrv_errors());
                 $response->send();
             }
         }
         else if($_POST['status']=="preview_sp" && $id != 0){
             $dataSp=array();
             
-            $sp = "SELECT * FROM tbl_standar_packaging s WHERE s.id = '".$id."' limit 1";
-            $spResult = mysqli_query($con, $sp);
-            while ($rowSP = mysqli_fetch_assoc($spResult)) {
+            $sp = "SELECT TOP 1 * FROM db_laborat.tbl_standar_packaging s WHERE s.id = ? ";
+            $spResult = sqlsrv_query($con, $sp,[$id]);
+            while ($rowSP = sqlsrv_fetch_array($spResult, SQLSRV_FETCH_ASSOC)) {
                 $dataSp['id']=$rowSP['id'];
                 $dataSp['kode_obat']=$rowSP['kode_erp'];
                 $dataSp['nama_obat']=$rowSP['nama_obat'];
@@ -192,10 +182,9 @@
         }
         else if($_POST['status']=="get_data_obat" && $id != 0){
             $spData=array();
-            $get=mysqli_prepare( $con, "select kode_erp from tbl_standar_packaging " );
-            mysqli_stmt_execute($get);
-            $getData = mysqli_stmt_get_result($get);
-            while ($row = mysqli_fetch_assoc($getData)) {
+            $get="select kode_erp from db_laborat.tbl_standar_packaging ";
+            $getData= sqlsrv_query($con,$get);
+            while ($row = sqlsrv_fetch_array($getData, SQLSRV_FETCH_ASSOC)) {
                 $spData[]=$row['kode_erp'];
             }
             $nowData=array();
@@ -214,7 +203,7 @@
                         OR p.SUBCODE01 = 'R'
                         OR p.SUBCODE01 = 'E'
                     )";
-            $result_now = db2_exec($conn1, $query_get_data_now, ['cursor' => DB2_SCROLLABLE]);
+            $result_now = db2_exec($conn1, $query_get_data_now);
             while($rowdb = db2_fetch_assoc($result_now)){
                 $nowData[]=$rowdb["KODEOBAT"];
                 if(!in_array($rowdb["KODEOBAT"],$spData)){

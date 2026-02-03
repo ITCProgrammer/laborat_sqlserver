@@ -208,7 +208,7 @@ if(in_array(strtoupper($_SESSION['userLAB']),["DIT","INDAH","CICIK"])==false){
                     <div class="col-lg-12 overflow-auto table-responsive" style="overflow-x: auto;">   
                         <div id="standartPackaging">
                             <?php
-                                $standar_packaging = mysqli_query($con,"select * from tbl_standar_packaging") ;
+                                $standar_packaging = sqlsrv_query($con,"select * from db_laborat.tbl_standar_packaging") ;
                                 $no = 1;
                             ?>
                             <table class='table table-bordered table-striped' id='standartPackagingTable'>
@@ -235,7 +235,7 @@ if(in_array(strtoupper($_SESSION['userLAB']),["DIT","INDAH","CICIK"])==false){
                                         <button class='btn btn-warning btn-sm edit_sp' title='Edit' data-toggle='tooltip' ><i class='fa fa-pencil'></i></button> 
                                         <button class='btn btn-danger btn-sm delete_sp' title='Delete' data-toggle='tooltip' ><i class='fa fa-trash'></i></button> 
                                         <button class='btn btn-success btn-sm preview_sp' title='Preview' data-toggle='tooltip' ><i class='fa fa-list'></i></button>";
-                                    while ($row = mysqli_fetch_assoc($standar_packaging)) {
+                                    while ($row = sqlsrv_fetch_array($standar_packaging, SQLSRV_FETCH_ASSOC)) {
                                         echo "<tr id='tr_".$row['id']."' data-id='" .$row['id']. "' data-no='" .$no. "'>
                                                 <td class='text-center'>".$no++."</td>
                                                 <td>" . htmlspecialchars($row['kode_erp']) . "</td>
