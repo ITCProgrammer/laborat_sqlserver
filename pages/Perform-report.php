@@ -4,9 +4,9 @@
     include "koneksi.php";
     $day = date('Y-m-d');
     $month = date('Y-m');
-    if ($_POST['submit']) {
-        $start_date = $_POST['start_date']." ".$_POST['time_start'];
-        $end_date = $_POST['end_date']." ".$_POST['time_end'];
+    if (isset($_POST['submit'])) {
+        $start_date = ($_POST['start_date'] ?? '')." ".($_POST['time_start'] ?? '');
+        $end_date = ($_POST['end_date'] ?? '')." ".($_POST['time_end'] ?? '');
 		//$time_s = $_POST['time_start'];
         //$time_e = $_POST['time_end'];
     } else {
@@ -215,16 +215,16 @@
                     <form class="form-inline" method="POST" action="">
                         <div class="form-group mx-sm-3 mb-2">
                             <input type="text" class="form-control input-sm month-picker" value="<?php
-                                                                                                    if ($_POST['submit']) {
-                                                                                                        echo $_POST['start_date'];
+                                                                                                    if (isset($_POST['submit'])) {
+                                                                                                        echo $_POST['start_date'] ?? '';
                                                                                                     } else {
                                                                                                         echo date('Y-m-d');
                                                                                                     } ?>" name="start_date" id="start_date">
                         </div>
 						<div class="form-group mb-2">
               				<input type="text" class="form-control input-sm time-picker" name="time_start" id="time_start" value="<?php
-                                                                                                                    if ($_POST['submit']) {
-                                                                                                                      echo $_POST['time_start'];
+                                                                                                                    if (isset($_POST['submit'])) {
+                                                                                                                      echo $_POST['time_start'] ?? '';
                                                                                                                     } else {
                                                                                                                       echo "23:00";
                                                                                                                     } ?>" placeholder="00:00" maxlength="5">
@@ -232,8 +232,8 @@
                         S/d
                         <div class="form-group mx-sm-3 mb-2">
                             <input type="text" class="form-control input-sm month-picker" value="<?php
-                                                                                                    if ($_POST['submit']) {
-                                                                                                        echo $_POST['end_date'];
+                                                                                                    if (isset($_POST['submit'])) {
+                                                                                                        echo $_POST['end_date'] ?? '';
                                                                                                     } else {
                                                                                                         //echo date('Y-m-d');
 																										echo date('Y-m-d', strtotime($day . ' + 1 day'));
@@ -241,8 +241,8 @@
                         </div>
 						<div class="form-group mb-2">
               				<input type="text" class="form-control input-sm time-picker" name="time_end" id="time_end" value="<?php
-                                                                                                                    if ($_POST['submit']) {
-                                                                                                                      echo $_POST['time_end'];
+                                                                                                                    if (isset($_POST['submit'])) {
+                                                                                                                      echo $_POST['time_end'] ?? '';
                                                                                                                     } else {
                                                                                                                       echo "23:00";
                                                                                                                     } ?>" placeholder="00:00" maxlength="5">

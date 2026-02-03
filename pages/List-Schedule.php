@@ -216,7 +216,7 @@ $filters    = [
                           class="openElementModal"
                           data-resep="<?php echo $li['no_resep']; ?>"
                           data-order="<?php echo $li['no_order']; ?>"
-                          data-element="<?php echo htmlspecialchars($li['element_code'], ENT_QUOTES); ?>">
+                          data-element="<?php echo htmlspecialchars($li['element_code'] ?? '', ENT_QUOTES); ?>">
                           <i>
                             <?php if (empty($li['element_code'])): ?>
                               <button
@@ -232,7 +232,7 @@ $filters    = [
                                 style="cursor:pointer;"
                                 data-resep="<?php echo $li['no_resep']; ?>"
                                 data-order="<?php echo $li['no_order']; ?>"
-                                data-ket="<?php echo htmlspecialchars($li['element_code'], ENT_QUOTES); ?>">
+                                data-ket="<?php echo htmlspecialchars($li['element_code'] ?? '', ENT_QUOTES); ?>">
                                 <?php echo $li['element_code']; ?>
                               </span>
                             <?php endif; ?>

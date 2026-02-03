@@ -107,6 +107,8 @@ $fmtDT = function($v){
                             </thead>
                             <tbody>
                                 <?php
+                                $no = $no ?? 0;
+                                $col = $col ?? 0;
                                 $sql = sqlsrv_query($con,"SELECT a.*, b.*, a.id as id_status, a.created_at as tgl_buat_status, a.created_by as status_created_by
                                 FROM db_laborat.tbl_status_matching a
                                 INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
@@ -116,10 +118,10 @@ $fmtDT = function($v){
                                     $no++;
                                     $bgcolor = ($col++ & 1) ? 'gainsboro' : 'antiquewhite';
                                     // normalisasi tanggal agar aman untuk strtotime/echo
-                                    $r['tgl_buat_status'] = $fmtDT($r['tgl_buat_status']);
-                                    $r['tgl_buat']        = $fmtDT($r['tgl_buat']);
-                                    $r['tgl_selesai']     = $fmtDT($r['tgl_selesai']);
-                                    $r['tgl_delivery']    = $fmtDT($r['tgl_delivery']);
+                                    $r['tgl_buat_status'] = $fmtDT($r['tgl_buat_status'] ?? null);
+                                    $r['tgl_buat']        = $fmtDT($r['tgl_buat'] ?? null);
+                                    $r['tgl_selesai']     = $fmtDT($r['tgl_selesai'] ?? null);
+                                    $r['tgl_delivery']    = $fmtDT($r['tgl_delivery'] ?? null);
                                 ?>
                                     <tr>
                                         <td valign="center" class="details-control">

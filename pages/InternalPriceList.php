@@ -12,7 +12,7 @@
 
   $rate = db2_exec($conn1, $query_rate);
   $cek_d_rate = db2_fetch_assoc($rate);
-  if($cek_d_rate && $cek_d_rate['WEEKLYEXCHANGERATE'] == 0){
+  if(!$cek_d_rate || ($cek_d_rate['WEEKLYEXCHANGERATE'] ?? 0) == 0){
     $rate = db2_exec($conn1, "SELECT * FROM ITTWEEKLYEXCHANGERATE ORDER BY INITIALDATE DESC LIMIT 1");
     $d_rate = db2_fetch_assoc($rate);
   }else{
@@ -22,13 +22,13 @@
 
   $sql_curr = db2_exec($conn1, $query_rate);
   $d_curr = db2_fetch_assoc($sql_curr);
-  if($d_curr['WEEKLYEXCHANGERATE']){                              
+  if($d_curr && isset($d_curr['WEEKLYEXCHANGERATE']) && $d_curr['WEEKLYEXCHANGERATE']){                              
       $curr = $d_curr['WEEKLYEXCHANGERATE'];
   }else{
       $sql_curr = db2_exec($conn1, "SELECT * FROM ITTWEEKLYEXCHANGERATE ORDER BY INITIALDATE DESC LIMIT 1");
       $d_curr = db2_fetch_assoc($sql_curr);
 
-      $curr = $d_curr['WEEKLYEXCHANGERATE'];
+      $curr = $d_curr['WEEKLYEXCHANGERATE'] ?? 0;
   }
   $sql_header = db2_exec($conn1, "SELECT 
                                     RECIPE_CODE,
@@ -130,7 +130,7 @@
 <script>
   function jenis_kain(){
     var jenis_kain    = document.getElementById("jenis_kain").value;
-    var harga_dasar   = <?php echo number_format($d_header_sumprice['PRICE'], 8) * 1.1 ?>
+    var harga_dasar   = parseFloat(<?php echo json_encode((float)($d_header_sumprice['PRICE'] ?? 0) * 1.1); ?>);
 
     if(jenis_kain == 'cotton'){
       var total_price = 0.220 + harga_dasar;
@@ -154,7 +154,7 @@
                 <form class="form-inline" method="POST" action="">
                   <div class="form-group mb-2">
                     <input type="date" class="form-control input-sm" name="date_start" id="date_start" value="<?php
-                                                                                                                if ($_POST['submit']) {
+                                                                                                                if (!empty($_POST['submit'])) {
                                                                                                                   $date = date_create($_POST['date_start']);
                                                                                                                   echo $date_curr = date_format($date, "Y-m-d");
                                                                                                                 } else {
@@ -166,7 +166,7 @@
                   </div>
                   <div class="form-group mx-sm-3 mb-2">
                     <input type="text" class="form-control input-sm" name="recipe_code" placeholder="Recipe Code" value="<?php
-                                                                                                                          if ($_POST['submit']) {
+                                                                                                                          if (!empty($_POST['submit'])) {
                                                                                                                             echo $_POST['recipe_code'];
                                                                                                                           } else {
                                                                                                                             echo '';
@@ -180,15 +180,15 @@
                   <table class="table table-striped table-bordered" id="tableee" width="100%" style="margin-top: 10px;">
                     <tr>
                       <td class="text-center bg-green" width="10%">RECIPE CODE</td>
-                      <td><?php if($recipe_code){ echo $d_header['RECIPE_CODE']; } ?> </td>
+                      <td><?php if($recipe_code && isset($d_header['RECIPE_CODE'])){ echo $d_header['RECIPE_CODE']; } ?> </td>
                     </tr>
                     <tr>
                       <td class="text-center bg-green" width="10%">SUFFIXCODE</td>
-                      <td><?php if($recipe_code){ echo $d_header['SUFFIX']; } ?></td>
+                      <td><?php if($recipe_code && isset($d_header['SUFFIX'])){ echo $d_header['SUFFIX']; } ?></td>
                     </tr>
                     <tr>
                       <td class="text-center bg-green" width="10%">RATE</td>
-                      <td><?php if($recipe_code){ echo number_format($d_rate['WEEKLYEXCHANGERATE']); } ?></td>
+                      <td><?php if($recipe_code && isset($d_rate['WEEKLYEXCHANGERATE'])){ echo number_format($d_rate['WEEKLYEXCHANGERATE']); } ?></td>
                     </tr>
                     <tr>
                       <td class="text-center bg-green" width="10%">Jenis Kain</td>
@@ -226,20 +226,20 @@
                       </thead>
                       <tbody>
                       <?php 
-                        if($_POST['submit']) {
-                          $date = date_create($_POST['date_start']);
+                        if(!empty($_POST['submit'])) {
+                          $date = date_create($_POST['date_start'] ?? date('Y-m-d'));
                           $date_curr = date_format($date, "Y-m-d");
-                          $recipe_code  = $_POST['recipe_code'];
+                          $recipe_code  = $_POST['recipe_code'] ?? '';
                           
                           $sql_curr = db2_exec($conn1, $query_rate);
                           $d_curr = db2_fetch_assoc($sql_curr);
-                          if($d_curr['WEEKLYEXCHANGERATE']){                              
+                          if($d_curr && isset($d_curr['WEEKLYEXCHANGERATE']) && $d_curr['WEEKLYEXCHANGERATE']){                              
                               $curr = $d_curr['WEEKLYEXCHANGERATE'];
                           }else{
                               $sql_curr = db2_exec($conn1, "SELECT * FROM ITTWEEKLYEXCHANGERATE ORDER BY INITIALDATE DESC LIMIT 1");
                               $d_curr = db2_fetch_assoc($sql_curr);
 
-                              $curr = $d_curr['WEEKLYEXCHANGERATE'];
+                              $curr = $d_curr['WEEKLYEXCHANGERATE'] ?? 0;
                           }
                         $sql = db2_exec($conn1, "SELECT r.RECIPESUBCODE01,
                                                       TRIM(r.SUBCODE01) || '-' || TRIM(r.SUBCODE02) || '-' || TRIM(r.SUBCODE03) AS CODE_DYESTUFF,

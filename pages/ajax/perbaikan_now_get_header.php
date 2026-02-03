@@ -46,8 +46,8 @@ try {
         exit;
     }
 
-    $projectCode   = trim($dt_langganan['PROJECTCODE']);
-    $langgananText = trim($dt_langganan['LANGGANAN']) . '/' . trim($dt_langganan['BUYER']);
+    $projectCode   = trim($dt_langganan['PROJECTCODE'] ?? '');
+    $langgananText = trim($dt_langganan['LANGGANAN'] ?? '') . '/' . trim($dt_langganan['BUYER'] ?? '');
 
     // 2. LIST NO. ITEM (sesuai kode lama NowForm: ITXVIEWBONORDER)
     $sqlItems = "
@@ -88,8 +88,8 @@ try {
             $bruto = isset($r['BRUTO']) ? (float) $r['BRUTO'] : 0;
 
             // Format lama: ITEMTYPE-SUBCODE02.SUBCODE03 | WARNA | BRUTO
-            $text  = trim($r['ITEMTYPEAFICODE']) . '-' . trim($r['SUBCODE02']) . '.' . trim($r['SUBCODE03']);
-            $text .= ' | ' . trim($r['WARNA']);
+            $text  = trim($r['ITEMTYPEAFICODE'] ?? '') . '-' . trim($r['SUBCODE02'] ?? '') . '.' . trim($r['SUBCODE03'] ?? '');
+            $text .= ' | ' . trim($r['WARNA'] ?? '');
             $text .= ' | ' . number_format($bruto, 2);
 
             $items[] = [

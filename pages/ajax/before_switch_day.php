@@ -82,7 +82,7 @@ include '../../koneksi.php';
             <?php
             function get_val($jenismatching, $group)
             {
-                include '../../koneksi.php';
+                global $con;
                 if (! $con) {
                     return 0;
                 }
@@ -105,8 +105,8 @@ include '../../koneksi.php';
                             CASE WHEN a.koreksi_resep7 <> '' AND a.koreksi_resep7 IS NOT NULL THEN 0.5 ELSE 0 END +
                             CASE WHEN a.koreksi_resep8 <> '' AND a.koreksi_resep8 IS NOT NULL THEN 0.5 ELSE 0 END
                         ) AS total_value
-                    FROM tbl_status_matching a
-                    LEFT JOIN tbl_matching b ON b.no_resep = a.idm
+                    FROM db_laborat.tbl_status_matching a
+                    LEFT JOIN db_laborat.tbl_matching b ON b.no_resep = a.idm
                     WHERE a.grp = ?
                       AND b.jenis_matching = ?
                       AND a.approve_at >= ?

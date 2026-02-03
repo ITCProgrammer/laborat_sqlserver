@@ -67,12 +67,49 @@
 			die('Koneksi SQL Server db_laborat gagal.');
 		}
 
+		// default nilai agar tidak muncul warning saat data belum terisi
+		$cek = $cek ?? 0;
+		$cek1 = $cek1 ?? 0;
+		$rw = $rw ?? [
+			'langganan' => '',
+			'no_item' => '',
+			'jenis_kain' => '',
+			'warna' => '',
+			'no_warna' => '',
+			'salesman_sample' => '0',
+		];
+		$r1 = $r1 ?? [
+			'Flag' => '',
+			'OtherDesc' => '',
+			'RequiredDate' => '',
+			'pcid' => '',
+		];
+		$dt_langganan = $dt_langganan ?? [
+			'LANGGANAN' => '',
+			'BUYER' => '',
+			'PROJECTCODE' => '',
+		];
+		$jns_match = $jns_match ?? '';
+		$dt_kk_tas = $dt_kk_tas ?? [
+			'BUYER' => '',
+			'NO_HANGER' => '',
+			'NO_WARNA' => '',
+			'JENIS_KAIN' => '',
+			'WARNA' => '',
+			'LEBAR' => '',
+			'GRAMASI' => '',
+			'JENIS_BENANG' => '',
+			'STDCCKWARNA' => '',
+			'TGL_KIRIM' => '',
+			'QTY' => '',
+		];
+
 		$rowNoUrut = sqlsrv_first_assoc($con, "SELECT TOP 1 nourut FROM db_laborat.no_urut_matching");
 		$nourut = isset($rowNoUrut['nourut']) ? ((int)$rowNoUrut['nourut'] + 1) : 1;
 
-		if ($_GET['idk'] != "") {
+		if (!empty($_GET['idk'])) {
 			$order 		= $_GET['idk'];
-			$jns_match	= $_GET['jn_mcng'];
+			$jns_match	= $_GET['jn_mcng'] ?? '';
 
 			if ($jns_match == "Matching Ulang NOW" or $jns_match == "Perbaikan NOW") {
 				$query_langganan = db2_exec($conn1, "SELECT TRIM(s.CODE) AS PROJECTCODE, TRIM(ip.LANGGANAN) AS LANGGANAN, TRIM(ip.BUYER) AS BUYER
@@ -87,7 +124,7 @@
 															WHERE s.CODE LIKE '%$order%'");
 				$dt_langganan = db2_fetch_assoc($query_langganan);
 			} else if ($jns_match == "Matching Development") {
-				$demand = $_GET['demand'];
+				$demand = $_GET['demand'] ?? '';
 				if($demand){
 					$where_demand = "AND TRIM(NO_DEMAND) = '$demand'";
 				}else{
@@ -109,7 +146,7 @@
 			$warna = str_replace("'", "''", $_POST['warna']);
 			$nowarna = str_replace("'", "", $_POST['no_warna']);
 			$langganan = str_replace("'", "''", $_POST['langganan']);
-			if ($_POST['salesman_sample'] == "1") {
+			if (($_POST['salesman_sample'] ?? '') == "1") {
 				$salesman = "1";
 			} else {
 				$salesman = "0";
@@ -151,21 +188,21 @@
 			$dataNoUrut 	= isset($queryGetNoUrut['nourut']) ? $queryGetNoUrut['nourut'] + 1 : 1;
 			$no_resep 		= $_POST['Dyestuff'] . $dataNoUrut;
 
-			$recipe 		= str_replace("'", "''", $_POST['recipe_code']);
-			$colorcode 		= str_replace("'", "''", $_POST['color_code']);
-			$gLD 			= str_replace("'", "''", $_POST['g_LD']);
-			$jnsMtch 		= $_POST['jen_matching'];
-			$tempCode 		= $_POST['temp_code'];
-			$tempCode2 		= $_POST['temp_code2'];
+			$recipe 		= str_replace("'", "''", $_POST['recipe_code'] ?? '');
+			$colorcode 		= str_replace("'", "''", $_POST['color_code'] ?? '');
+			$gLD 			= str_replace("'", "''", $_POST['g_LD'] ?? '');
+			$jnsMtch 		= $_POST['jen_matching'] ?? '';
+			$tempCode 		= $_POST['temp_code'] ?? '';
+			$tempCode2 		= $_POST['temp_code2'] ?? '';
 			// Rapikan spasi berlebih dan batasi panjang kolom yang rentan truncation
-			$no_po_raw      = preg_replace('/\s+/', ' ', $_POST['no_po']);
+			$no_po_raw      = preg_replace('/\s+/', ' ', $_POST['no_po'] ?? '');
 			$no_po_capped   = substr(trim($no_po_raw), 0, 50); // kolom no_po varchar(50)
 			$lebarVal       = isset($_POST['lebar']) ? (int)round((float)$_POST['lebar']) : 0;
 			$qtyVal         = isset($_POST['qty']) ? (float)$_POST['qty'] : 0;
 			$gramasiVal     = isset($_POST['gramasi']) ? (float)$_POST['gramasi'] : 0;
 
-			$suhuchamber 	= $_POST['suhu_chamber'] !== '' ? $_POST['suhu_chamber'] : ($_POST['none_suhu_chamber'] !== '' ? $_POST['none_suhu_chamber'] : null);
-			$warnafluorescent	= $_POST['warna_fluorescent'];
+			$suhuchamber 	= ($_POST['suhu_chamber'] ?? '') !== '' ? $_POST['suhu_chamber'] : (( $_POST['none_suhu_chamber'] ?? '') !== '' ? $_POST['none_suhu_chamber'] : null);
+			$warnafluorescent	= $_POST['warna_fluorescent'] ?? '';
 
 			// Checkbox "For Forecast?" -> kirim 1 jika diceklis, else 0
 			$for_forecast	= (isset($_POST['for_forecast']) && $_POST['for_forecast'] == '1') ? 1 : 0;
@@ -248,7 +285,7 @@
 			<!-- Custom Tabs -->
 			<div class="nav-tabs-custom">
 				<ul class="nav nav-tabs">
-					<li class="active"><a href="#tab_1" data-toggle="tab">Input Order <?php $_GET['Dystf'] ?></a></li>
+					<li class="active"><a href="#tab_1" data-toggle="tab">Input Order <?php echo $_GET['Dystf'] ?? ''; ?></a></li>
 				</ul>
 				<div class="tab-content">
 					<div class="tab-pane active" id="tab_1">
@@ -260,7 +297,7 @@
 										...
 									</button>
 									<div class="col-sm-2">
-										<select value="<?php echo $_GET['Dystf'] ?>" type="text" class="form-control" id="Dyestuff" name="Dyestuff" required>
+										<select value="<?php echo $_GET['Dystf'] ?? ''; ?>" type="text" class="form-control" id="Dyestuff" name="Dyestuff" required>
 											<option value="" selected disabled>Pilih...</option>
 											<?php
 												$sqlmstrcd = sqlsrv_query($con, "SELECT kode, value FROM db_laborat.tbl_mstrheadercd");
@@ -269,7 +306,7 @@
 													echo '<option value="">[ERR] load Dyestuff: ' . htmlspecialchars(print_r($err, true)) . '</option>';
 												} else {
 													while ($li = sqlsrv_fetch_array($sqlmstrcd, SQLSRV_FETCH_ASSOC)) { ?>
-														<option value="<?php echo $li['value'] ?>" <?php if ($li['value'] == $_GET['Dystf']) {
+														<option value="<?php echo $li['value'] ?>" <?php if ($li['value'] == ($_GET['Dystf'] ?? '')) {
 																										echo 'selected';
 																									} ?>><?php echo $li['kode'] ?></option>
 													<?php }
@@ -290,25 +327,25 @@
 									<div class="col-sm-2">
 										<select class="form-control" id="jen_matching" name="jen_matching" required>
 											<option selected disabled>Pilih...</option>
-											<option <?php if ($_GET['jn_mcng'] == "L/D") {
+											<option <?php if (($_GET['jn_mcng'] ?? '') == "L/D") {
 														echo "selected";
 													} ?> value="L/D">L/D</option>
-											<option <?php if ($_GET['jn_mcng'] == "LD NOW") {
+											<option <?php if (($_GET['jn_mcng'] ?? '') == "LD NOW") {
 														echo "selected";
 													} ?> value="LD NOW">L/D NOW</option>
-											<option <?php if ($_GET['jn_mcng'] == "Matching Ulang") {
+											<option <?php if (($_GET['jn_mcng'] ?? '') == "Matching Ulang") {
 														echo "selected";
 													} ?> value="Matching Ulang">Matching Ulang</option>
-											<option <?php if ($_GET['jn_mcng'] == "Perbaikan") {
+											<option <?php if (($_GET['jn_mcng'] ?? '') == "Perbaikan") {
 														echo "selected";
 													} ?> value="Perbaikan">Perbaikan</option>
-											<option <?php if ($_GET['jn_mcng'] == "Matching Ulang NOW") {
+											<option <?php if (($_GET['jn_mcng'] ?? '') == "Matching Ulang NOW") {
 														echo "selected";
 													} ?> value="Matching Ulang NOW">Matching Ulang NOW</option>
-											<option <?php if ($_GET['jn_mcng'] == "Perbaikan NOW") {
+											<option <?php if (($_GET['jn_mcng'] ?? '') == "Perbaikan NOW") {
 														echo "selected";
 													} ?> value="Perbaikan NOW">Perbaikan NOW</option>
-											<option <?php if ($_GET['jn_mcng'] == "Matching Development") {
+											<option <?php if (($_GET['jn_mcng'] ?? '') == "Matching Development") {
 														echo "selected";
 													} ?> value="Matching Development">Matching Development</option>
 										</select>
@@ -391,9 +428,7 @@
 	<div class="form-group">
 		<label for="order" class="col-sm-2 control-label">No Order</label>
 		<div class="col-sm-4">
-			<input name="no_order" placeholder="No order ..." type="text" onkeyup="this.value = this.value.toUpperCase();" class="form-control ordercuy" id="order" onchange="window.location='?p=Form-Matching&idk='+this.value+'&Dystf='+document.getElementById(`Dyestuff`).value+'&jn_mcng='+document.getElementById(`jen_matching`).value" value="<?php if ($_GET['idk'] != "") {
-																																																																																							echo $_GET['idk'];
-																																																																																						} ?>" placeholder="No Order" required>
+			<input name="no_order" placeholder="No order ..." type="text" onkeyup="this.value = this.value.toUpperCase();" class="form-control ordercuy" id="order" onchange="window.location='?p=Form-Matching&idk='+this.value+'&Dystf='+document.getElementById(`Dyestuff`).value+'&jn_mcng='+document.getElementById(`jen_matching`).value" value="<?php echo $_GET['idk'] ?? ''; ?>" placeholder="No Order" required>
 		</div>
 	</div>
 	<div class="form-group">
@@ -409,7 +444,7 @@
 	<div class="form-group">
 		<label for="no_item" class="col-sm-2 control-label">Item</label>
 		<div class="col-sm-10">
-			<select name="no_item" class="form-control selectNoItem" id="no_item" onchange="window.location='?p=Form-Matching&idk=<?php echo $_GET['idk']; ?>&iditem='+this.value+'&Dystf='+document.getElementById(`Dyestuff`).value+'&jn_mcng='+document.getElementById(`jen_matching`).value" required style="width: 400px;">
+			<select name="no_item" class="form-control selectNoItem" id="no_item" onchange="window.location='?p=Form-Matching&idk=<?php echo $_GET['idk'] ?? ''; ?>&iditem='+this.value+'&Dystf='+document.getElementById(`Dyestuff`).value+'&jn_mcng='+document.getElementById(`jen_matching`).value" required style="width: 400px;">
 				<option value="">Pilih</option>
 				<?php //while ($r = sqlsrv_fetch_array($sqljk)) { ?>
 					<option value="<?php // echo $r['id']; ?>" <?php //if ($_GET['iditem'] == $r['id']) { echo "SELECTED"; } ?>>
@@ -923,7 +958,7 @@
 	<div class="form-group">
 		<label for="order" class="col-sm-2 control-label">No Order</label>
 		<div class="col-sm-4">
-			<input name="no_order" type="text" class="form-control orderdevelopment" id="order" required placeholder="No Order..." value="<?= $_GET['idk']; ?>">
+			<input name="no_order" type="text" class="form-control orderdevelopment" id="order" required placeholder="No Order..." value="<?= $_GET['idk'] ?? ''; ?>">
 		</div>
 	</div>
 	<div class="form-group">
@@ -1354,15 +1389,13 @@
 	<div class="form-group">
 		<label for="order" class="col-sm-2 control-label">No Order</label>
 		<div class="col-sm-4">
-			<input name="no_order" placeholder="No order ..." onkeyup="this.value = this.value.toUpperCase();" type="text" class="form-control ordernowcuy" id="order" value="<?php if ($_GET['idk'] != "") {
-																																																																																								echo $_GET['idk'];
-																																																																																							} ?>" placeholder="No Order" required>
+			<input name="no_order" placeholder="No order ..." onkeyup="this.value = this.value.toUpperCase();" type="text" class="form-control ordernowcuy" id="order" value="<?php echo $_GET['idk'] ?? ''; ?>" placeholder="No Order" required>
 		</div>
 	</div>
 	<div class="form-group">
 		<label for="langganan" class="col-sm-2 control-label">Langganan</label>
 		<div class="col-sm-8">
-			<input name="langganan" type="text" class="form-control" id="langganan" value="<?= $dt_langganan['LANGGANAN'] . '/' . $dt_langganan['BUYER']; ?>" placeholder="Langganan">
+			<input name="langganan" type="text" class="form-control" id="langganan" value="<?= ($dt_langganan['LANGGANAN'] ?? '') . '/' . ($dt_langganan['BUYER'] ?? ''); ?>" placeholder="Langganan">
 		</div>
 	</div>
 	<!-- HIDDEN -->
@@ -1402,7 +1435,7 @@
 				?>
 				<option value="">Pilih</option>
 				<?php while ($r = db2_fetch_assoc($sqljk)) { ?>
-					<option value="<?= $r['DLVSALESORDERLINEORDERLINE']; ?>" <?php if ($_GET['iditem'] == $r['DLVSALESORDERLINEORDERLINE']) {
+					<option value="<?= $r['DLVSALESORDERLINEORDERLINE']; ?>" <?php if (($_GET['iditem'] ?? '') == $r['DLVSALESORDERLINEORDERLINE']) {
 																					echo "SELECTED";
 																				} ?>>
 						<?= $r['ITEMTYPEAFICODE'] . '-' . $r['SUBCODE02'] . '.' . $r['SUBCODE03']; ?> | <?= $r['WARNA']; ?> | <?= number_format($r['BRUTO'], 2); ?>
@@ -1412,7 +1445,7 @@
 
 			<?php
 				$order = $dt_langganan['PROJECTCODE'];
-				$getorderline = $_GET['iditem'];
+				$getorderline = $_GET['iditem'] ?? '';
 				$sqlitem = db2_exec($conn1, "SELECT 
 												p.DLVSALESORDERLINEORDERLINE AS DLVSALESORDERLINEORDERLINE,
 												p.ITEMTYPEAFICODE AS ITEMTYPEAFICODE,
@@ -1455,7 +1488,7 @@
 		<div class="col-sm-4">
 			<?php
 			$order = $dt_langganan['PROJECTCODE'];
-			$orderline = $_GET['iditem'];
+			$orderline = $_GET['iditem'] ?? '';
 
 			$sqljk_colorcode = db2_exec($conn1, "SELECT 
 													p.DLVSALESORDERLINEORDERLINE,
@@ -1490,6 +1523,22 @@
 												GROUP BY 
 													p.DLVSALESORDERLINEORDERLINE,i2.SUBCODE01,i2.SUBCODE02,i2.SUBCODE03,i2.SUBCODE04,i2.SUBCODE05,i2.SUBCODE06,i2.SUBCODE07,i2.SUBCODE08,i2.SUBCODE09,i2.SUBCODE10,i2.ITEMTYPEAFICODE,i.WARNA,p.CODE");
 			$assoc_colorcode = db2_fetch_assoc($sqljk_colorcode);
+			if (!is_array($assoc_colorcode)) {
+				$assoc_colorcode = [
+					'ITEMTYPEAFICODE' => '',
+					'SUBCODE01' => '',
+					'SUBCODE02' => '',
+					'SUBCODE03' => '',
+					'SUBCODE04' => '',
+					'SUBCODE05' => '',
+					'SUBCODE06' => '',
+					'SUBCODE07' => '',
+					'SUBCODE08' => '',
+					'SUBCODE09' => '',
+					'SUBCODE10' => '',
+					'WARNA' => '',
+				];
+			}
 			?>
 			<input name="color_code" type="text" class="form-control" id="color_code" placeholder="Color Code" value="<?= $assoc_colorcode['SUBCODE05']; ?>">
 		</div>
@@ -1541,6 +1590,11 @@
 															AND TRIM(SUBCODE10) = '$s10'
 															AND TRIM(ITEMTYPECODE) = '$itemtype'");
 			$r_jk = db2_fetch_assoc($sql_jk);
+			if (!is_array($r_jk)) {
+				$r_jk = [
+					'LONGDESCRIPTION' => '',
+				];
+			}
 			?>
 			<input name="kain" type="text" class="form-control" required id="kain" value="<?= str_replace('"', " ", $r_jk['LONGDESCRIPTION']); ?>" placeholder="Jenis kain...">
 		</div>
@@ -1556,10 +1610,16 @@
 		<div class="col-sm-6">
 			<?php
 			$order = $dt_langganan['PROJECTCODE'];
-			$orderline = $_GET['iditem'];
+			$orderline = $_GET['iditem'] ?? '';
 
 			$sql_cck = db2_exec($conn1, "SELECT * FROM ITXVIEW_STD_CCK_WARNA WHERE SALESORDERCODE = '$order' AND ORDERLINE = '$orderline'");
 			$r_cck = db2_fetch_assoc($sql_cck);
+			if (!is_array($r_cck)) {
+				$r_cck = [
+					'LABDIPNO' => '',
+					'STDCCKWARNA' => '',
+				];
+			}
 			?>
 			<input name="no_warna" type="text" class="form-control" id="no_warna" value="<?= $r_cck['LABDIPNO']; ?>" placeholder="LAB DIP NO">
 		</div>
@@ -1569,7 +1629,7 @@
 		<label for="gramasi" class="col-sm-2 control-label">Gramasi</label>
 		<div class="col-sm-2">
 			<input name="lebar" required type="text" class="form-control" id="lebar" placeholder="Inci" value="<?php
-																												$jn_mcng = $_GET['jn_mcng'];
+																												$jn_mcng = $_GET['jn_mcng'] ?? '';
 
 																												if ($jn_mcng == "Matching Ulang NOW" or $jns_match == "Perbaikan NOW") {
 																													$sql_lebar = db2_exec($conn1, "SELECT
@@ -1618,7 +1678,7 @@
 		</div>
 		<div class="col-sm-2">
 			<input name="gramasi" required type="text" class="form-control" id="gramasi" placeholder="Gr/M2" value="<?php
-																													$jn_mcng = $_GET['jn_mcng'];
+																													$jn_mcng = $_GET['jn_mcng'] ?? '';
 
 																													if ($jn_mcng == "Matching Ulang NOW" or $jns_match == "Perbaikan NOW") {
 																														$sql_gramasi = db2_exec($conn1, "SELECT
@@ -1669,8 +1729,28 @@
 		<label for="benang" class="col-sm-2 control-label">Benang</label>
 		<div class="col-sm-8">
 			<?php
-				$q_itxviewkk	= db2_exec($conn1, "SELECT * FROM ITXVIEWBONORDER i WHERE SALESORDERCODE = '$_GET[idk]' AND ORDERLINE = '$_GET[iditem]'");
-				$d_itxviewkk	= db2_fetch_assoc($q_itxviewkk);
+				$order_id = $_GET['idk'] ?? '';
+				$order_line = $_GET['iditem'] ?? '';
+
+				$q_itxviewkk = false;
+				if ($order_id !== '' && $order_line !== '') {
+					$q_itxviewkk = db2_exec($conn1, "SELECT * FROM ITXVIEWBONORDER i WHERE SALESORDERCODE = '$order_id' AND ORDERLINE = '$order_line'");
+				}
+				$d_itxviewkk = $q_itxviewkk ? db2_fetch_assoc($q_itxviewkk) : false;
+				if (!is_array($d_itxviewkk)) {
+					$d_itxviewkk = [
+						'ITEMTYPEAFICODE' => '',
+						'RESERVATION_SUBCODE04' => '',
+						'SUBCODE04' => '',
+						'SUBCODE01' => '',
+						'SUBCODE02' => '',
+						'SUBCODE03' => '',
+						'ADDITIONALDATA' => '',
+						'ADDITIONALDATA2' => '',
+						'ADDITIONALDATA3' => '',
+						'ADDITIONALDATA4' => '',
+					];
+				}
 
 				if($d_itxviewkk['ITEMTYPEAFICODE'] == 'KFF'){
 					$subcode04 = $d_itxviewkk['RESERVATION_SUBCODE04'];
@@ -1689,9 +1769,14 @@
 														AND SUBCODE02 = '$d_itxviewkk[SUBCODE02]'
 														AND SUBCODE03 = '$d_itxviewkk[SUBCODE03]'
 														AND SUBCODE04 = '$subcode04'
-														AND ORIGDLVSALORDLINESALORDERCODE = '$_GET[idk]'
+														AND ORIGDLVSALORDLINESALORDERCODE = '$order_id'
 														AND (ITEMTYPEAFICODE ='KGF' OR ITEMTYPEAFICODE = 'FKG')");
 				$d_rajut	= db2_fetch_assoc($q_rajut);
+				if (!is_array($d_rajut)) {
+					$d_rajut = [
+						'SUMMARIZEDDESCRIPTION' => '',
+					];
+				}
 
 				$q_booking_blm_ready_1	= db2_exec($conn1, "SELECT
 																*
@@ -1705,6 +1790,12 @@
 																AND ORIGDLVSALORDLINESALORDERCODE = '$d_itxviewkk[ADDITIONALDATA]'-- NGAMBIL DARI ADDITIONAL DATA 
 																AND (ITEMTYPEAFICODE ='KGF' OR ITEMTYPEAFICODE = 'FKG')");
 				$d_booking_blm_ready_1	= db2_fetch_assoc($q_booking_blm_ready_1);
+				if (!is_array($d_booking_blm_ready_1)) {
+					$d_booking_blm_ready_1 = [
+						'SUMMARIZEDDESCRIPTION' => '',
+						'ORIGDLVSALORDLINESALORDERCODE' => '',
+					];
+				}
 				
 				$q_booking_blm_ready_2	= db2_exec($conn1, "SELECT
 																*
@@ -1718,6 +1809,12 @@
 																AND ORIGDLVSALORDLINESALORDERCODE = '$d_itxviewkk[ADDITIONALDATA2]'-- NGAMBIL DARI ADDITIONAL DATA 
 																AND (ITEMTYPEAFICODE ='KGF' OR ITEMTYPEAFICODE = 'FKG')");
 				$d_booking_blm_ready_2	= db2_fetch_assoc($q_booking_blm_ready_2);
+				if (!is_array($d_booking_blm_ready_2)) {
+					$d_booking_blm_ready_2 = [
+						'SUMMARIZEDDESCRIPTION' => '',
+						'ORIGDLVSALORDLINESALORDERCODE' => '',
+					];
+				}
 				
 				$q_booking_blm_ready_3	= db2_exec($conn1, "SELECT
 																*
@@ -1731,6 +1828,12 @@
 																AND ORIGDLVSALORDLINESALORDERCODE = '$d_itxviewkk[ADDITIONALDATA3]'-- NGAMBIL DARI ADDITIONAL DATA 
 																AND (ITEMTYPEAFICODE ='KGF' OR ITEMTYPEAFICODE = 'FKG')");
 				$d_booking_blm_ready_3	= db2_fetch_assoc($q_booking_blm_ready_3);
+				if (!is_array($d_booking_blm_ready_3)) {
+					$d_booking_blm_ready_3 = [
+						'SUMMARIZEDDESCRIPTION' => '',
+						'ORIGDLVSALORDLINESALORDERCODE' => '',
+					];
+				}
 				
 				$q_booking_blm_ready_4	= db2_exec($conn1, "SELECT
 																*
@@ -1744,6 +1847,12 @@
 																AND ORIGDLVSALORDLINESALORDERCODE = '$d_itxviewkk[ADDITIONALDATA4]'-- NGAMBIL DARI ADDITIONAL DATA 
 																AND (ITEMTYPEAFICODE ='KGF' OR ITEMTYPEAFICODE = 'FKG')");
 				$d_booking_blm_ready_4	= db2_fetch_assoc($q_booking_blm_ready_4);
+				if (!is_array($d_booking_blm_ready_4)) {
+					$d_booking_blm_ready_4 = [
+						'SUMMARIZEDDESCRIPTION' => '',
+						'ORIGDLVSALORDLINESALORDERCODE' => '',
+					];
+				}
 				
 				$q_booking_blm_ready_5	= db2_exec($conn1, "SELECT
 																*
@@ -1757,15 +1866,29 @@
 																AND ORIGDLVSALORDLINESALORDERCODE = '$d_itxviewkk[ADDITIONALDATA4]'-- NGAMBIL DARI ADDITIONAL DATA 
 																AND (ITEMTYPEAFICODE ='KGF' OR ITEMTYPEAFICODE = 'FKG')");
 				$d_booking_blm_ready_5	= db2_fetch_assoc($q_booking_blm_ready_5);
+				if (!is_array($d_booking_blm_ready_5)) {
+					$d_booking_blm_ready_5 = [
+						'SUMMARIZEDDESCRIPTION' => '',
+						'ORIGDLVSALORDLINESALORDERCODE' => '',
+					];
+				}
 
-				$q_booking_new	= db2_exec($conn1, "SELECT
+				$q_booking_new = false;
+				if ($order_id !== '' && $order_line !== '') {
+					$q_booking_new = db2_exec($conn1, "SELECT
 														*
 													FROM
 														ITXVIEW_BOOKING_NEW ibn 
 													WHERE
-														SALESORDERCODE = '$_GET[idk]'
-														AND ORDERLINE = '$_GET[iditem]'");
-				$d_booking_new	= db2_fetch_assoc($q_booking_new);
+														SALESORDERCODE = '$order_id'
+														AND ORDERLINE = '$order_line'");
+				}
+				$d_booking_new	= $q_booking_new ? db2_fetch_assoc($q_booking_new) : false;
+				if (!is_array($d_booking_new)) {
+					$d_booking_new = [
+						'SUMMARIZEDDESCRIPTION' => '',
+					];
+				}
 			?>
 			<textarea name="benang" rows="6" class="form-control" id="benang" required placeholder="Benang">
 				<?php 
@@ -1817,11 +1940,23 @@
 		<label for="tgl_delivery" class="col-sm-2 control-label">Tgl Delivery </label>
 		<div class="col-sm-3">
 			<?php
-			$d_tgldelivery = db2_exec($conn1, "SELECT * FROM SALESORDERDELIVERY WHERE SALESORDERLINESALESORDERCODE = '$_GET[idk]' AND SALESORDERLINEORDERLINE = '$_GET[iditem]'");
-			$r_delivery = db2_fetch_assoc($d_tgldelivery);
+			$order_id = $_GET['idk'] ?? '';
+			$order_line = $_GET['iditem'] ?? '';
+			$d_tgldelivery = false;
+			if ($order_id !== '' && $order_line !== '') {
+				$d_tgldelivery = db2_exec($conn1, "SELECT * FROM SALESORDERDELIVERY WHERE SALESORDERLINESALESORDERCODE = '$order_id' AND SALESORDERLINEORDERLINE = '$order_line'");
+			}
+			$r_delivery = $d_tgldelivery ? db2_fetch_assoc($d_tgldelivery) : false;
+			if (!is_array($r_delivery)) {
+				$r_delivery = [
+					'DELIVERYDATE' => null,
+				];
+			}
 			?>
-			<input name="tgl_delivery" type="text" value="<?php $date_deliv = date_create($r_delivery['DELIVERYDATE']);
-															echo date_format($date_deliv, "Y-m-d"); ?>" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery">
+			<input name="tgl_delivery" type="text" value="<?php
+															$date_deliv = $r_delivery['DELIVERYDATE'] ? date_create($r_delivery['DELIVERYDATE']) : null;
+															echo $date_deliv ? date_format($date_deliv, "Y-m-d") : '';
+														?>" class="form-control datepicker" id="tgl_delivery" placeholder="Tgl Delivery">
 		</div>
 	</div>
 	<div class="form-group">
@@ -1839,11 +1974,16 @@
 		<label for="qty" class="col-sm-2 control-label">Qty Order</label>
 		<div class="col-sm-3">
 			<?php
-			$demand = $assoc_colorcode['DEMANDCODE'];
+			$demand = $assoc_colorcode['DEMANDCODE'] ?? '';
 			$qry_berat = db2_exec($conn1, "SELECT SUM(USERPRIMARYQUANTITY) AS QTY_BRUTO FROM ITXVIEW_KGBRUTO 
-													WHERE PROJECTCODE = '$_GET[idk]'
-													AND	  ORIGDLVSALORDERLINEORDERLINE = '$_GET[iditem]'");
-			$rw_berat = db2_fetch_assoc($qry_berat);
+													WHERE PROJECTCODE = '$order_id'
+													AND	  ORIGDLVSALORDERLINEORDERLINE = '$order_line'");
+			$rw_berat = $qry_berat ? db2_fetch_assoc($qry_berat) : false;
+			if (!is_array($rw_berat)) {
+				$rw_berat = [
+					'QTY_BRUTO' => '',
+				];
+			}
 			?>
 			<input name="qty" type="text" required class="form-control" id="qty" value="<?= $rw_berat['QTY_BRUTO']; ?>" placeholder="Qty Order">
 		</div>
