@@ -29,42 +29,86 @@ $columns = array(
 // group by c.id, c.`order`
 // order by a.idm, c.flag;
 
-$sql = "SELECT a.id, a.idm,b.no_order, c.flag, a.grp, b.jenis_kain, c.`order`, c.lot, b.no_item, b.no_po, b.no_warna, b.warna, c.created_at,c.created_by, b.langganan";
-$sql .= " FROM tbl_status_matching a";
-$sql .= " join tbl_matching b on b.no_resep = a.idm";
-$sql .= " join tbl_orderchild c on c.id_status = a.id and c.id_matching = b.id";
-$sql .= " group by c.id, c.`order`";
+function fetch_count($sql, array $params = [])
+{
+    global $con;
+    $stmt = sqlsrv_query($con, $sql, $params);
+    if (! $stmt) {
+        return 0;
+    }
+    $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+    sqlsrv_free_stmt($stmt);
+    return isset($row['cnt']) ? (int)$row['cnt'] : 0;
+}
 
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku 0");
-$totalData = mysqli_num_rows($query);
+$baseFrom = " FROM db_laborat.tbl_status_matching a
+              JOIN db_laborat.tbl_matching b ON b.no_resep = a.idm
+              JOIN db_laborat.tbl_orderchild c ON c.id_status = a.id AND c.id_matching = b.id";
+
+$totalData = fetch_count(
+    "SELECT COUNT(DISTINCT c.id) AS cnt" . $baseFrom
+);
 $totalFiltered = $totalData;
 
 //----------------------------------------------------------------------------------
-$sql = "SELECT a.id, a.idm, b.no_order, c.flag, a.grp, b.jenis_kain, c.`order`, c.lot, b.no_item, b.no_po, b.no_warna, b.warna, c.created_at, c.created_by, b.langganan";
-$sql .= " FROM tbl_status_matching a";
-$sql .= " join tbl_matching b on b.no_resep = a.idm";
-$sql .= " join tbl_orderchild c on c.id_status = a.id and c.id_matching = b.id";
-$sql .= " where a.approve = 'TRUE' AND a.status = 'selesai' ";
+$sql = "SELECT DISTINCT
+            a.id, a.idm, b.no_order, c.flag, a.grp, b.jenis_kain,
+            c.[order] AS [order], c.lot, b.no_item, b.no_po, b.no_warna,
+            b.warna, c.created_at, c.created_by, b.langganan";
+$sql .= $baseFrom;
+$sql .= " WHERE a.approve = 'TRUE' AND a.status = 'selesai' ";
 
+$params = [];
 if (!empty($requestData['search']['value'])) {
     //----------------------------------------------------------------------------------
-    $sql .= " AND (b.no_warna LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR b.no_order LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR b.no_item LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR b.warna LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR a.idm LIKE '%" . $requestData['search']['value'] . "%' ";
-    $sql .= " OR c.order LIKE '%" . $requestData['search']['value'] . "%')";
+    $search = '%' . $requestData['search']['value'] . '%';
+    $sql .= " AND (b.no_warna LIKE ? OR b.no_order LIKE ? OR b.no_item LIKE ?
+                   OR b.warna LIKE ? OR a.idm LIKE ? OR c.[order] LIKE ?)";
+    $params = [$search, $search, $search, $search, $search, $search];
 }
 //----------------------------------------------------------------------------------
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku 1");
-$totalFiltered = mysqli_num_rows($query);
-$sql .= "GROUP BY c.id, c.`order` ORDER BY a." . $columns[$requestData['order'][0]['column']] . "   " . $requestData['order'][0]['dir'] . ", c.flag asc  LIMIT " . $requestData['start'] . " ," . $requestData['length'] . "   ";
+$countFilteredSql = "SELECT COUNT(DISTINCT c.id) AS cnt" . $baseFrom .
+    " WHERE a.approve = 'TRUE' AND a.status = 'selesai' ";
+if (!empty($requestData['search']['value'])) {
+    $countFilteredSql .= " AND (b.no_warna LIKE ? OR b.no_order LIKE ? OR b.no_item LIKE ?
+                                 OR b.warna LIKE ? OR a.idm LIKE ? OR c.[order] LIKE ?)";
+}
+$totalFiltered = fetch_count($countFilteredSql, $params);
 
-$query = mysqli_query($con,$sql) or die("data_server.php: get dataku 2");
+$orderColumns = [
+    0 => 'a.idm',
+    1 => 'c.flag',
+    2 => 'b.no_order',
+    3 => 'a.grp',
+    4 => 'b.jenis_kain',
+    5 => 'c.[order]',
+    6 => 'c.lot',
+    7 => 'b.no_item',
+    8 => 'b.no_po',
+    9 => 'b.no_warna',
+    10 => 'b.warna',
+    11 => 'b.langganan',
+    12 => 'c.created_at',
+    13 => 'c.created_by',
+    14 => 'a.id'
+];
+
+$orderIndex = (int)($requestData['order'][0]['column'] ?? 0);
+$orderDir = strtolower($requestData['order'][0]['dir'] ?? 'asc') === 'desc' ? 'DESC' : 'ASC';
+$orderBy = $orderColumns[$orderIndex] ?? 'a.idm';
+
+$start = (int)($requestData['start'] ?? 0);
+$length = (int)($requestData['length'] ?? 10);
+$sql .= " ORDER BY $orderBy $orderDir, c.flag ASC
+          OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+$params[] = $start;
+$params[] = $length;
+
+$query = sqlsrv_query($con, $sql, $params, ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
 
 $data = array();
 $no = 1;
-while ($row = mysqli_fetch_array($query)) {
+while ($row = $query ? sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC) : null) {
     $nestedData = array();
     $nestedData[] =
         '<b>▕ Rcode > ' . $row["idm"] . ' &nbsp;&nbsp;▕&nbsp;&nbsp;J.kain > ' . $row['jenis_kain'] . '
@@ -85,13 +129,20 @@ while ($row = mysqli_fetch_array($query)) {
     $nestedData[] = $row["no_warna"];
     $nestedData[] = $row["warna"];
     $nestedData[] = $row["langganan"];
-    $nestedData[] = substr($row["created_at"], 0, 10);
+    if ($row["created_at"] instanceof DateTime) {
+        $nestedData[] = $row["created_at"]->format('Y-m-d');
+    } else {
+        $nestedData[] = $row["created_at"] ? substr((string)$row["created_at"], 0, 10) : '';
+    }
     $nestedData[] = $row["created_by"];
     //     $nestedData[] = '<li class="btn-group" role="group" aria-label="...">
     //     <a href="index1.php?p=Detail-status-approved&idm=' . $row['id'] . '" class="btn btn-primary btn-xs"><i class="fa fa-fw fa-search"></i></a>
     //     <a href="pages/cetak/cetak_resep.php?ids=' . $row['id'] . '&idm=' . $row['idm'] . '" class="btn btn-danger btn-xs" target="_blank"><i class="fa fa-fw fa-print"></i></a>
     //   </li>';
     $data[] = $nestedData;
+}
+if ($query) {
+    sqlsrv_free_stmt($query);
 }
 //----------------------------------------------------------------------------------
 $json_data = array(
