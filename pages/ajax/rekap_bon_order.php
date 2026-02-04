@@ -24,7 +24,7 @@ $tanggalAwal = '2025-06-01';
 
 // Ambil semua PIC
 $rekap = [];
-$resPIC = sqlsrv_query($sqlsrvLab, "SELECT username FROM tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC", [], ["Scrollable" => SQLSRV_CURSOR_KEYSET]);
+$resPIC = sqlsrv_query($sqlsrvLab, "SELECT username FROM db_laborat.tbl_user WHERE pic_bonorder = 1 ORDER BY id ASC", [], ["Scrollable" => SQLSRV_CURSOR_KEYSET]);
 while ($resPIC && ($row = sqlsrv_fetch_array($resPIC, SQLSRV_FETCH_ASSOC))) {
     $pic = $row['username'];
     $rekap[$pic] = [
@@ -38,7 +38,7 @@ if ($resPIC) {
     sqlsrv_free_stmt($resPIC);
 }
 
-$sqlApproved = "SELECT * FROM approval_bon_order WHERE CONVERT(date, tgl_approve_lab) = ? ORDER BY id DESC";
+$sqlApproved = "SELECT * FROM db_laborat.approval_bon_order WHERE CONVERT(date, tgl_approve_lab) = ? ORDER BY id DESC";
 $resultApproved = sqlsrv_query($sqlsrvLab, $sqlApproved, [$kemarin], ["Scrollable" => SQLSRV_CURSOR_KEYSET]);
 $approve_today = $resultApproved ? sqlsrv_num_rows($resultApproved) : 0;
 
@@ -46,7 +46,7 @@ $approve_today = $resultApproved ? sqlsrv_num_rows($resultApproved) : 0;
 $resApproval = sqlsrv_query(
     $sqlsrvLab,
     "SELECT pic_lab, status
-     FROM approval_bon_order
+     FROM db_laborat.approval_bon_order
      WHERE (status = 'Approved' AND CONVERT(date, tgl_approve_lab) = ?)
         OR (status = 'Rejected' AND CONVERT(date, tgl_rejected_lab) = ?)",
     [$kemarin, $kemarin],
@@ -82,8 +82,8 @@ $resStatus = sqlsrv_query(
     "SELECT 
         smb.pic_check, 
         LOWER(LTRIM(RTRIM(smb.status_bonorder))) AS status_bonorder
-     FROM status_matching_bon_order smb
-     JOIN approval_bon_order ab ON ab.code = smb.salesorder
+     FROM db_laborat.status_matching_bon_order smb
+     JOIN db_laborat.approval_bon_order ab ON ab.code = smb.salesorder
      WHERE (ab.status = 'Approved' AND CONVERT(date, ab.tgl_approve_lab) = ?)
         OR (ab.status = 'Rejected' AND CONVERT(date, ab.tgl_rejected_lab) = ?)",
     [$kemarin, $kemarin],
@@ -115,7 +115,7 @@ if ($resStatus) {
 
 // Total Bon Order diterima H-1 (via query dari ITXVIEW)
 $approvedCodes = [];
-$resCode = sqlsrv_query($sqlsrvLab, "SELECT code FROM approval_bon_order");
+$resCode = sqlsrv_query($sqlsrvLab, "SELECT code FROM db_laborat.approval_bon_order");
 while ($resCode && ($r = sqlsrv_fetch_array($resCode, SQLSRV_FETCH_ASSOC))) {
     $approvedCodes[] = "'" . str_replace("'", "''", $r['code']) . "'";
 }
