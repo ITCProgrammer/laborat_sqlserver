@@ -1392,7 +1392,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 // Setelah semua data selesai diproses, lakukan INSERT SEKALI SAJA
                                 if (!empty($insertData)) {
 
-                                    $sql = "INSERT INTO db_laborat.dbo.tb_stock_gd_kimia (
+                                    $sql = "INSERT INTO db_laborat.tb_stock_gd_kimia (
                                             kode_obat,
                                             nama_obat,
                                             qty_awal,
