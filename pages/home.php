@@ -266,7 +266,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
         <?php
           $Total_resep = sqlsrv_scalar_int(
             $con,
-            "SELECT COUNT(*) FROM tbl_status_matching WHERE status = 'selesai' AND approve = 'TRUE'"
+            "SELECT COUNT(*) FROM db_laborat.tbl_status_matching WHERE status = 'selesai' AND approve = 'TRUE'"
           );
         ?>
         <div class="inner">
@@ -288,7 +288,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
         <?php
           $Total_Dyes = sqlsrv_scalar_int(
             $con,
-            "SELECT COUNT(*) FROM tbl_dyestuff WHERE is_active = 'TRUE'"
+            "SELECT COUNT(*) FROM db_laborat.tbl_dyestuff WHERE is_active = 'TRUE'"
           );
         ?>
         <div class="inner">
@@ -308,11 +308,11 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
       <?php
         $totalmatcher = sqlsrv_scalar_int(
           $con,
-          "SELECT COUNT(*) FROM tbl_matcher WHERE status = 'Aktif'"
+          "SELECT COUNT(*) FROM db_laborat.tbl_matcher WHERE status = 'Aktif'"
         );
         $totalcolorist = sqlsrv_scalar_int(
           $con,
-          "SELECT COUNT(*) FROM tbl_colorist WHERE is_active = 'TRUE'"
+          "SELECT COUNT(*) FROM db_laborat.tbl_colorist WHERE is_active = 'TRUE'"
         );
       ?>
       <div class="small-box bg-yellow">
@@ -333,7 +333,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
       <?php
         $proses = sqlsrv_scalar_int(
           $con,
-          "SELECT COUNT(*) FROM master_proses WHERE is_active = 'TRUE'"
+          "SELECT COUNT(*) FROM db_laborat.master_proses WHERE is_active = 'TRUE'"
         );
       ?>
       <div class="small-box bg-red">
@@ -473,7 +473,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
           text: 'Persentase Status Akhir Resep -12 Hari'
         },
         subtitle: {
-          text: 'Source: DB 10.0.0.10/laborat'
+          text: 'Source: DB 10.0.0.221/laborat'
         },
         xAxis: {
           categories: d.xCategories,

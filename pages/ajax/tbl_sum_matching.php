@@ -26,7 +26,7 @@ function Masuk($jenis_matching)
     $start = date('Y-m-01 23:00:00');
     $end = date('Y-m-d 23:00:00');
     return count_query(
-        "SELECT COUNT(id) AS count FROM tbl_matching
+        "SELECT COUNT(id) AS count FROM db_laborat.tbl_matching
          WHERE jenis_matching = ?
            AND tgl_buat >= ?
            AND tgl_buat <= ?",
@@ -37,8 +37,8 @@ function SiapBagi($jenis_matching)
 {
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_matching a
-         LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+         FROM db_laborat.tbl_matching a
+         LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
          WHERE b.approve_at IS NULL AND b.status IS NULL
            AND a.status_bagi = 'siap bagi'
            AND a.jenis_matching = ?",
@@ -49,8 +49,8 @@ function SedangJalan($jenis_matching)
 {
     return count_query(
         "SELECT COUNT(b.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND b.jenis_matching = ?",
         [$jenis_matching]
@@ -60,8 +60,8 @@ function WaitingApprove($jenis_matching)
 {
     return count_query(
         "SELECT COUNT(b.id) AS count
-         FROM tbl_status_matching a
-         INNER JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('selesai','batal')
            AND a.approve = 'NONE'
            AND b.jenis_matching = ?",
@@ -74,7 +74,7 @@ function Delete($jenis_matching)
     $start = date('Y-m-01 23:00:00');
     $end = date('Y-m-d 23:00:00');
     return count_query(
-        "SELECT COUNT(id) AS count FROM historical_delete_matching
+        "SELECT COUNT(id) AS count FROM db_laborat.historical_delete_matching
          WHERE jenis_matching = ?
            AND delete_at >= ?
            AND delete_at <= ?",
@@ -86,8 +86,8 @@ function Tunggu($jenis_matching)
 {
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_matching a
-         LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+         FROM db_laborat.tbl_matching a
+         LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
          WHERE b.approve_at IS NULL AND b.status IS NULL
            AND a.status_bagi = 'tunggu'
            AND a.jenis_matching = ?",
@@ -98,8 +98,8 @@ function belum_bagi($jenis_matching)
 {
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_matching a
-         LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+         FROM db_laborat.tbl_matching a
+         LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
          WHERE b.approve_at IS NULL AND b.status IS NULL
            AND a.status_bagi IS NULL
            AND a.jenis_matching = ?",
@@ -113,8 +113,8 @@ function Selesai($jenis_matching)
     $end = date('Y-m-d 23:00:00');
     return count_query(
         "SELECT COUNT(b.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON b.no_resep = a.idm
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON b.no_resep = a.idm
          WHERE b.jenis_matching = ?
            AND a.approve = 'TRUE'
            AND a.approve_at >= ?
@@ -260,7 +260,7 @@ function MasukYesterday($jenis_matching)
 	$ystrdy = date('Y-m-d', strtotime("-2 days"));
 	$tody = date('Y-m-d', strtotime("-1 days"));
     return count_query(
-        "SELECT COUNT(id) AS count FROM tbl_matching
+        "SELECT COUNT(id) AS count FROM db_laborat.tbl_matching
          WHERE jenis_matching = ?
            AND tgl_buat BETWEEN ? AND ?",
         [$jenis_matching, "$ystrdy 23:00:00", "$tody 23:00:00"]
@@ -275,8 +275,8 @@ function Selesai_Y($jenis_matching)
 	$tody = date('Y-m-d', strtotime("-1 days"));
     return count_query(
         "SELECT COUNT(b.id) AS count
-         FROM tbl_status_matching a 
-         JOIN tbl_matching b ON b.no_resep = a.idm
+         FROM db_laborat.tbl_status_matching a 
+         JOIN db_laborat.tbl_matching b ON b.no_resep = a.idm
          WHERE b.jenis_matching = ?
            AND a.approve = 'TRUE'
            AND (a.koreksi_resep <> '' OR a.koreksi_resep2 <> '')
@@ -292,8 +292,8 @@ function grpA($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'A'
            AND b.jenis_matching = ?",
@@ -306,8 +306,8 @@ function grpB($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'B'
            AND b.jenis_matching = ?",
@@ -320,8 +320,8 @@ function grpC($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'C'
            AND b.jenis_matching = ?",
@@ -334,8 +334,8 @@ function grpD($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'D'
            AND b.jenis_matching = ?",
@@ -348,8 +348,8 @@ function grpE($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'E'
            AND b.jenis_matching = ?",
@@ -362,8 +362,8 @@ function grpF($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'F'
            AND b.jenis_matching = ?",
@@ -376,8 +376,8 @@ function SA($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'SA'
            AND b.jenis_matching = ?",
@@ -390,8 +390,8 @@ function SB($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'SB'
            AND b.jenis_matching = ?",
@@ -404,8 +404,8 @@ function SC($jenis_matching)
 	$tody = date('Y-m-d');
     return count_query(
         "SELECT COUNT(a.id) AS count
-         FROM tbl_status_matching a
-         JOIN tbl_matching b ON a.idm = b.no_resep
+         FROM db_laborat.tbl_status_matching a
+         JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
          WHERE a.status IN ('buka','mulai','hold','revisi','tunggu')
            AND a.grp = 'SC'
            AND b.jenis_matching = ?",

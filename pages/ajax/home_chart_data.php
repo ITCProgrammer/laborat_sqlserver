@@ -36,7 +36,11 @@ function grouped_map($conn, string $sql, array $params): array {
   }
   $out = [];
   while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
-    $out[$row['d']] = (int) $row['cnt'];
+    $key = $row['d'];
+    if ($key instanceof DateTime) {
+      $key = $key->format('Y-m-d');
+    }
+    $out[$key] = (int) $row['cnt'];
   }
   sqlsrv_free_stmt($stmt);
   return $out;
@@ -46,7 +50,7 @@ function grouped_map($conn, string $sql, array $params): array {
 $mapSelesai = grouped_map(
   $con,
   "SELECT CONVERT(date, approve_at) AS d, COUNT(*) AS cnt
-   FROM tbl_status_matching
+   FROM db_laborat.tbl_status_matching
    WHERE status='selesai' AND approve='TRUE'
      AND approve_at IS NOT NULL
      AND approve_at >= ? AND approve_at < ?
@@ -58,7 +62,7 @@ $mapSelesai = grouped_map(
 $mapClosed = grouped_map(
   $con,
   "SELECT CONVERT(date, tutup_at) AS d, COUNT(*) AS cnt
-   FROM tbl_status_matching
+   FROM db_laborat.tbl_status_matching
    WHERE status='tutup'
      AND tutup_at IS NOT NULL
      AND tutup_at >= ? AND tutup_at < ?
@@ -70,8 +74,8 @@ $mapClosed = grouped_map(
 $mapArsip = grouped_map(
   $con,
   "SELECT CONVERT(date, b.do_at) AS d, COUNT(DISTINCT a.idm) AS cnt
-   FROM tbl_status_matching a
-   JOIN log_status_matching b ON a.idm = b.ids
+   FROM db_laborat.tbl_status_matching a
+   JOIN db_laborat.log_status_matching b ON a.idm = b.ids
    WHERE a.status='arsip' AND b.status='arsip'
      AND b.do_at IS NOT NULL
      AND b.do_at >= ? AND b.do_at < ?
@@ -96,7 +100,7 @@ $qPie = "
     SUM(CASE WHEN status='selesai' AND approve='TRUE' THEN 1 ELSE 0 END) AS row_selesai,
     SUM(CASE WHEN status='tutup' THEN 1 ELSE 0 END) AS row_tutup,
     SUM(CASE WHEN status='arsip' THEN 1 ELSE 0 END) AS row_arsip
-  FROM tbl_status_matching
+  FROM db_laborat.tbl_status_matching
 ";
 $stmtPie = sqlsrv_query($con, $qPie, [], ['Scrollable' => SQLSRV_CURSOR_KEYSET]);
 if ($stmtPie && ($row = sqlsrv_fetch_array($stmtPie, SQLSRV_FETCH_ASSOC))) {

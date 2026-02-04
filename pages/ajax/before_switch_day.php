@@ -25,7 +25,7 @@ include '../../koneksi.php';
                 //    $tody           = date('Y-m-d', strtotime("-1 days"));
                 $stmt_23 = sqlsrv_query(
                     $con,
-                    "SELECT * FROM sisa_schedule WHERE [time] BETWEEN ? AND ?",
+                    "SELECT * FROM db_laborat.sisa_schedule WHERE [time] BETWEEN ? AND ?",
                     ["$ystrdy 23:00:00", "$tody 23:00:00"],
                     ["Scrollable" => SQLSRV_CURSOR_KEYSET]
                 );
