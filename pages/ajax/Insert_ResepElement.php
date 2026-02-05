@@ -22,7 +22,7 @@ if ($no_resep === '' || $element_code === '') {
     exit;
 }
 
-$sqlGetId = "SELECT NUMBERID FROM balance WHERE ELEMENTSCODE = ?";
+$sqlGetId = "SELECT NUMBERID FROM db_laborat.balance WHERE ELEMENTSCODE = ?";
 $stmt = sqlsrv_query($con, $sqlGetId, [$element_code]);
 $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 sqlsrv_free_stmt($stmt);
@@ -39,7 +39,7 @@ $element_id = $row['NUMBERID'];
 
 
 // Cek balance: pastikan record balance ada dan qty (BASEPRIMARYQUANTITYUNIT) > 0
-$checkBalanceQuery = "SELECT TOP 1 BASEPRIMARYQUANTITYUNIT FROM balance WHERE NUMBERID = ?";
+$checkBalanceQuery = "SELECT TOP 1 BASEPRIMARYQUANTITYUNIT FROM db_laborat.balance WHERE NUMBERID = ?";
 $stmt = sqlsrv_query($con, $checkBalanceQuery, [$element_id]);
 $balanceRow = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 sqlsrv_free_stmt($stmt);

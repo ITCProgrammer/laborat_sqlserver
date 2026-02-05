@@ -753,10 +753,10 @@ $page = strtolower($page);
                                 </ul> -->
                                 <ul class="dropdown-menu">
                                     <li class="header">
-                                        Ada <a href="/laborat/index1.php?p=Approval-Bon-Order" style="display: inline; padding: 3px 3px; font-weight: 700;">
+                                        Ada <a href="?p=Approval-Bon-Order" style="display: inline; padding: 3px 3px; font-weight: 700;">
                                             <span id="notifTBOText" style="color:#FF0007;"></span> Bon Order Baru
                                         </a> dan
-                                        <a href="/laborat/index1.php?p=Approval-Revisi-Bon-Order" style="display: inline; padding: 3px 3px; font-weight: 700;">
+                                        <a href="?p=Approval-Revisi-Bon-Order" style="display: inline; padding: 3px 3px; font-weight: 700;">
                                             <span id="notifTBOText_revisi" style="color:#FF0007;"></span> Revisi Bon Order
                                         </a>
                                     </li>
@@ -1183,10 +1183,10 @@ $(document).ready(function() {
 
                 const $list = $('#notifList').empty();
                 resp.new.codes.forEach(code => $list.append(
-                    `<li style="padding:6px 12px; background-color: rgb(220, 220, 220);"><a href="/laborat/index1.php?p=Approval-Bon-Order&code=${encodeURIComponent(code)}">Bon Order Baru ${code}</a></li>`
+                    `<li style="padding:6px 12px; background-color: rgb(220, 220, 220);"><a href="?p=Approval-Bon-Order&code=${encodeURIComponent(code)}">Bon Order Baru ${code}</a></li>`
                 ));
                 resp.revisi.codes.forEach(code => $list.append(
-                    `<li style="padding:6px 12px; background-color: rgb(250, 235, 215);"><a href="/laborat/index1.php?p=Approval-Revisi-Bon-Order&code=${encodeURIComponent(code)}">Revisi Bon Order ${code}</a></li>`
+                    `<li style="padding:6px 12px; background-color: rgb(250, 235, 215);"><a href="?p=Approval-Revisi-Bon-Order&code=${encodeURIComponent(code)}">Revisi Bon Order ${code}</a></li>`
                 ));
             });
         }
