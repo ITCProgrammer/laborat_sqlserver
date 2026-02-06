@@ -3,7 +3,7 @@ ini_set("error_reporting", 1);
 session_start();
 include("../koneksi.php");
 $time = date('Y-m-d H:i:s');
-if (isset($_POST['savee'])) {
+if (isset($_POST['save'])) {
 $qry1 = sqlsrv_query($con, "UPDATE db_laborat.tbl_status_matching SET
           grp=?,
           matcher=?,

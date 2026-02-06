@@ -1832,21 +1832,21 @@
                         
                         $KodeBaru = sqlsrv_query($con,"SELECT * FROM db_laborat.tbl_dyestuff where code = '$rsp1[kode]'");
                         $kdbr = sqlsrv_fetch_array($KodeBaru, SQLSRV_FETCH_ASSOC);
-                        
-                        if($kdbr['code_new']){ 
-                            $kode_lama = $rsp1['kode'];
+                        if (!is_array($kdbr)) {
+                            $kdbr = ['code_new' => '', 'ket' => '', 'Product_Name' => ''];
+                        }
+
+                        $kode_lama = $rsp1['kode'];
+                        $kode_baru = $rsp1['kode'];
+
+                        if (!empty($kdbr['code_new'])) { 
                             $kode_baru = $kdbr['code_new'];
-                        // JIKA KODE BARU MASUK KE KODE LAMA, PENCARIAN BERDASARKAN KODE LAMA
-                        }else{
+                        } else {
                             $KodeBaru_now = sqlsrv_query($con,"SELECT [code], code_new FROM db_laborat.tbl_dyestuff where code_new = '$rsp1[kode]'");
                             $kdbr_now = sqlsrv_fetch_array($KodeBaru_now, SQLSRV_FETCH_ASSOC);
-                            if($kdbr_now['code'] && $kdbr_now['code_new']){
+                            if (is_array($kdbr_now) && !empty($kdbr_now['code']) && !empty($kdbr_now['code_new'])) {
                                 $kode_lama = $kdbr_now['code'];
                                 $kode_baru = $kdbr_now['code_new'];
-                            // JIKA KODE BARU KOSONG
-                            }else{
-                                $kode_lama = $rsp1['kode'];
-                                $kode_baru = $kdbr['code_new'];
                             }
                         }
                     ?>
