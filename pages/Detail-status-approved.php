@@ -1326,7 +1326,7 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                             </tr>
                             <tr>
                                 <td colspan="2">Liquor Ratio (LR)</td>
-                                <td colspan="3">: <?php if ($data['lr'] == '0') {
+                                <td colspan="3">: <?php if ($data['lr'] == '0' || $data['lr'] == '-') {
                                                         echo $data['second_lr'];
                                                     } else {
                                                         echo $data['lr'];
@@ -1549,7 +1549,7 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                                 </tr>
                                 <tr>
                                     <td>Liquor Ratio (LR)</td>
-                                    <td>: <?php if ($data['lr'] == '0') {
+                                    <td>: <?php if ($data['lr'] == '0' || $data['lr'] == '-') {
                                                 echo $data['second_lr'];
                                             } else {
                                                 echo $data['lr'];
@@ -1749,7 +1749,7 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                                 </tr>
                                 <tr>
                                     <td>Liquor Ratio (LR)</td>
-                                    <td>: <?php if ($data['lr'] == '0') {
+                                    <td>: <?php if ($data['lr'] == '0' || $data['lr'] == '-') {
                                                 echo $data['second_lr'];
                                             } else {
                                                 echo $data['lr'];

@@ -50,7 +50,7 @@ $sqlRecipe = "SELECT TOP 1
                     a.idm AS SUFFIXCODE, 
                     b.warna, 
                     CASE 
-                        WHEN a.lr = '0' THEN SUBSTRING(CONVERT(VARCHAR(50), a.second_lr), 3, LEN(CONVERT(VARCHAR(50), a.second_lr))) 
+                        WHEN a.lr = '0' OR a.lr = '-' THEN SUBSTRING(CONVERT(VARCHAR(50), a.second_lr), 3, LEN(CONVERT(VARCHAR(50), a.second_lr))) 
                         ELSE SUBSTRING(CONVERT(VARCHAR(50), a.lr), 3, LEN(CONVERT(VARCHAR(50), a.lr))) 
                     END AS LR,
                     PARSENAME(REPLACE(b.recipe_code,' ','.'),2) as recipe_code_1,
