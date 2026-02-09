@@ -150,7 +150,7 @@ if (file_exists($logoPath)) {
     <?php
 
     $no = 1;
-    $sql = "SELECT * FROM db_laborat.tb_stock_gd_kimia WHERE ip_address = ?";
+    $sql = "SELECT * FROM db_laborat.tb_stock_gd_kimia WHERE ip_address = ? group by kode_obat ASC" ;
         $stmt = sqlsrv_query($con, $sql, [$ip_num]);
 
         if ($stmt === false) {
