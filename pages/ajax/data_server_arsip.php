@@ -79,8 +79,10 @@ while ($row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC)) {
     $nestedData[] = $row["no_item"] ?? '';
     $nestedData[] = $row["no_po"] ?? '';
     $nestedData[] = $row["cocok_warna"] ?? '';
-    $nestedData[] = $row["approve_at"] ?? '';
-    $nestedData[] = $row["tgl_arsip"] ?? '';
+    $approveAt = $row["approve_at"] ?? null;
+    $tglArsip = $row["tgl_arsip"] ?? null;
+    $nestedData[] = ($approveAt instanceof DateTimeInterface) ? $approveAt->format('Y-m-d H:i:s') : ($approveAt ?? '');
+    $nestedData[] = ($tglArsip instanceof DateTimeInterface) ? $tglArsip->format('Y-m-d H:i:s') : ($tglArsip ?? '');
 
     $data[] = $nestedData;
     $no++;
