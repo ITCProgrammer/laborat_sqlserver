@@ -835,7 +835,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                 CASE 
                                                     WHEN s.USERPRIMARYUOMCODE = 't' THEN 'g'
                                                     WHEN s.USERPRIMARYUOMCODE = 'kg' THEN 'g'
-                                                    ELSE s.USERPRIMARYUOMCODEz
+                                                    ELSE s.USERPRIMARYUOMCODE
                                                 END AS SATUAN_MASUK
                                             FROM
                                                 STOCKTRANSACTION s
