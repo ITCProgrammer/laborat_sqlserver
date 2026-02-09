@@ -3,23 +3,20 @@
     include "../../koneksi.php";
     session_start();
 
-    mysqli_set_charset($con, "utf8mb4"); // biar aman untuk semua karakter
-
     $ids      = $_POST['ids'] ?? '';
     $idm      = $_POST['idm'] ?? '';
     $adj_no   = $_POST['adj_no'] ?? '';
     $comment  = $_POST['comment'] ?? '';
     $idUser   = $_POST['idUser'] ?? '';
 
-    $stmt = $con->prepare("INSERT INTO tbl_comment (ids, idm, adj, comment, created_by) VALUES (?, ?, ?, ?, ?)");
-    $stmt->bind_param("sssss", $ids, $idm, $adj_no, $comment, $idUser);
+    $sql = "INSERT INTO db_laborat.tbl_comment (ids, idm, adj, comment, created_by)
+            VALUES (?, ?, ?, ?, ?)";
+    $stmt = sqlsrv_query($con, $sql, [$ids, $idm, $adj_no, $comment, $idUser]);
 
-    if ($stmt->execute()) {
+    if ($stmt) {
         echo 'SAVED';
     } else {
-        echo 'ERROR: ' . $stmt->error;
+        $err = sqlsrv_errors();
+        echo 'ERROR: ' . ($err[0]['message'] ?? 'unknown');
     }
-
-    $stmt->close();
-    mysqli_close($con);
 ?>

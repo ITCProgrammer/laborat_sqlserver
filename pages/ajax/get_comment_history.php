@@ -6,19 +6,19 @@
         die(print_r(sqlsrv_errors(), true));
     }
 
-    $ids = mysqli_real_escape_string($con, $_GET['ids'] ?? '');
-    $idm = mysqli_real_escape_string($con, $_GET['idm'] ?? '');
-    $adj = mysqli_real_escape_string($con, $_GET['adj'] ?? '');
+    $ids = $_GET['ids'] ?? '';
+    $idm = $_GET['idm'] ?? '';
+    $adj = $_GET['adj'] ?? '';
 
-    $sql = "SELECT comment, created_at, created_by FROM tbl_comment 
-            WHERE ids = '$ids' AND idm = '$idm' AND adj = '$adj' 
+    $sql = "SELECT comment, created_at, created_by FROM db_laborat.tbl_comment 
+            WHERE ids = ? AND idm = ? AND adj = ?
             ORDER BY id DESC";
-    $res = mysqli_query($con, $sql);
+    $res = sqlsrv_query($con, $sql, [$ids, $idm, $adj]);
 
     $data = [];
 
-    while ($row = mysqli_fetch_assoc($res)) {
-        $created_by = (int)$row['created_by']; // cast to int for safety
+    while ($res && ($row = sqlsrv_fetch_array($res, SQLSRV_FETCH_ASSOC))) {
+        $created_by = (int)($row['created_by'] ?? 0); // cast to int for safety
 
         $getUserName = "SELECT username FROM [nowprd].[users]
                         WHERE id = $created_by AND menu = 'prd_bukuresep.php'";
@@ -27,7 +27,7 @@
 
         $data[] = [
             'comment'       => $row['comment'],
-            'created_at'    => $row['created_at'],
+            'created_at'    => ($row['created_at'] instanceof DateTime) ? $row['created_at']->format('Y-m-d H:i:s') : $row['created_at'],
             'username'      => $userName['username'] ?? 'tidak diketahui'
         ];
     }

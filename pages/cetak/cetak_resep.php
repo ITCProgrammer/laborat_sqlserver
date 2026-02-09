@@ -4054,8 +4054,8 @@
         td.addEventListener('contextmenu', function(e) {
         e.preventDefault();
         currentCell = this;
-        contextMenu.style.top = [${e.pageY}px];
-        contextMenu.style.left = [${e.pageX}px];
+        contextMenu.style.top = `${e.pageY}px`;
+        contextMenu.style.left = `${e.pageX}px`;
         contextMenu.style.display = 'block';
         });
     });
@@ -4084,15 +4084,15 @@
             if (data.length > 0) {
                 let html = '';
                 data.forEach(row => {
-                    html += [<tr>
+                    html += `<tr>
                                 <td>${row.username}</td>
                                 <td>${row.created_at}</td>
                                 <td>${row.comment}</td>
-                            </tr>];
+                            </tr>`;
                 });
                 tbody.innerHTML = html;
             } else {
-                tbody.innerHTML = "<tr><td colspan='2'>Belum ada komentar.</td></tr>";
+                tbody.innerHTML = "<tr><td colspan='3'>Belum ada komentar.</td></tr>";
             }
         });
     });
