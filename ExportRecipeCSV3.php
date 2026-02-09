@@ -83,7 +83,32 @@ while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
     }
     $tgl = date('Y-m-d H:i:s');
     $warna  = str_replace("'", "`", $r['warna']);
-    $lrNumeric = normalizeLiquorRatio($r['LR'] ?? '');
+    $lrRaw = $r['LR'] ?? '';
+    $lrNumeric = normalizeLiquorRatio($lrRaw);
+    $validationErrors = [];
+    if (trim((string)$lrRaw) === '') {
+        $validationErrors[] = "LR wajib diisi (contoh: 1.6)";
+    }
+    // Jika hasil normalisasi 0 tapi input bukan 0/0.0, anggap format tidak valid
+    if ($lrNumeric === '0' && !preg_match('/^\s*0([.,]0+)?\s*$/', (string)$lrRaw)) {
+        $validationErrors[] = "Format LR tidak valid. Gunakan angka desimal (contoh: 1.6)";
+    }
+    if (trim((string)($r['recipe_code_2'] ?? '')) === '') {
+        $validationErrors[] = "Recipe code tidak valid (bagian recipe_code_2 kosong)";
+    }
+    if (trim((string)($r['no_resep_convert'] ?? '')) === '') {
+        $validationErrors[] = "No resep convert kosong";
+    }
+    if (trim((string)($r['warna'] ?? '')) === '') {
+        $validationErrors[] = "Warna kosong";
+    }
+
+    if (!empty($validationErrors)) {
+        $msg = "Data tidak valid:\\n- " . implode("\\n- ", $validationErrors);
+        echo "<script>alert(" . json_encode($msg) . ");</script>";
+        echo "<pre>VALIDATION ERROR:\n".htmlentities(print_r($validationErrors, true))."</pre>";
+        exit;
+    }
     $queryDataMain  = "INSERT INTO RECIPEBEAN (
                                                 COMPANYCODE,
                                                 IMPORTAUTOCOUNTER,
