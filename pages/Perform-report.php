@@ -38,8 +38,8 @@
     function sisa_bulan_lalu($head_code, $month_param, $jenis_matching)
     {
         $sql = "SELECT COUNT(a.jenis_matching) AS summary
-        FROM tbl_matching a
-        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        FROM db_laborat.tbl_matching a
+        LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
         WHERE substring(a.no_resep, 1, 2) = ?
           AND CONVERT(varchar(7), a.tgl_buat, 120) = ?
           AND a.jenis_matching = ?
@@ -51,8 +51,8 @@
     function masuk_bulan_ini($head_code, $start, $end, $jenis_matching)
     {
         $sql = "SELECT COUNT(a.jenis_matching) AS summary
-        FROM tbl_matching a
-        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        FROM db_laborat.tbl_matching a
+        LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
         WHERE substring(a.no_resep, 1, 2) = ?
           AND a.tgl_buat >= ?
           AND a.tgl_buat <= ?
@@ -64,8 +64,8 @@
     function belum_keluar_bulan_ini($head_code, $start, $end, $jenis_matching)
     {
         $sql = "SELECT COUNT(a.jenis_matching) AS summary
-        FROM tbl_matching a
-        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        FROM db_laborat.tbl_matching a
+        LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
         WHERE substring(a.no_resep, 1, 2) = ?
           AND a.tgl_buat >= ?
           AND a.tgl_buat <= ?
@@ -78,8 +78,8 @@
     function keluar_bulan_ini($head_code, $start, $end, $jenis_matching)
     {
         $sql = "SELECT COUNT(a.jenis_matching) AS summary
-        FROM tbl_matching a
-        LEFT JOIN tbl_status_matching b ON a.no_resep = b.idm
+        FROM db_laborat.tbl_matching a
+        LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
         WHERE substring(a.no_resep, 1, 2) = ?
           AND b.approve_at >= ?
           AND b.approve_at <= ?
@@ -93,8 +93,8 @@
     function get_sum_by_matcher($final_matcher, $head_code, $start, $end, $jenis_matching)
     {
         $sql = "SELECT COUNT(a.final_matcher) AS summary
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
+        FROM db_laborat.tbl_status_matching a
+        JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
         WHERE a.final_matcher = ?
           AND substring(b.no_resep, 1, 2) = ?
           AND a.approve_at >= ?
@@ -108,8 +108,8 @@
     function get_summary($start, $end)
     {
         $sql = "SELECT COUNT(a.final_matcher) AS summary
-        FROM tbl_status_matching a
-        JOIN tbl_matching b ON a.idm = b.no_resep
+        FROM db_laborat.tbl_status_matching a
+        JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
         WHERE a.approve_at >= ?
           AND a.approve_at <= ?
           AND a.approve = 'TRUE'";
@@ -484,7 +484,7 @@
                         </thead>
                         <tbody>
                             <?php
-                                $sql_matcher = sqlsrv_query($con, "SELECT * FROM tbl_matcher WHERE [status]='Aktif'");
+                                $sql_matcher = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_matcher WHERE [status]='Aktif'");
                                 if ($sql_matcher === false) {
                                     error_log('Perform-report matcher query failed: ' . print_r(sqlsrv_errors(), true));
                                 }

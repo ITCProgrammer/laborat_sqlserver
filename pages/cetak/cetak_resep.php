@@ -1031,33 +1031,44 @@
                                             KODE";
                 }
                 $resultFinal = db2_exec($conn1, $queryFinal);
-                $dataFinal = db2_fetch_assoc($resultFinal);
+                $dataFinal = $resultFinal ? db2_fetch_assoc($resultFinal) : null;
+                $empty = [
+                    'kode' => '',
+                    'lab' => '',
+                    'adj1' => '',
+                    'adj2' => '',
+                    'adj3' => '',
+                    'adj4' => '',
+                    'adj5' => '',
+                    'adj6' => '',
+                    'adj7' => '',
+                    'statusDyc' => ''
+                ];
                 if ($dataFinal) {
-                    $kode       = $dataFinal['KODE'];
-                    $lab        = $dataFinal['LAB'];
-                    $adj1       = $dataFinal['ADJ1'];
-                    $adj2       = $dataFinal['ADJ2'];
-                    $adj3       = $dataFinal['ADJ3'];
-                    $adj4       = $dataFinal['ADJ4'];
-                    $adj5       = $dataFinal['ADJ5'];
-                    $adj6       = $dataFinal['ADJ6'];
-                    $adj7       = $dataFinal['ADJ7'];
-                    $statusDyc  = $dataFinal['STATUSDYC'];
+                    $kode       = $dataFinal['KODE'] ?? '';
+                    $lab        = $dataFinal['LAB'] ?? '';
+                    $adj1       = $dataFinal['ADJ1'] ?? '';
+                    $adj2       = $dataFinal['ADJ2'] ?? '';
+                    $adj3       = $dataFinal['ADJ3'] ?? '';
+                    $adj4       = $dataFinal['ADJ4'] ?? '';
+                    $adj5       = $dataFinal['ADJ5'] ?? '';
+                    $adj6       = $dataFinal['ADJ6'] ?? '';
+                    $adj7       = $dataFinal['ADJ7'] ?? '';
+                    $statusDyc  = $dataFinal['STATUSDYC'] ?? '';
                     return [
                         'kode' => $kode,
-                        'lab'  => rtrim(rtrim($lab, '0'), '.'),
-                        'adj1' => rtrim(rtrim($adj1, '0'), '.'),
-                        'adj2' => rtrim(rtrim($adj2, '0'), '.'),
-                        'adj3' => rtrim(rtrim($adj3, '0'), '.'),
-                        'adj4' => rtrim(rtrim($adj4, '0'), '.'),
-                        'adj5' => rtrim(rtrim($adj5, '0'), '.'),
-                        'adj6' => rtrim(rtrim($adj6, '0'), '.'),
-                        'adj7' => rtrim(rtrim($adj7, '0'), '.'),
+                        'lab'  => rtrim(rtrim((string)$lab, '0'), '.'),
+                        'adj1' => rtrim(rtrim((string)$adj1, '0'), '.'),
+                        'adj2' => rtrim(rtrim((string)$adj2, '0'), '.'),
+                        'adj3' => rtrim(rtrim((string)$adj3, '0'), '.'),
+                        'adj4' => rtrim(rtrim((string)$adj4, '0'), '.'),
+                        'adj5' => rtrim(rtrim((string)$adj5, '0'), '.'),
+                        'adj6' => rtrim(rtrim((string)$adj6, '0'), '.'),
+                        'adj7' => rtrim(rtrim((string)$adj7, '0'), '.'),
                         'statusDyc' => $statusDyc
                     ];
-                } else {
-                    return null;
                 }
+                return $empty;
             }
             $dataDyc1 = GetDataFinalAdj($conn1, '1', $suffixcode.'L', $suffixcode.'DS1', $suffixcode.'DS2', $suffixcode.'DS3', $suffixcode.'DS4', $suffixcode.'DS5', $suffixcode.'DS6', $suffixcode.'DS7', $data['recipe_code_1'], $data['recipe_code_2'], $kodesuffix);
             $dataDyc2 = GetDataFinalAdj($conn1, '2', $suffixcode.'L', $suffixcode.'DS1', $suffixcode.'DS2', $suffixcode.'DS3', $suffixcode.'DS4', $suffixcode.'DS5', $suffixcode.'DS6', $suffixcode.'DS7', $data['recipe_code_1'], $data['recipe_code_2'], $kodesuffix);
