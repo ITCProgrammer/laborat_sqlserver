@@ -17,6 +17,23 @@ $safeDb2 = function(string $sql) use (&$conn1, &$db2_errors) {
     }
     return $stmt;
 };
+
+function normalizeLiquorRatio($lr)
+{
+    $lr = trim((string)$lr);
+    if ($lr === '' || $lr === '0') {
+        return '0';
+    }
+    // Buang prefix non-numeric seperti "LR"
+    $lr = preg_replace('/^LR/i', '', $lr);
+    // Samakan pemisah jadi titik
+    $lr = str_replace([',', ':'], '.', $lr);
+    // Ambil angka desimal pertama yang valid
+    if (preg_match('/\d+(?:\.\d+)?/', $lr, $m)) {
+        return $m[0];
+    }
+    return '0';
+}
 $idstatus               = $_GET['idm']; // ID_STATUS_MATCHING
 $idmatching             = $_GET['id']; // ID_MATCHING
 $IMPORTAUTOCOUNTER      = $_GET['IMPORTAUTOCOUNTER'];
@@ -66,6 +83,7 @@ while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
     }
     $tgl = date('Y-m-d H:i:s');
     $warna  = str_replace("'", "`", $r['warna']);
+    $lrNumeric = normalizeLiquorRatio($r['LR'] ?? '');
     $queryDataMain  = "INSERT INTO RECIPEBEAN (
                                                 COMPANYCODE,
                                                 IMPORTAUTOCOUNTER,
@@ -289,7 +307,7 @@ while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
                                                 '0', -- RESIDUALBATHVOLUME
                                                 'l', -- VOLUMEUMCODE
                                                 '', -- COMPOSITIONCODE
-                                                '$r[LR]', --LIQUORRATIO
+                                                '$lrNumeric', --LIQUORRATIO
                                                 '0', -- MIXVOLUME
                                                 '001', -- PRODUCTIONRESERVATIONGROUPCODE
                                                 '', -- COSTGROUPCODE
@@ -395,22 +413,29 @@ while ($r = sqlsrv_fetch_array($recipe, SQLSRV_FETCH_ASSOC)) {
     $insert_recipeBean  = db2_exec($conn1, $queryDataMain);
     if (!$insert_recipeBean) {
         $errorMsg = db2_stmt_errormsg();
-        // echo "Error: " . $errorMsg;
+        $context = [
+            'idstatus' => $idstatus,
+            'idmatching' => $idmatching,
+            'IMPORTAUTOCOUNTER' => $IMPORTAUTOCOUNTER,
+            'suffix' => $jenis_suffix,
+            'number_suffix' => $number_suffix,
+            'userLogin' => $userLogin,
+            'recipe_code' => $r['recipe_code'] ?? null,
+            'recipe_code_1' => $r['recipe_code_1'] ?? null,
+            'recipe_code_2' => $r['recipe_code_2'] ?? null,
+            'suffixcode' => $r['SUFFIXCODE'] ?? null,
+            'no_resep_convert' => $r['no_resep_convert'] ?? null,
+            'warna' => $r['warna'] ?? null,
+            'created_by' => $r['created_by'] ?? null,
+            'LR_raw' => $r['LR'] ?? null,
+            'LR_norm' => $lrNumeric ?? null
+        ];
 
-        // Periksa apakah pesan kesalahan mengandung kode SQLCODE=-803
-        if (strpos($errorMsg, 'SQLCODE=-803') !== false) {
-            // Cetak pesan alert menggunakan JavaScript
-            echo '<script>alert("Terjadi kesalahan. Data yang dimasukkan sudah ada di NOW.");</script>';
-            // Kembali ke halaman sebelumnya jika pengguna menekan OK pada alert
-            // echo '<script>window.history.back();</script>';
-            // echo $queryDataMain;
-        } else {
-            echo '<script>alert("Terjadi kesalahan. pastikan data sudah benar");</script>';
-            // Kembali ke halaman sebelumnya jika pengguna menekan OK pada alert
-            echo '<script>window.history.back();</script>';
-        }
-
-        // Hentikan eksekusi skrip lebih lanjut jika diperlukan
+        // Tampilkan detail error agar tahu data mana yang gagal
+        echo "<pre>Insert RECIPEBEAN gagal.\n".
+             "DB2 error: ".htmlentities($errorMsg)."\n".
+             "Context:\n".htmlentities(print_r($context, true))."\n".
+             "</pre>";
         exit;
     }
 }
