@@ -1139,6 +1139,10 @@ $_SESSION['jenis_matching'] = $ldorno;
             window.location.href = 'index1.php?p=Status-Matching';
         }, 4000);
     }
+    function SpinnerStop() {
+        spinner.hide();
+        enableScroll();
+    }
 </script>
 
 <!-- ALL ABOUT HOLD HERE ! -->
@@ -1327,11 +1331,21 @@ $_SESSION['jenis_matching'] = $ldorno;
                         console.log(response)
                         after_Hold_Insert_dataTableResep_toDB()
                     } else {
-                        toastr.error("ajax error !")
+                        SpinnerStop();
+                        if (response && response.status === 'error') {
+                            const msg = (response.message || 'Gagal update status')
+                                + (response.ctx ? `\nCTX: ${response.ctx}` : '');
+                            alert(msg);
+                            console.error(response);
+                        } else {
+                            toastr.error("ajax error !");
+                            console.error(response);
+                        }
                     }
                 },
-                error: function() {
-                    alert("Error");
+                error: function(xhr) {
+                    SpinnerStop();
+                    alert("Error AJAX: " + (xhr && xhr.responseText ? xhr.responseText : "unknown"));
                 }
             });
         }

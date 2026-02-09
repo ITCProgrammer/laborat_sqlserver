@@ -4,8 +4,17 @@ session_start();
 include "../../koneksi.php";
 
 $fail = function($ctx){
-    $err = print_r(sqlsrv_errors(), true);
-    echo json_encode(['status'=>'error','ctx'=>$ctx,'sqlsrv'=>$err]);
+    $errs = sqlsrv_errors();
+    $msg = '';
+    if (is_array($errs) && isset($errs[0]['message'])) {
+        $msg = $errs[0]['message'];
+    }
+    echo json_encode([
+        'status' => 'error',
+        'ctx' => $ctx,
+        'message' => $msg,
+        'sqlsrv' => $errs
+    ]);
     exit;
 };
 
@@ -16,8 +25,63 @@ $benang_a   = $_POST['benang_a'] ?? '';
 $Benang     = $_POST['Benang'] ?? '';
 $keterangan = $_POST['keterangan'] ?? '';
 
-$second_lr_format = !empty($_POST['second_lr']) ? preg_replace('/\s*:\s*/', ':', $_POST['second_lr']) : "0:0";
-$lr_format        = !empty($_POST['l_R']) ? preg_replace('/\s*:\s*/', ':', $_POST['l_R']) : null;
+// Normalisasi angka agar tidak gagal konversi ke numeric di SQL Server
+$norm_num = function ($val) {
+    $val = trim((string)$val);
+    if ($val === '' || $val === '-' || strcasecmp($val, 'null') === 0 || strcasecmp($val, 'undefined') === 0 || strcasecmp($val, 'nan') === 0) {
+        return null;
+    }
+    // ubah format 1:6 / 1,6 menjadi 1.6
+    $val = str_replace([',', ':', ' '], ['.', '.', ''], $val);
+    return $val;
+};
+$is_num = function ($val) {
+    return ($val === null || $val === '') ? true : preg_match('/^-?\d+(\.\d+)?$/', $val);
+};
+
+$second_lr_format = $norm_num($_POST['second_lr'] ?? '');
+$lr_format        = $norm_num($_POST['l_R'] ?? '');
+
+// Validasi numeric sebelum query
+$numericFields = [
+    'matching_ke' => $norm_num($_POST['matching_ke'] ?? null),
+    'howmany_Matching_ke' => $norm_num($_POST['howmany_Matching_ke'] ?? null),
+    'lebar_a' => $norm_num($_POST['lebar_a'] ?? null),
+    'gramasi_a' => $norm_num($_POST['gramasi_a'] ?? null),
+    'kadar_air' => $norm_num($_POST['kadar_air'] ?? null),
+    'RC_Suhu' => $norm_num($_POST['RC_Suhu'] ?? null),
+    'RCWaktu' => $norm_num($_POST['RCWaktu'] ?? null),
+    'soapingSuhu' => $norm_num($_POST['soapingSuhu'] ?? null),
+    'soapingWaktu' => $norm_num($_POST['soapingWaktu'] ?? null),
+    'cie_wi' => $norm_num($_POST['cie_wi'] ?? null),
+    'cie_tint' => $norm_num($_POST['cie_tint'] ?? null),
+    'yellowness' => $norm_num($_POST['yellowness'] ?? null),
+    'Spektro_R' => $norm_num($_POST['Spektro_R'] ?? null),
+    'tside_c' => $norm_num($_POST['tside_c'] ?? null),
+    'tside_min' => $norm_num($_POST['tside_min'] ?? null),
+    'cside_c' => $norm_num($_POST['cside_c'] ?? null),
+    'cside_min' => $norm_num($_POST['cside_min'] ?? null),
+    'kadar_air_true' => $norm_num($_POST['kadar_air_true'] ?? null),
+    'bleaching_sh' => $norm_num($_POST['bleaching_sh'] ?? null),
+    'bleaching_tm' => $norm_num($_POST['bleaching_tm'] ?? null),
+    'lr' => $lr_format,
+    'second_lr' => $second_lr_format
+];
+$invalid = [];
+foreach ($numericFields as $k => $v) {
+    if (!$is_num($v)) {
+        $invalid[$k] = $v;
+    }
+}
+if (!empty($invalid)) {
+    echo json_encode([
+        'status' => 'error',
+        'ctx' => 'invalid_numeric',
+        'message' => 'Input numeric tidak valid: ' . implode(', ', array_keys($invalid)),
+        'invalid' => $invalid
+    ]);
+    exit;
+}
 
 // hapus detail lama
 if(!sqlsrv_query($con, "DELETE FROM db_laborat.tbl_matching_detail WHERE id_matching = ? AND id_status = ?", [$_POST['id_matching'], $_POST['id_status']])) $fail('hapus_detail');
@@ -76,15 +140,39 @@ if(!sqlsrv_query($con, "UPDATE db_laborat.tbl_status_matching SET
                     bleaching_tm=?,
                     second_lr=?
                     where id = ? and idm = ?", [
-                      $_POST['matching_ke'], $_POST['howmany_Matching_ke'], $benang_a, $_POST['lebar_a'], $_POST['gramasi_a'],
-                      $lr_format, $_POST['kadar_air'], $_POST['RC_Suhu'], $_POST['RCWaktu'], $_POST['soapingSuhu'], $_POST['soapingWaktu'],
-                      $_POST['cie_wi'], $_POST['cie_tint'], $_POST['yellowness'], $_POST['Spektro_R'], $_POST['Done_Matching'], $keterangan,
-                      $_SESSION['userLAB'], $time, $_POST['tside_c'], $_POST['tside_min'], $_POST['cside_c'], $_POST['cside_min'],
-                      $_POST['kadar_air_true'], $_POST['koreksi_resep'], $_POST['koreksi_resep2'], $_POST['koreksi_resep3'], $_POST['koreksi_resep4'],
-                      $_POST['koreksi_resep5'], $_POST['koreksi_resep6'], $_POST['koreksi_resep7'], $_POST['koreksi_resep8'], $_POST['final_matcher'],
-                      $_POST['create_resep'], $_POST['acc_ulang_ok'], $_POST['acc_resep1'], $_POST['acc_resep2'], $_POST['colorist1'], $_POST['colorist2'],
-                      $_POST['colorist3'], $_POST['colorist4'], $_POST['colorist5'], $_POST['colorist6'], $_POST['colorist7'], $_POST['colorist8'],
-                      $_POST['Matcher'], $_POST['Group'], $_POST['bleaching_sh'], $_POST['bleaching_tm'], $second_lr_format, $_POST['id_status'], $_POST['idm']
+                      $numericFields['matching_ke'], $numericFields['howmany_Matching_ke'], $benang_a, $numericFields['lebar_a'], $numericFields['gramasi_a'],
+                      $numericFields['lr'], $numericFields['kadar_air'], $numericFields['RC_Suhu'], $numericFields['RCWaktu'], $numericFields['soapingSuhu'], $numericFields['soapingWaktu'],
+                      $numericFields['cie_wi'], $numericFields['cie_tint'], $numericFields['yellowness'], $numericFields['Spektro_R'], $_POST['Done_Matching'], $keterangan,
+                      $_SESSION['userLAB'], $time, $numericFields['tside_c'], $numericFields['tside_min'], $numericFields['cside_c'], $numericFields['cside_min'],
+                      $numericFields['kadar_air_true'],
+                      $_POST['koreksi_resep'] ?? null,
+                      $_POST['koreksi_resep2'] ?? null,
+                      $_POST['koreksi_resep3'] ?? null,
+                      $_POST['koreksi_resep4'] ?? null,
+                      $_POST['koreksi_resep5'] ?? null,
+                      $_POST['koreksi_resep6'] ?? null,
+                      $_POST['koreksi_resep7'] ?? null,
+                      $_POST['koreksi_resep8'] ?? null,
+                      $_POST['final_matcher'] ?? null,
+                      $_POST['create_resep'] ?? null,
+                      $_POST['acc_ulang_ok'] ?? null,
+                      $_POST['acc_resep1'] ?? null,
+                      $_POST['acc_resep2'] ?? null,
+                      $_POST['colorist1'] ?? null,
+                      $_POST['colorist2'] ?? null,
+                      $_POST['colorist3'] ?? null,
+                      $_POST['colorist4'] ?? null,
+                      $_POST['colorist5'] ?? null,
+                      $_POST['colorist6'] ?? null,
+                      $_POST['colorist7'] ?? null,
+                      $_POST['colorist8'] ?? null,
+                      $_POST['Matcher'] ?? null,
+                      $_POST['Group'] ?? null,
+                      $numericFields['bleaching_sh'],
+                      $numericFields['bleaching_tm'],
+                      $numericFields['second_lr'],
+                      $_POST['id_status'] ?? null,
+                      $_POST['idm'] ?? null
                     ])) $fail('update_status_matching');
 
 // update matching
