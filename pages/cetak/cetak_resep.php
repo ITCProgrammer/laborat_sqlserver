@@ -1134,17 +1134,20 @@
                                         WHERE
                                             SIDE = '{$side}'";
                 $resultFinalSuhu    = db2_exec($conn1, $queryFinalSuhu);
-                $dataFinalSuhu      = db2_fetch_assoc($resultFinalSuhu);
+                $dataFinalSuhu      = $resultFinalSuhu ? db2_fetch_assoc($resultFinalSuhu) : null;
+                $empty = [
+                    'side' => '',
+                    'commentline' => ''
+                ];
                 if ($dataFinalSuhu) {
-                    $side           = $dataFinalSuhu['SIDE'];
-                    $commentline    = $dataFinalSuhu['COMMENTLINE'];
+                    $side           = $dataFinalSuhu['SIDE'] ?? '';
+                    $commentline    = $dataFinalSuhu['COMMENTLINE'] ?? '';
                     return [
                         'side'          => $side,
                         'commentline'   => $commentline
                     ];
-                } else {
-                    return null;
                 }
+                return $empty;
             }
 
             $dataSuhu1TSide = GetDataFinalSuhu($conn1, $suffixcode.'L', $data['recipe_code_1'], $data['recipe_code_2'], 'T-SIDE');
@@ -1180,6 +1183,25 @@
             function getEditorName_laborat(){
                 return null;
             }
+        }
+
+        // Pastikan data suhu selalu berbentuk array agar tidak warning saat akses ['commentline']
+        $defaultSuhu = ['side' => '', 'commentline' => ''];
+        foreach ([
+            'dataSuhu1TSide','dataSuhu2TSide','dataSuhu3TSide','dataSuhu4TSide','dataSuhu5TSide','dataSuhu6TSide','dataSuhu7TSide','dataSuhu8TSide',
+            'dataSuhu1CSide','dataSuhu2CSide','dataSuhu3CSide','dataSuhu4CSide','dataSuhu5CSide','dataSuhu6CSide','dataSuhu7CSide','dataSuhu8CSide',
+            'dataSuhu1TSideLD','dataSuhu1CSideLD'
+        ] as $varName) {
+            if (!isset($$varName) || !is_array($$varName)) {
+                $$varName = $defaultSuhu;
+            }
+        }
+        // Default agar tidak warning jika kode lama belum diisi di branch lain
+        if (!isset($kode_lama26)) {
+            $kode_lama26 = '';
+        }
+        if (!isset($kode_lama27)) {
+            $kode_lama27 = '';
         }
         
     ?>
