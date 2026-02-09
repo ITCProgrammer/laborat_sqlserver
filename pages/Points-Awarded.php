@@ -256,6 +256,9 @@ if ($shouldRun) {
     $possible = 10;
 
     $isTest = ((int)$row['is_test'] === 1);
+    // SEMENTARA IS_TEST = 1 DILEWATI SAJA
+    if ($isTest) continue;
+
     $stage  = $row['stage'];
 
     $userMap = [
@@ -276,13 +279,16 @@ if ($shouldRun) {
       ];
     }
 
-    if ($isTest) {
-      $data[$stage][$user][$tgl][$base]['t_awarded']  = $points;
-      $data[$stage][$user][$tgl][$base]['t_possible'] = $possible;
-    } else {
-      $data[$stage][$user][$tgl][$base]['awarded']  = $points;
-      $data[$stage][$user][$tgl][$base]['possible'] = $possible;
-    }
+    // if ($isTest) {
+    //   $data[$stage][$user][$tgl][$base]['t_awarded']  = $points;
+    //   $data[$stage][$user][$tgl][$base]['t_possible'] = $possible;
+    // } else {
+    //   $data[$stage][$user][$tgl][$base]['awarded']  = $points;
+    //   $data[$stage][$user][$tgl][$base]['possible'] = $possible;
+    // }
+
+    $data[$stage][$user][$tgl][$base]['awarded']  = $points;
+    $data[$stage][$user][$tgl][$base]['possible'] = $possible;
   }
   sqlsrv_free_stmt($stmt);
 

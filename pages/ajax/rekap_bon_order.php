@@ -337,7 +337,9 @@ while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
       $baseJob = substr($jobFull, 0, -2); // DRxxxxx saja
   }
 
-  $isTest = (int)$row['is_test'] === 1; // tetap disimpan kalau nanti perlu
+  $isTest = (int)$row['is_test'] === 1;
+  // SEMENTARA IS_TEST = 1 DILEWATI SAJA
+  if ($isTest) continue;
 
   // ambil user sesuai stage
   $user = '';

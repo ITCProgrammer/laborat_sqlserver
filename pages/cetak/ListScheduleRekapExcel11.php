@@ -28,11 +28,13 @@
 				  <?php	
    $no=1;   
    $c=0;
-   $sqlDB21 = " SELECT *
-   FROM tbl_listsch_11 WHERE tgl_tutup ='".date("Y-m-d", strtotime($TglTutup))."'
+   $sqlDB21 = "SELECT *
+   FROM db_laborat.tbl_listsch_11
+   WHERE tgl_tutup = ?
    ORDER BY id DESC";
-	$stmt1   = mysqli_query($con,$sqlDB21);
-    while($li = mysqli_fetch_array($stmt1)){		
+   $params = [date("Y-m-d", strtotime($TglTutup))];
+	$stmt1   = sqlsrv_query($con, $sqlDB21, $params);
+    while ($li = sqlsrv_fetch_array($stmt1, SQLSRV_FETCH_ASSOC)) {		
 	?>
 	  <tr>
 	    <td><?php if ($li['status'] == null or $li['status'] == "") { ?>
@@ -63,8 +65,8 @@
 	    <td><?php echo $li['langganan'] ?></td>
 	    <td><?php echo $li['no_item'] ?></td>
 	    <td><?php echo $li['ket'] ?></td>
-	    <td><?php echo $li['tgl_update'] ?></td>
-	    <td><?php echo $li['tgl_tutup'] ?></td>
+	    <td><?php echo ($li['tgl_update'] instanceof DateTimeInterface) ? $li['tgl_update']->format('Y-m-d H:i:s') : $li['tgl_update']; ?></td>
+	    <td><?php echo ($li['tgl_tutup'] instanceof DateTimeInterface) ? $li['tgl_tutup']->format('Y-m-d') : $li['tgl_tutup']; ?></td>
       </tr>				  
 <?php	$no++; } ?>                  
         </table>
