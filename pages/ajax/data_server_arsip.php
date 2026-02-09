@@ -22,7 +22,7 @@ $columns = array(
 $baseSql = "FROM db_laborat.tbl_status_matching a
             JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep
             JOIN db_laborat.log_status_matching lsm ON a.idm = lsm.ids AND lsm.info = 'Resep di arsipkan'
-            WHERE a.status = 'arsip'";
+            WHERE a.status = 'arsip'"; 
 
 $countSql = "SELECT COUNT(*) AS total FROM (
                 SELECT a.id
