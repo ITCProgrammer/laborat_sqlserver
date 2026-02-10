@@ -1,6 +1,6 @@
 <?php
 	header("Content-type: application/octet-stream");
-	header("Content-Disposition: attachment; filename=LAB_ReportMatching11".date('Y-m-d').".xls"); //ganti nama sesuai keperluan
+	header("Content-Disposition: attachment; filename=LAB_ReportMatching11".'2026-02-09'.".xls"); //ganti nama sesuai keperluan
 	header("Pragma: no-cache");
 	header("Expires: 0");
 	// disini script laporan anda
@@ -106,27 +106,30 @@ include "../../koneksi.php";
                 <th class="text-center">remark_dye</th>
               </tr>
               <?php
-              $date_s = date('Y-m-d', strtotime("-1 days"));
-              $date_e = date('Y-m-d');
+              $date_s = '2026-02-08';
+              $date_e = '2026-02-09';
 			  $time_s = "23:00";
               $time_e = "23:00";	
+              $no = 0;
 
-              $sql = mysqli_query($con,"SELECT
+              $sql = "SELECT
                                           *,
                                           a.id AS id_status,
                                           a.created_at AS tgl_buat_status,
                                           a.created_by AS status_created_by 
                                         FROM
-                                          tbl_status_matching a
-                                          INNER JOIN tbl_matching b ON a.idm = b.no_resep 
+                                          db_laborat.tbl_status_matching a
+                                          INNER JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep 
                                         WHERE
                                           a.STATUS = 'selesai' 
                                           AND a.approve = 'TRUE' 
-                                          AND DATE_FORMAT( a.approve_at, '%Y-%m-%d %H:%i' ) >= '$date_s $time_s' 
-                                          AND DATE_FORMAT( a.approve_at, '%Y-%m-%d %H:%i' ) <= '$date_e $time_e' 
+                                          AND a.approve_at >= ? 
+                                          AND a.approve_at <= ? 
                                         ORDER BY
-                                          a.id DESC");              
-              while ($r = mysqli_fetch_array($sql)) {
+                                          a.id DESC";
+              $params = ["$date_s $time_s:00", "$date_e $time_e:00"];
+              $stmt = sqlsrv_query($con, $sql, $params);
+              while ($r = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
                 $no++;
               ?>
                 <tr>
@@ -144,16 +147,16 @@ include "../../koneksi.php";
                   <td> <?php echo $r['gramasi'] ?></td>
                   <td> <?php echo $r['qty_order'] ?></td>
                   <td> <?php echo $r['status_bagi'] ?></td>
-                  <td> <?php echo $r['tgl_in'] ?></td>
-                  <td> <?php echo $r['tgl_out'] ?></td>
+                  <td> <?php echo ($r['tgl_in'] instanceof DateTimeInterface) ? $r['tgl_in']->format('Y-m-d') : $r['tgl_in']; ?></td>
+                  <td> <?php echo ($r['tgl_out'] instanceof DateTimeInterface) ? $r['tgl_out']->format('Y-m-d') : $r['tgl_out']; ?></td>
                   <td> <?php echo $r['proses'] ?></td>
                   <td> <?php echo $r['buyer'] ?></td>
-                  <td> <?php echo $r['tgl_delivery'] ?></td>
+                  <td> <?php echo ($r['tgl_delivery'] instanceof DateTimeInterface) ? $r['tgl_delivery']->format('Y-m-d') : $r['tgl_delivery']; ?></td>
                   <td> <?php echo $r['note'] ?></td>
                   <td> <?php echo $r['jenis_matching'] ?></td>
-                  <td> <?php echo $r['tgl_buat'] ?></td>
+                  <td> <?php echo ($r['tgl_buat'] instanceof DateTimeInterface) ? $r['tgl_buat']->format('Y-m-d H:i:s') : $r['tgl_buat']; ?></td>
                   <td> <?php echo $r['created_by'] ?></td>
-                  <td> <?php echo $r['tgl_update'] ?></td>
+                  <td> <?php echo ($r['tgl_update'] instanceof DateTimeInterface) ? $r['tgl_update']->format('Y-m-d H:i:s') : $r['tgl_update']; ?></td>
                   <td> <?php echo $r['last_update_by'] ?></td>
                   <td><?php echo $r['grp'] ?></td>
                   <td><?php echo $r['matcher'] ?></td>
@@ -188,24 +191,24 @@ include "../../koneksi.php";
                   <td><?php echo $r['cside_min'] ?></td>
                   <td><?php echo $r['tside_c'] ?></td>
                   <td><?php echo $r['tside_min'] ?></td>
-                  <td><?php echo $r['done_matching'] ?></td>
-                  <td><?php echo $r['created_at'] ?></td>
+                  <td><?php echo ($r['done_matching'] instanceof DateTimeInterface) ? $r['done_matching']->format('Y-m-d') : $r['done_matching']; ?></td>
+                  <td><?php echo ($r['created_at'] instanceof DateTimeInterface) ? $r['created_at']->format('Y-m-d H:i:s') : $r['created_at']; ?></td>
                   <td><?php echo $r['created_by'] ?></td>
-                  <td><?php echo $r['edited_at'] ?></td>
+                  <td><?php echo ($r['edited_at'] instanceof DateTimeInterface) ? $r['edited_at']->format('Y-m-d H:i:s') : $r['edited_at']; ?></td>
                   <td><?php echo $r['edited_by'] ?></td>
-                  <td><?php echo $r['target_selesai'] ?></td>
+                  <td><?php echo ($r['target_selesai'] instanceof DateTimeInterface) ? $r['target_selesai']->format('Y-m-d') : $r['target_selesai']; ?></td>
                   <td><?php echo $r['mulai_by'] ?></td>
-                  <td><?php echo $r['mulai_at'] ?></td>
+                  <td><?php echo ($r['mulai_at'] instanceof DateTimeInterface) ? $r['mulai_at']->format('Y-m-d H:i:s') : $r['mulai_at']; ?></td>
                   <td><?php echo $r['selesai_by'] ?></td>
-                  <td><?php echo $r['selesai_at'] ?></td>
+                  <td><?php echo ($r['selesai_at'] instanceof DateTimeInterface) ? $r['selesai_at']->format('Y-m-d H:i:s') : $r['selesai_at']; ?></td>
                   <td><?php echo $r['approve_by'] ?></td>
-                  <td><?php echo $r['approve_at'] ?></td>
+                  <td><?php echo ($r['approve_at'] instanceof DateTimeInterface) ? $r['approve_at']->format('Y-m-d H:i:s') : $r['approve_at']; ?></td>
                   <td><?php echo $r['approve'] ?></td>
-                  <td><?php echo $r['hold_at'] ?></td>
+                  <td><?php echo ($r['hold_at'] instanceof DateTimeInterface) ? $r['hold_at']->format('Y-m-d H:i:s') : $r['hold_at']; ?></td>
                   <td><?php echo $r['hold_by'] ?></td>
                   <td><?php echo $r['timer'] ?></td>
                   <td><?php echo $r['why_batal'] ?></td>
-                  <td><?php echo $r['revisi_at'] ?></td>
+                  <td><?php echo ($r['revisi_at'] instanceof DateTimeInterface) ? $r['revisi_at']->format('Y-m-d H:i:s') : $r['revisi_at']; ?></td>
                   <td><?php echo $r['revisi_by'] ?></td>
                   <td><?php echo $r['kadar_air'] ?></td>
                   <td><?php echo $r['final_matcher'] ?></td>

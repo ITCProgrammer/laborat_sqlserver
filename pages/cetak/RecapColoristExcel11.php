@@ -28,44 +28,42 @@ $end = $end_date . " 23:00:00";
 	<?php
 	function get_value($start, $end, $jenis, $colorist)
 	{
-		include '../../koneksi.php';
-		$sql = mysqli_query($con, "SELECT
-							a.colorist1,
-							a.colorist2,
-							a.colorist3,
-							a.colorist4,
-							a.colorist5,
-							a.colorist6,
-							a.colorist7,
-							a.colorist8,
-							SUM(IF(a.colorist1 = '$colorist', 0.5, 0 ) + 
-								IF(a.colorist2 = '$colorist', 0.5, 0 ) +
-								IF(a.colorist3 = '$colorist', 0.5, 0 ) +
-								IF(a.colorist4 = '$colorist', 0.5, 0 ) +
-								IF(a.colorist5 = '$colorist', 0.5, 0 ) +
-								IF(a.colorist6 = '$colorist', 0.5, 0 ) +
-								IF(a.colorist7 = '$colorist', 0.5, 0 ) +
-								IF(a.colorist8 = '$colorist', 0.5, 0 )) AS total_value 
+		global $con;
+		$sql = "SELECT
+							SUM(CASE WHEN a.colorist1 = ? THEN 0.5 ELSE 0 END + 
+								CASE WHEN a.colorist2 = ? THEN 0.5 ELSE 0 END +
+								CASE WHEN a.colorist3 = ? THEN 0.5 ELSE 0 END +
+								CASE WHEN a.colorist4 = ? THEN 0.5 ELSE 0 END +
+								CASE WHEN a.colorist5 = ? THEN 0.5 ELSE 0 END +
+								CASE WHEN a.colorist6 = ? THEN 0.5 ELSE 0 END +
+								CASE WHEN a.colorist7 = ? THEN 0.5 ELSE 0 END +
+								CASE WHEN a.colorist8 = ? THEN 0.5 ELSE 0 END) AS total_value 
 						FROM
-							tbl_status_matching a
-							JOIN tbl_matching b ON a.idm = b.no_resep 
+							db_laborat.tbl_status_matching a
+							JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep 
 						WHERE
-							a.approve_at >= '$start'
-							AND a.approve_at < '$end'
-							AND b.jenis_matching = '$jenis'
-							AND ('$colorist' IN (a.colorist1, a.colorist2, a.colorist3, a.colorist4,
+							a.approve_at >= ?
+							AND a.approve_at < ?
+							AND b.jenis_matching = ?
+							AND (? IN (a.colorist1, a.colorist2, a.colorist3, a.colorist4,
 												a.colorist5, a.colorist6, a.colorist7, a.colorist8))
-							AND a.status = 'selesai'");
+							AND a.status = 'selesai'";
+		$params = array_fill(0, 8, $colorist);
+		$params[] = $start;
+		$params[] = $end;
+		$params[] = $jenis;
+		$params[] = $colorist;
+		$stmt = sqlsrv_query($con, $sql, $params);
 
-		$data = mysqli_fetch_array($sql);
+		$data = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 
-		return $data['total_value'];
+		return $data['total_value'] ?? 0;
 	}
-	$colorist = mysqli_query($con, "SELECT * FROM tbl_colorist WHERE is_active = 'TRUE'");
+	$colorist = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_colorist WHERE is_active = 'TRUE'");
 	?>
 	<?php
 	$all = 0;
-	while ($clrst = mysqli_fetch_array($colorist)) { ?>
+	while ($clrst = sqlsrv_fetch_array($colorist, SQLSRV_FETCH_ASSOC)) { ?>
 		<tr>
 			<td><?php echo $clrst['nama'] ?></td>
 			<td><?php $mu = get_value($start, $end, 'Matching Ulang', $clrst['nama']) + get_value($start, $end, 'Matching Ulang NOW', $clrst['nama']);
