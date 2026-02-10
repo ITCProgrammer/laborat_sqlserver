@@ -1,6 +1,6 @@
 <?php
 	header("Content-type: application/octet-stream");
-	header("Content-Disposition: attachment; filename=LAB_ReportMatching11".'2026-02-09'.".xls"); //ganti nama sesuai keperluan
+	header("Content-Disposition: attachment; filename=LAB_ReportMatching11".date('Y-m-d').".xls"); //ganti nama sesuai keperluan
 	header("Pragma: no-cache");
 	header("Expires: 0");
 	// disini script laporan anda
@@ -106,8 +106,8 @@ include "../../koneksi.php";
                 <th class="text-center">remark_dye</th>
               </tr>
               <?php
-              $date_s = '2026-02-08';
-              $date_e = '2026-02-09';
+              $date_s = date('Y-m-d', strtotime("-1 days"));
+              $date_e = date('Y-m-d');
 			  $time_s = "23:00";
               $time_e = "23:00";	
               $no = 0;
