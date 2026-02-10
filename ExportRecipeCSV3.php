@@ -54,7 +54,7 @@ $sqlRecipe = "SELECT TOP 1
                         ELSE SUBSTRING(CONVERT(VARCHAR(50), a.lr), 3, LEN(CONVERT(VARCHAR(50), a.lr))) 
                     END AS LR,
                     CASE
-                        WHEN LEFT(b.no_resep, 2) IN ('OB') THEN PARSENAME(REPLACE(b.recipe_code,' ','.'),1)
+                        WHEN LEFT(b.no_resep, 2) IN ('OB','R2','D2','R2','A2') THEN PARSENAME(REPLACE(b.recipe_code,' ','.'),1)
                         ELSE PARSENAME(REPLACE(b.recipe_code,' ','.'),2)
                     END AS recipe_code_1,
                     PARSENAME(REPLACE(b.recipe_code,' ','.'),1) as recipe_code_2,
