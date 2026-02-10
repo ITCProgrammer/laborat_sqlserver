@@ -70,7 +70,7 @@ sqlsrv_free_stmt($stmt);
 if ($row['total'] > 0) {
     // 2. UPDATE jika sudah ada
     $updateQuery = "UPDATE db_laborat.tbl_resep_element 
-        SET element_id = ?, element_code = ?
+        SET element_id = ?, element_code = ?, updated_at = GETDATE()
         WHERE no_resep = ?";
     $stmt = sqlsrv_query($con, $updateQuery, [$element_id, $element_code, $no_resep]);
 
@@ -89,7 +89,7 @@ if ($row['total'] > 0) {
 
 } else {
     // 3. INSERT jika belum ada
-    $insertQuery = "INSERT INTO db_laborat.tbl_resep_element (no_resep, element_id, element_code) VALUES (?, ?, ?)";
+    $insertQuery = "INSERT INTO db_laborat.tbl_resep_element (no_resep, element_id, element_code, created_at) VALUES (?, ?, ?, GETDATE())";
     $stmt = sqlsrv_query($con, $insertQuery, [$no_resep, $element_id, $element_code]);
 
     if ($stmt) {

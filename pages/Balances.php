@@ -1227,6 +1227,11 @@ include "koneksi.php";
         return;
       }
 
+      const payload = {
+          element_id: elementId,
+          qty_return: qtyReturn / 1000,
+      }
+
       // if (!selectedResep) {
       //   Swal.fire({
       //     icon: 'warning',

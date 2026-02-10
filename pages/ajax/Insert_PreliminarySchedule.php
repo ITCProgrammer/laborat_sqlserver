@@ -71,8 +71,8 @@ try {
     ";
     // Insert child
     $sqlInsertChild = "
-        INSERT INTO db_laborat.tbl_preliminary_schedule_element (tbl_preliminary_schedule_id, element_id, qty)
-        VALUES (?, ?, ?)
+        INSERT INTO db_laborat.tbl_preliminary_schedule_element (tbl_preliminary_schedule_id, element_id, qty, created_at)
+        VALUES (?, ?, ?, GETDATE())
     ";
 
     // Insert test bottles
