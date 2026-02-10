@@ -53,7 +53,10 @@ $sqlRecipe = "SELECT TOP 1
                         WHEN a.lr = '0' OR a.lr = '-' THEN SUBSTRING(CONVERT(VARCHAR(50), a.second_lr), 3, LEN(CONVERT(VARCHAR(50), a.second_lr))) 
                         ELSE SUBSTRING(CONVERT(VARCHAR(50), a.lr), 3, LEN(CONVERT(VARCHAR(50), a.lr))) 
                     END AS LR,
-                    PARSENAME(REPLACE(b.recipe_code,' ','.'),2) as recipe_code_1,
+                    CASE
+                        WHEN LEFT(b.no_resep, 2) IN ('OB') THEN PARSENAME(REPLACE(b.recipe_code,' ','.'),1)
+                        ELSE PARSENAME(REPLACE(b.recipe_code,' ','.'),2)
+                    END AS recipe_code_1,
                     PARSENAME(REPLACE(b.recipe_code,' ','.'),1) as recipe_code_2,
                     CASE
                         WHEN b.jenis_matching IN ('LD NOW','L/D') THEN '001'
