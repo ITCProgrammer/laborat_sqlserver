@@ -92,6 +92,7 @@ if (is_array($data)) {
                 <button type="button" id="exsecute" class="btn btn-danger btn-sm">Save Changes <i class="fa fa-save"></i></button>
             </li>
         </ul>
+        <div id="ajaxErrorBox" class="alert alert-danger" style="display:none; margin-top:10px; white-space:pre-wrap;"></div>
     </div>
     <form action="#" class="form-horizontal" id="form-status">
         <div class="tab-content">
@@ -1074,17 +1075,52 @@ if (is_array($data)) {
         window.onscroll = function() {};
     }
 
+    var hasAjaxError = false;
+    var spinnerHideTimer = null;
+
     function SpinnerShow() {
         spinner.show();
         disableScroll()
     }
 
     function SpinnerHide() {
-        setTimeout(function() {
+        if (hasAjaxError) {
+            spinner.hide();
+            enableScroll();
+            return;
+        }
+        spinnerHideTimer = setTimeout(function() {
             spinner.hide();
             enableScroll();
             window.location.href = 'index1.php?p=Adjust_Resep_Lab_New&idm=<?php echo $_GET["idm"] ?>';
         }, 4000);
+    }
+
+    function showAjaxError(message) {
+        hasAjaxError = true;
+        if (spinnerHideTimer) {
+            clearTimeout(spinnerHideTimer);
+            spinnerHideTimer = null;
+        }
+        spinner.hide();
+        enableScroll();
+        var box = document.getElementById('ajaxErrorBox');
+        if (box) {
+            box.style.display = 'block';
+            box.textContent = message || 'Terjadi error.';
+        }
+    }
+
+    function buildAjaxError(xhr) {
+        var msg = '';
+        if (xhr && xhr.responseText) {
+            msg = xhr.responseText;
+        } else if (xhr && xhr.statusText) {
+            msg = xhr.statusText;
+        } else {
+            msg = 'Terjadi error.';
+        }
+        return msg;
     }
 </script>
 <!-- PREPARATION FOR TABLE editable hold-->
@@ -1969,12 +2005,12 @@ if (is_array($data)) {
                         Update_tableResep_OnApprvRsp();
                         // SendMessage(idm);
                     } else {
-                        toastr.error("ajax error !")
+                        showAjaxError(JSON.stringify(response))
                     }
                 },
-                error: function() {
-                    alert("Error");
-                }
+                error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
             });
         }
 
@@ -1990,7 +2026,7 @@ if (is_array($data)) {
         //             // toastr.error('berhasil kirim pesan')
         //             console.log('got it telegram sended')
         //         },
-        //         error: function() {
+        //         error: function(xhr) {
         //             console.log('telegram error')
         //             // alert("telegram error");
         //         }
@@ -2025,12 +2061,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 2) {
@@ -2062,12 +2098,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 3) {
@@ -2101,12 +2137,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 4) {
@@ -2142,12 +2178,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 5) {
@@ -2185,12 +2221,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response.session)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 6) {
@@ -2230,12 +2266,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 7) {
@@ -2277,12 +2313,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 8) {
@@ -2326,12 +2362,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 9) {
@@ -2377,12 +2413,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             } else if ($("#lookupmodal1 thead tr th:last").prev().attr('flag_th') == 10) {
@@ -2430,12 +2466,12 @@ if (is_array($data)) {
                             if (response.session == "LIB_SUCCSS") {
                                 console.log(response)
                             } else {
-                                toastr.error("ajax error !")
+                                showAjaxError(JSON.stringify(response))
                             }
                         },
-                        error: function() {
-                            alert("Error");
-                        }
+                        error: function(xhr) {
+                        showAjaxError(buildAjaxError(xhr));
+                    }
                     });
                 });
             }
@@ -2615,7 +2651,7 @@ if (is_array($data)) {
                         }
                     }
                 },
-                error: function() {
+                error: function(xhr) {
                     alert("Hubungi Departement DIT !");
                 }
             });
@@ -2909,7 +2945,7 @@ if (is_array($data)) {
                     r_code: $('#idm').val(),
                     p: "Adjust_Resep_Lab_New"
                 },
-                error: function() {
+                error: function(xhr) {
                     $(".dataku-error").html("");
                     $("#dataku").append('<tbody class="dataku-error"><tr><th colspan="3">Tidak ada data untuk ditampilkan</th></tr></tbody>');
                     $("#dataku-error-proses").css("display", "none");
@@ -2992,7 +3028,7 @@ if (is_array($data)) {
                     success: function(response) {
                         location.reload();
                     },
-                    error: function() {
+                    error: function(xhr) {
                         alert("Hubungi Departement DIT !");
                     }
                 });
@@ -3074,7 +3110,7 @@ if (is_array($data)) {
                     id_matching: $('#id_matching').val(),
                     id_status: $('#id_status').val()
                 },
-                error: function() {
+                error: function(xhr) {
                     $(".dataku-error").html("");
                     $("#dataku").append('<tbody class="dataku-error"><tr><th colspan="3">Tidak ada data untuk ditampilkan</th></tr></tbody>');
                     $("#dataku-error-proses").css("display", "none");
