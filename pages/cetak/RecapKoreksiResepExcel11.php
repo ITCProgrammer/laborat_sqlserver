@@ -27,41 +27,39 @@ $end = $end_date . " 23:00:00";
 	<?php
 	function get_val($start, $end, $jenis, $colorist)
 	{
-		include "../../koneksi.php";
-		$sql = mysqli_query($con, "SELECT
-									a.koreksi_resep,
-									a.koreksi_resep2,
-									a.koreksi_resep3,
-									a.koreksi_resep4,
-									a.koreksi_resep5,
-									a.koreksi_resep6,
-									a.koreksi_resep7,
-									a.koreksi_resep8,
-									SUM(IF( a.koreksi_resep = '$colorist', 0.5, 0 ) +
-										IF(a.koreksi_resep2 = '$colorist', 0.5, 0 ) +
-										IF(a.koreksi_resep3 = '$colorist', 0.5, 0 ) +
-										IF(a.koreksi_resep4 = '$colorist', 0.5, 0 ) +
-										IF(a.koreksi_resep5 = '$colorist', 0.5, 0 ) +
-										IF(a.koreksi_resep6 = '$colorist', 0.5, 0 ) +
-										IF(a.koreksi_resep7 = '$colorist', 0.5, 0 ) +
-										IF(a.koreksi_resep8 = '$colorist', 0.5, 0 )) AS total_value 
+		global $con;
+		$sql = "SELECT
+									SUM(CASE WHEN a.koreksi_resep = ? THEN 0.5 ELSE 0 END +
+										CASE WHEN a.koreksi_resep2 = ? THEN 0.5 ELSE 0 END +
+										CASE WHEN a.koreksi_resep3 = ? THEN 0.5 ELSE 0 END +
+										CASE WHEN a.koreksi_resep4 = ? THEN 0.5 ELSE 0 END +
+										CASE WHEN a.koreksi_resep5 = ? THEN 0.5 ELSE 0 END +
+										CASE WHEN a.koreksi_resep6 = ? THEN 0.5 ELSE 0 END +
+										CASE WHEN a.koreksi_resep7 = ? THEN 0.5 ELSE 0 END +
+										CASE WHEN a.koreksi_resep8 = ? THEN 0.5 ELSE 0 END) AS total_value 
 								FROM
-									tbl_status_matching a
-									JOIN tbl_matching b ON a.idm = b.no_resep 
+									db_laborat.tbl_status_matching a
+									JOIN db_laborat.tbl_matching b ON a.idm = b.no_resep 
 								WHERE
-									a.approve_at >= '$start'
-									AND a.approve_at < '$end'
-									AND b.jenis_matching = '$jenis'
-									AND ('$colorist' IN (a.koreksi_resep, a.koreksi_resep2, a.koreksi_resep3, a.koreksi_resep4,
+									a.approve_at >= ?
+									AND a.approve_at < ?
+									AND b.jenis_matching = ?
+									AND (? IN (a.koreksi_resep, a.koreksi_resep2, a.koreksi_resep3, a.koreksi_resep4,
 														a.koreksi_resep5, a.koreksi_resep6, a.koreksi_resep7, a.koreksi_resep8))
-									AND a.status = 'selesai'");
-		$data = mysqli_fetch_array($sql);
+									AND a.status = 'selesai'";
+		$params = array_fill(0, 8, $colorist);
+		$params[] = $start;
+		$params[] = $end;
+		$params[] = $jenis;
+		$params[] = $colorist;
+		$stmt = sqlsrv_query($con, $sql, $params);
+		$data = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
 
-		return $data['total_value'];
+		return $data['total_value'] ?? 0;
 	}
 	$alll = 0;
-	$colorist = mysqli_query($con, "SELECT * FROM tbl_colorist WHERE is_active= 'TRUE' ");
-	while ($clrst = mysqli_fetch_array($colorist)) { ?>
+	$colorist = sqlsrv_query($con, "SELECT * FROM db_laborat.tbl_colorist WHERE is_active= 'TRUE' ");
+	while ($clrst = sqlsrv_fetch_array($colorist, SQLSRV_FETCH_ASSOC)) { ?>
 		<tr>
 			<td><?php echo $clrst['nama'] ?></td>
 			<td><?php $mu2 = get_val($start, $end, 'Matching Ulang', $clrst['nama']) + get_val($start, $end, 'Matching Ulang NOW', $clrst['nama']);

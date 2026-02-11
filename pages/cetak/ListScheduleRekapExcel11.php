@@ -39,17 +39,17 @@
 	  <tr>
 	    <td><?php if ($li['status'] == null or $li['status'] == "") { ?>
                                                 <!-- status kosong -->
-                                                <?php if ($li['status_bagi'] == 'siap bagi') { 
+                                                <?php if (trim($li['status_bagi']) == 'siap bagi') { 
                                                     echo "Siap Bagi";                                              
-													} else if ($li['status_bagi'] == 'tunggu') {
+													} else if (trim($li['status_bagi']) == 'tunggu') {
 													echo "tunggu"; 
                                                 } else { echo "Belum Bagi"; } ?>
            <?php } else { ?>
-                                                <?php if ($li['status'] == 'buka') {
+                                                <?php if (trim($li['status']) == 'buka') {
                                                     echo 'sedang jalan';
-                                                } else if ($li['status'] == 'selesai' && $li['approve'] == 'NONE') {
+                                                } else if (trim($li['status']) == 'selesai' && trim($li['approve']) == 'NONE') {
                                                     echo 'Waiting Approval';
-                                                } else if ($li['status'] == 'selesai' && $li['approve'] == 'TRUE') {
+                                                } else if (trim($li['status']) == 'selesai' && trim($li['approve']) == 'TRUE') {
                                                     echo 'Selesai';
                                                 } else {
                                                     echo  $li['status'];
