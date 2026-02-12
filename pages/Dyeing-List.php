@@ -171,8 +171,11 @@
 <script>
     let dyeingData = []
     let blockedResepMap = {};
+    let isLoadingSchedule = false;
 
     function loadScheduleTable(callback) {
+        if (isLoadingSchedule) return;
+        isLoadingSchedule = true;
         const scrollLeft = $('#tableContainer').scrollLeft();
         const scrollLeftNext = $('#tableContainerNext').scrollLeft();
 
@@ -275,7 +278,6 @@
                     $.post('pages/ajax/update_is_old_data.php', { resepList: JSON.stringify(movedReseps) })
                         .done(res => {
                             console.log("✅ Bulk is_old_data updated:", res);
-                            loadScheduleTable();
                         })
                         .fail(xhr => console.error("❌ Failed bulk update:", xhr.responseText));
                 }
@@ -361,6 +363,9 @@
             error: function (xhr, status, error) {
                 console.error("Failed to fetch data:", error);
                 $('#schedule_table').html('<div class="alert alert-danger">Gagal memuat data schedule.</div>');
+            },
+            complete: function () {
+                isLoadingSchedule = false;
             }
         });
     }
