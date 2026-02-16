@@ -141,6 +141,7 @@ LEFT JOIN (SELECT
             p.SUBCODE01 = 'C'
             OR p.SUBCODE01 = 'D'
             OR p.SUBCODE01 = 'R'
+            OR p.SUBCODE01 = 'E'
             OR p.SUBCODE01 = 'P'
             OR p.SUBCODE01 = 'N'
         ) 
@@ -234,21 +235,143 @@ LEFT JOIN (SELECT
     }
 }
 else if($kategori=="CHEMICAL"){
-    $query_get_data_now="SELECT p.ITEMTYPECODE ,p.SUBCODE01 ,p.SUBCODE02 ,p.SUBCODE03 ,p.SUBCODE04 , p.LONGDESCRIPTION
-    FROM 
-        PRODUCT p
-    LEFT JOIN 
-        adstorage c on p.ABSUNIQUEID = c.UNIQUEID and c.FIELDNAME='ShowChemical' AND c.NAMEENTITYNAME ='Product'
+    // $query_get_data_now="SELECT p.ITEMTYPECODE ,p.SUBCODE01 ,p.SUBCODE02 ,p.SUBCODE03 ,p.SUBCODE04 , p.LONGDESCRIPTION
+    // FROM 
+    //     PRODUCT p
+    // LEFT JOIN 
+    //     adstorage c on p.ABSUNIQUEID = c.UNIQUEID and c.FIELDNAME='ShowChemical' AND c.NAMEENTITYNAME ='Product'
+    // WHERE 
+    //     c.VALUEBOOLEAN = 1
+    //     AND P.ITEMTYPECODE ='DYC'
+    //     AND p.SUBCODE01 = 'E'
+    // ORDER BY p.SUBCODE01 ";
+    // $result_now = db2_exec($conn1, $query_get_data_now, ['cursor' => DB2_SCROLLABLE]);
+    // while($rowdb = db2_fetch_assoc($result_now)){
+    //     $kode_obat=trim($rowdb["SUBCODE01"]," ")."-".trim($rowdb["SUBCODE02"]," ")."-".trim($rowdb["SUBCODE03"]," ");
+    //     $data_now[$kode_obat]['kode_obat']=$kode_obat;
+    //     $data_now[$kode_obat]['LONGDESCRIPTION']=$rowdb["LONGDESCRIPTION"];
+    // }
+    $query_get_data_now = "SELECT p.ITEMTYPECODE ,p.SUBCODE01 ,p.SUBCODE02 ,p.SUBCODE03 ,p.SUBCODE04 , p.LONGDESCRIPTION,
+     CASE 
+        WHEN b.QTY_MASUK IS NULL THEN 0 ELSE 
+        b.QTY_MASUK
+    END AS QTY_MASUK
+FROM 
+    PRODUCT p
+LEFT JOIN 
+    adstorage c on p.ABSUNIQUEID = c.UNIQUEID and c.FIELDNAME='ShowChemical' AND c.NAMEENTITYNAME ='Product'
+LEFT JOIN (SELECT 
+            ITEMTYPECODE, 
+            DECOSUBCODE01, 
+            DECOSUBCODE02, 
+            DECOSUBCODE03, 
+            SUM(QTY_MASUK) AS QTY_MASUK, 
+            SATUAN_MASUK 
+        FROM 
+        (
+            SELECT 
+                ITEMTYPECODE, 
+                TEMPLATE, 
+                DECOSUBCODE01, 
+                DECOSUBCODE02, 
+                DECOSUBCODE03, 
+                SUM(QTY_MASUK) AS QTY_MASUK, 
+                SATUAN_MASUK 
+            FROM 
+            (
+                SELECT 
+                    s.TRANSACTIONDATE, 
+                    s.TRANSACTIONNUMBER, 
+                    CASE 
+                        WHEN s3.TEMPLATECODE IS NOT NULL THEN s3.TEMPLATECODE 
+                        ELSE s.TEMPLATECODE 
+                    END AS TEMPLATE, 
+                    s3.LOGICALWAREHOUSECODE AS terimadarigd, 
+                    s.TEMPLATECODE AS TEMPLATE_S, 
+                    s.ITEMTYPECODE, 
+                    s.DECOSUBCODE01, 
+                    s.DECOSUBCODE02, 
+                    s.DECOSUBCODE03, 
+                    s2.LONGDESCRIPTION, 
+                    TRIM(s.DECOSUBCODE01) || '-' || TRIM(s.DECOSUBCODE02) || '-' || TRIM(s.DECOSUBCODE03) AS KODE_OBAT, 
+                    CASE 
+                        WHEN s.CREATIONUSER = 'MT_STI' AND s.TEMPLATECODE = 'OPN' AND (s.TRANSACTIONDATE ='2025-07-13' OR s.TRANSACTIONDATE ='2025-10-05') THEN 0 
+                        WHEN s.USERPRIMARYUOMCODE = 't' THEN s.USERPRIMARYQUANTITY * 1000000 
+                        WHEN s.USERPRIMARYUOMCODE = 'kg' THEN s.USERPRIMARYQUANTITY * 1000 
+                        ELSE s.USERPRIMARYQUANTITY 
+                    END AS QTY_MASUK, 
+                    CASE 
+                        WHEN s.USERPRIMARYUOMCODE = 't' THEN 'g' 
+                        WHEN s.USERPRIMARYUOMCODE = 'kg' THEN 'g' 
+                        ELSE s.USERPRIMARYUOMCODE 
+                    END AS SATUAN_MASUK, 
+                    CASE 
+                        WHEN s.TEMPLATECODE = 'OPN' THEN s2.LONGDESCRIPTION 
+                        WHEN s.TEMPLATECODE = 'QCT' THEN s.ORDERCODE 
+                        WHEN s.TEMPLATECODE IN ('304','303','203','204') THEN 'Terima dari ' || TRIM(s3.LOGICALWAREHOUSECODE) 
+                        WHEN s.TEMPLATECODE = '125' THEN 'Retur dari ' || TRIM(s.ORDERCODE ) 
+                    END AS KETERANGAN 
+                FROM STOCKTRANSACTION s            
+                LEFT JOIN STOCKTRANSACTIONTEMPLATE s2 ON s2.CODE = s.TEMPLATECODE 
+                LEFT JOIN INTERNALDOCUMENT i ON i.PROVISIONALCODE = s.ORDERCODE 
+                LEFT JOIN ORDERPARTNER o ON o.CUSTOMERSUPPLIERCODE = i.ORDPRNCUSTOMERSUPPLIERCODE 
+                LEFT JOIN LOGICALWAREHOUSE l ON l.CODE = o.CUSTOMERSUPPLIERCODE 
+                LEFT JOIN STOCKTRANSACTION s3 
+                    ON s3.TRANSACTIONNUMBER = s.TRANSACTIONNUMBER 
+                    AND NOT s3.LOGICALWAREHOUSECODE = 'M101' 
+                    AND s3.DETAILTYPE = 1 
+                LEFT JOIN LOGICALWAREHOUSE l2 ON l2.CODE = s3.LOGICALWAREHOUSECODE 
+                WHERE 
+                    s.ITEMTYPECODE = 'DYC' 
+                    AND s.TRANSACTIONDATE BETWEEN '$kemarin_stk_transaksi ' AND '$tgl_stk_op' 
+                    AND (
+                        (s.TRANSACTIONDATE > '$kemarin_stk_transaksi ' OR (s.TRANSACTIONDATE = '$kemarin_stk_transaksi ' AND s.TRANSACTIONTIME >= '23:01:00'))
+                        AND (s.TRANSACTIONDATE < '$tgl_stk_op' OR (s.TRANSACTIONDATE = '$tgl_stk_op' AND s.TRANSACTIONTIME <= '$jam_stk_op:00'))
+                    )
+                    AND s.TEMPLATECODE IN ('QCT','304','OPN','204','125') 
+                    AND NOT COALESCE(TRIM(
+                        CASE WHEN s3.TEMPLATECODE IS NOT NULL THEN s3.TEMPLATECODE ELSE s.TEMPLATECODE END
+                    ), '') || COALESCE(TRIM(
+                        CASE WHEN s3.LOGICALWAREHOUSECODE IS NOT NULL THEN s3.LOGICALWAREHOUSECODE ELSE s.LOGICALWAREHOUSECODE END
+                    ), '') IN ('OPNM101','303M101','304M510')
+                    AND s.LOGICALWAREHOUSECODE IN ('M510','M101')
+            ) AS sub 
+            WHERE TEMPLATE <> '304' 
+            GROUP BY 
+                ITEMTYPECODE, 
+                TEMPLATE, 
+                DECOSUBCODE01, 
+                DECOSUBCODE02, 
+                DECOSUBCODE03, 
+                SATUAN_MASUK
+        ) x 
+        GROUP BY 
+            ITEMTYPECODE, 
+            DECOSUBCODE01, 
+            DECOSUBCODE02, 
+            DECOSUBCODE03, 
+            SATUAN_MASUK )b ON  b.DECOSUBCODE01 = p.SUBCODE01
+                            AND b.DECOSUBCODE02 = p.SUBCODE02
+                            AND b.DECOSUBCODE03 = p.SUBCODE03
     WHERE 
         c.VALUEBOOLEAN = 1
         AND P.ITEMTYPECODE ='DYC'
-        AND p.SUBCODE01 = 'E'
+        AND (
+            p.SUBCODE01 = 'C'
+            OR p.SUBCODE01 = 'D'
+            OR p.SUBCODE01 = 'R'
+            OR p.SUBCODE01 = 'E'
+            OR p.SUBCODE01 = 'P'
+            OR p.SUBCODE01 = 'N'
+        ) 
     ORDER BY p.SUBCODE01 ";
+
     $result_now = db2_exec($conn1, $query_get_data_now, ['cursor' => DB2_SCROLLABLE]);
-    while($rowdb = db2_fetch_assoc($result_now)){
-        $kode_obat=trim($rowdb["SUBCODE01"]," ")."-".trim($rowdb["SUBCODE02"]," ")."-".trim($rowdb["SUBCODE03"]," ");
-        $data_now[$kode_obat]['kode_obat']=$kode_obat;
-        $data_now[$kode_obat]['LONGDESCRIPTION']=$rowdb["LONGDESCRIPTION"];
+    while ($rowdb = db2_fetch_assoc($result_now)) {
+        $kode_obat = trim($rowdb["SUBCODE01"]) . "-" . trim($rowdb["SUBCODE02"]) . "-" . trim($rowdb["SUBCODE03"]);
+        $data_now[$kode_obat]['kode_obat'] = $kode_obat;
+        $data_now[$kode_obat]['LONGDESCRIPTION'] = $rowdb["LONGDESCRIPTION"];
+        $data_now[$kode_obat]['QTY_MASUK'] = $rowdb["QTY_MASUK"];
     }
 
     $query_get_balance="SELECT KODE_OBAT, tgl_tutup, SUM(BASEPRIMARYQUANTITYUNIT) as total_balance 
@@ -452,7 +575,7 @@ if (count($data_now) > 0) {
             $saldo_awal=floatval($data_saldo[$index]['saldo_awal']??0);
             $total_balance_gram=$balance*1000;
             $saldo_awal_gram=round(($saldo_awal*1000),2);
-            $ending_balance=$total_balance_gram-$transaksi;
+            $ending_balance=($total_balance_gram+ $pemasukan)-$transaksi;
             $selisih_balance=$ending_balance-$total_stock;
             $selisih_plusminus=$total_stock-$ending_balance;
             if($selisih_balance>=0){
