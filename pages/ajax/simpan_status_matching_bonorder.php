@@ -1,9 +1,19 @@
 <?php
 include "../../koneksi.php";
+
+function sqlsrv_column_len($con, $table3Part, $column) {
+    $sql = "SELECT COL_LENGTH(?, ?) AS max_len";
+    $stmt = sqlsrv_query($con, $sql, [$table3Part, $column]);
+    if (!$stmt) return null;
+    $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+    $len = isset($row['max_len']) ? (int)$row['max_len'] : 0;
+    return $len > 0 ? $len : null;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $today = date('Y-m-d H:i:s');
     $salesorder = trim($_POST['salesorder'] ?? '');
-    $orderline  = trim($_POST['orderline'] ?? '');
+    $orderlineRaw = trim($_POST['orderline'] ?? '');
     $warna      = trim($_POST['warna'] ?? '');
     $benang     = trim($_POST['benang'] ?? '');
     $po         = trim($_POST['po_greige'] ?? '');
@@ -16,6 +26,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         echo "PIC dan Status harus dipilih!";
         exit;
     }
+    if ($orderlineRaw === '' || !ctype_digit($orderlineRaw)) {
+        echo "Orderline tidak valid: wajib numeric.";
+        exit;
+    }
+    $orderline = (int)$orderlineRaw;
+
+    // Hindari error truncation jika panjang teks melebihi definisi kolom SQL Server.
+    $lenStatus = sqlsrv_column_len($con, 'db_laborat.dbo.status_matching_bon_order', 'benang');
+    $lenLog    = sqlsrv_column_len($con, 'db_laborat.dbo.tbl_log_history_matching', 'benang');
+
+    $targetLen = null;
+    if ($lenStatus !== null && $lenLog !== null) $targetLen = min($lenStatus, $lenLog);
+    elseif ($lenStatus !== null) $targetLen = $lenStatus;
+    elseif ($lenLog !== null) $targetLen = $lenLog;
+
+    if ($targetLen !== null && strlen($benang) > $targetLen) {
+        $benang = substr($benang, 0, $targetLen);
+    }
 
     // Cek apakah data sudah ada berdasarkan unique key
     $checkSql = "SELECT TOP 1 1 FROM db_laborat.status_matching_bon_order
@@ -23,8 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                    AND orderline = ?
                    AND po_greige = ?";
     $checkResult = sqlsrv_query($con, $checkSql, [$salesorder, $orderline, $po]);
+    if ($checkResult === false) {
+        $errors = sqlsrv_errors();
+        echo "Gagal cek data existing: " . ($errors ? $errors[0]['message'] : 'unknown error');
+        exit;
+    }
 
-    if ($checkResult && sqlsrv_fetch_array($checkResult, SQLSRV_FETCH_ASSOC)) {
+    if (sqlsrv_fetch_array($checkResult, SQLSRV_FETCH_ASSOC)) {
         // Data sudah ada -> lakukan update
         $updateSql = "UPDATE db_laborat.status_matching_bon_order SET 
                         pic_check = ?,

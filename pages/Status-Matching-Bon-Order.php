@@ -540,7 +540,8 @@ $(document).ready(function () {
         const salesorder = row.find('.td-salesorder').text().trim();
         const orderline  = row.find('.td-orderline').text().trim();
         const warna      = row.find('.td-warna').text().trim();
-        const benang     = row.find('.td-benang').text().trim();
+        // Ambil text BENANG murni tanpa ikut text dari blok revisi/button di dalam sel.
+        const benang = row.find('.td-benang').clone().children().remove().end().text().trim();
         const po         = row.find('.td-po').text().trim();
 
         const picSelect    = row.find('.pic-check');
