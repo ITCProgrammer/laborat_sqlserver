@@ -209,298 +209,140 @@ $sisaReview = $totalH1 - ($totalApproved + $totalReject);
 </div>
 
 <?php
-/* ===== Helper ===== */
-function timer_to_hours($s){
-    $s = strtolower((string)$s);
-    $hari=0;$jam=0;$menit=0;
-    if (preg_match('/(\d+)\s*hari/',$s,$m))  $hari=(int)$m[1];
-    if (preg_match('/(\d+)\s*jam/',$s,$m))   $jam=(int)$m[1];
-    if (preg_match('/(\d+)\s*menit/',$s,$m)) $menit=(int)$m[1];
-    return ($hari*24)+$jam+($menit/60);
-}
-function hours_to_points($h){
-    if ($h < 24)   return 10;
-    if ($h <= 48)  return 9;
-    if ($h <= 72)  return 8;
-    if ($h <= 96)  return 7;
-    if ($h <= 120) return 6;
-    if ($h <= 144) return 5;
-    if ($h <= 168) return 4;
-    if ($h <= 192) return 3;
-    if ($h <= 216) return 2;
-    if ($h <= 240) return 1;
-    return 0;
-}
+/* ===== Rekap Points Awarded (sinkron dengan Points-Awarded-New) ===== */
+$dtStartPoints = $kemarin . ' 23:00';
+$dtEndPoints   = date('Y-m-d', strtotime($kemarin . ' +1 day')) . ' 23:00';
 
-/* ===== Ambil data per stage (UNION) ===== */
-$sql = "
-SELECT *
-FROM (
-    SELECT
-      ps.no_resep                                              AS no_resep,
-      'Preliminary'                                            AS stage,
-      sm.timer                                                 AS timer,
-      UPPER(ps.username)                                       AS user_pre,
-      UPPER(ps.user_dispensing)                                AS user_dis,
-      UPPER(ps.user_dyeing)                                    AS user_dye,
-      UPPER(COALESCE(ps.user_darkroom_end, ps.user_darkroom_start)) AS user_drk,
-      ps.is_test
-    FROM db_laborat.tbl_preliminary_schedule ps
-    JOIN db_laborat.tbl_status_matching sm
-      ON sm.idm = (CASE WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep,2) IN ('-A','-B')
-                        THEN SUBSTRING(ps.no_resep, 1, LEN(ps.no_resep)-2)
-                        ELSE ps.no_resep END)
-    WHERE CONVERT(date, ps.creationdatetime) = ?
-      AND sm.timer IS NOT NULL AND sm.timer <> ''
+$sqlPoints = "SELECT
+                  sm.idm,
+                  sm.approve_at,
+                  sm.timer,
+                  (t.hari * 24 + t.jam) AS total_jam,
+                  CASE
+                      WHEN (t.hari * 24 + t.jam) < 24 THEN 10
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 24 AND 48 THEN 9
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 49 AND 72 THEN 8
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 73 AND 96 THEN 7
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 97 AND 120 THEN 6
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 121 AND 144 THEN 5
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 145 AND 168 THEN 4
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 169 AND 192 THEN 3
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 193 AND 216 THEN 2
+                      WHEN (t.hari * 24 + t.jam) BETWEEN 217 AND 240 THEN 1
+                      ELSE 0
+                  END AS score,
+                  CONCAT(LOWER(LTRIM(RTRIM(psu.username))), ' (', u.jabatan, ')') AS people_involved
+              FROM db_laborat.tbl_status_matching sm
+              CROSS APPLY (
+                  SELECT
+                      TRY_CONVERT(int, LEFT(sm.timer, CHARINDEX(' Hari', sm.timer) - 1)) AS hari,
+                      TRY_CONVERT(int, LTRIM(RTRIM(SUBSTRING(
+                          sm.timer,
+                          CHARINDEX('Hari,', sm.timer) + LEN('Hari,'),
+                          CHARINDEX(' Jam', sm.timer) - (CHARINDEX('Hari,', sm.timer) + LEN('Hari,'))
+                      )))) AS jam
+              ) t
+              LEFT JOIN (
+                  SELECT DISTINCT
+                      x.idm_key,
+                      x.username
+                  FROM (
+                      SELECT
+                          CASE
+                              WHEN LEFT(ps.no_resep, 2) = 'DR' AND CHARINDEX('-', ps.no_resep) > 0
+                                  THEN LEFT(ps.no_resep, CHARINDEX('-', ps.no_resep) - 1)
+                              ELSE ps.no_resep
+                          END AS idm_key,
+                          v.username
+                      FROM db_laborat.tbl_preliminary_schedule ps
+                      CROSS APPLY (VALUES
+                          (NULLIF(LTRIM(RTRIM(ps.user_scheduled)), '')),
+                          (NULLIF(LTRIM(RTRIM(ps.user_dispensing)), '')),
+                          (NULLIF(LTRIM(RTRIM(ps.user_dyeing)), '')),
+                          (NULLIF(LTRIM(RTRIM(ps.user_darkroom_start)), '')),
+                          (NULLIF(LTRIM(RTRIM(ps.user_darkroom_end)), ''))
+                      ) v(username)
+                      WHERE v.username IS NOT NULL
+                  ) x
+              ) psu
+                ON psu.idm_key = sm.idm
+              LEFT JOIN db_laborat.tbl_user u ON u.username = LOWER(LTRIM(RTRIM(psu.username)))
+              WHERE
+                sm.approve_at BETWEEN ? AND ?
+                AND psu.username IS NOT NULL
+              ORDER BY
+                u.jabatan ASC,
+		            psu.username ASC";
 
-    UNION ALL
-    SELECT
-      ps.no_resep,'Dispensing',sm.timer,
-      UPPER(ps.username),UPPER(ps.user_dispensing),UPPER(ps.user_dyeing),
-      UPPER(COALESCE(ps.user_darkroom_end, ps.user_darkroom_start)), ps.is_test
-    FROM db_laborat.tbl_preliminary_schedule ps
-    JOIN db_laborat.tbl_status_matching sm
-      ON sm.idm = (CASE WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep,2) IN ('-A','-B')
-                        THEN SUBSTRING(ps.no_resep, 1, LEN(ps.no_resep)-2)
-                        ELSE ps.no_resep END)
-    WHERE CONVERT(date, ps.dispensing_start) = ?
-      AND sm.timer IS NOT NULL AND sm.timer <> ''
-
-    UNION ALL
-    SELECT
-      ps.no_resep,'Dyeing',sm.timer,
-      UPPER(ps.username),UPPER(ps.user_dispensing),UPPER(ps.user_dyeing),
-      UPPER(COALESCE(ps.user_darkroom_end, ps.user_darkroom_start)), ps.is_test
-    FROM db_laborat.tbl_preliminary_schedule ps
-    JOIN db_laborat.tbl_status_matching sm
-      ON sm.idm = (CASE WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep,2) IN ('-A','-B')
-                        THEN SUBSTRING(ps.no_resep, 1, LEN(ps.no_resep)-2)
-                        ELSE ps.no_resep END)
-    WHERE CONVERT(date, ps.dyeing_start) = ?
-      AND sm.timer IS NOT NULL AND sm.timer <> ''
-
-    UNION ALL
-    SELECT
-      ps.no_resep,'Darkroom',sm.timer,
-      UPPER(ps.username),UPPER(ps.user_dispensing),UPPER(ps.user_dyeing),
-      UPPER(COALESCE(ps.user_darkroom_end, ps.user_darkroom_start)), ps.is_test
-    FROM db_laborat.tbl_preliminary_schedule ps
-    JOIN db_laborat.tbl_status_matching sm
-      ON sm.idm = (CASE WHEN ps.no_resep LIKE 'DR%' AND RIGHT(ps.no_resep,2) IN ('-A','-B')
-                        THEN SUBSTRING(ps.no_resep, 1, LEN(ps.no_resep)-2)
-                        ELSE ps.no_resep END)
-    WHERE ((ps.darkroom_start IS NOT NULL AND CONVERT(date, ps.darkroom_start)=?)
-        OR (ps.darkroom_end   IS NOT NULL AND CONVERT(date, ps.darkroom_end)  =?))
-      AND sm.timer IS NOT NULL AND sm.timer <> ''
-) AS unioned
-ORDER BY
-  CASE unioned.stage
-    WHEN 'Preliminary' THEN 1
-    WHEN 'Dispensing'  THEN 2
-    WHEN 'Dyeing'      THEN 3
-    WHEN 'Darkroom'    THEN 4
-    ELSE 5 END,
-  unioned.no_resep
-";
-$stmt = sqlsrv_query($sqlsrvLab, $sql, [$kemarin, $kemarin, $kemarin, $kemarin, $kemarin], ["Scrollable" => SQLSRV_CURSOR_KEYSET]);
-if (! $stmt) {
-    die("Prepare/execute gagal: " . print_r(sqlsrv_errors(), true));
+$stmtPoints = sqlsrv_query($sqlsrvLab, $sqlPoints, [$dtStartPoints, $dtEndPoints]);
+if (! $stmtPoints) {
+    die("Query points gagal: " . print_r(sqlsrv_errors(), true));
 }
 
-/* ===== Agregasi per STAGE & USER ===== */
-$stageUser = [
-  'Preliminary'=>[], 'Dispensing'=>[], 'Dyeing'=>[], 'Darkroom'=>[]
-];
+$userPointAgg = [];
+while ($row = sqlsrv_fetch_array($stmtPoints, SQLSRV_FETCH_ASSOC)) {
+    $user = strtoupper(trim((string)($row['people_involved'] ?? '')));
+    if ($user === '') continue;
 
-// mapping urutan prioritas stage
-$stageIndexMap = [
-    'Preliminary' => 0,
-    'Dispensing'  => 1,
-    'Dyeing'      => 2,
-    'Darkroom'    => 3,
-];
-
-// untuk aturan:
-// - per user+base_job, hanya stage paling awal yang dihitung
-$jobFirstStage = [];
-
-// untuk menghindari double count dalam 1 stage untuk user+base_job yang sama
-$seen = [];
-
-while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)){
-  $stage  = $row['stage'];
-
-  // full job & base job (tanpa -A/-B)
-  $jobFull = $row['no_resep'];
-  $baseJob = $jobFull;
-  if (preg_match('/^DR.+-(A|B)$/', $jobFull)) {
-      $baseJob = substr($jobFull, 0, -2); // DRxxxxx saja
-  }
-
-  $isTest = (int)$row['is_test'] === 1;
-  // SEMENTARA IS_TEST = 1 DILEWATI SAJA
-  if ($isTest) continue;
-
-  // ambil user sesuai stage
-  $user = '';
-  if ($stage==='Preliminary')      $user = trim($row['user_pre']);
-  elseif ($stage==='Dispensing')   $user = trim($row['user_dis']);
-  elseif ($stage==='Dyeing')       $user = trim($row['user_dye']);
-  else                             $user = trim($row['user_drk']);
-  if ($user==='') continue;
-
-  // index prioritas stage
-  $idx = isset($stageIndexMap[$stage]) ? $stageIndexMap[$stage] : 999;
-
-  // === PRIORITAS STAGE BERANTAI PER USER ===
-  // Jika base job untuk user ini sudah pernah muncul di stage lebih awal,
-  // baris ini di-skip (tidak dihitung lagi di stage berikutnya).
-  if (isset($jobFirstStage[$user][$baseJob])) {
-      $firstIdx = $jobFirstStage[$user][$baseJob];
-
-      if ($idx > $firstIdx) {
-          // stage sekarang lebih akhir → abaikan
-          continue;
-      } elseif ($idx < $firstIdx) {
-          // kalau (secara teori) ketemu stage yang lebih awal belakangan,
-          // update prioritas ke yang lebih awal
-          $jobFirstStage[$user][$baseJob] = $idx;
-      }
-  } else {
-      // pertama kali lihat job ini untuk user ini
-      $jobFirstStage[$user][$baseJob] = $idx;
-  }
-
-  // === DEDUPE DALAM STAGE YANG SAMA (user + baseJob) ===
-  // DRxxxx-A & DRxxxx-B → dianggap 1 job di stage ini per user
-  if (isset($seen[$stage][$user][$baseJob])) {
-      continue;
-  }
-  $seen[$stage][$user][$baseJob] = true;
-
-  // semua baris (test & non-test) yang lolos aturan di atas ikut dihitung point
-  $points   = hours_to_points(timer_to_hours($row['timer']));
-  $possible = 10;
-
-  if (!isset($stageUser[$stage][$user])) {
-    $stageUser[$stage][$user] = ['sumA'=>0,'sumP'=>0];
-  }
-  $stageUser[$stage][$user]['sumA'] += $points;
-  $stageUser[$stage][$user]['sumP'] += $possible;
-}
-
-if ($stmt) {
-    sqlsrv_free_stmt($stmt);
-}
-
-/* ===== Sort user A–Z di tiap stage ===== */
-foreach ($stageUser as $st => $arr){
-  ksort($arr, SORT_NATURAL | SORT_FLAG_CASE);
-  $stageUser[$st] = $arr;
-}
-
-/* ===== Gabung per USER + tentukan stage prioritas tampil ===== */
-$orderStages = ['Preliminary','Dispensing','Dyeing','Darkroom'];
-
-$userAgg = []; // key: user
-foreach ($orderStages as $st) {
-  if (empty($stageUser[$st])) continue;
-
-  foreach ($stageUser[$st] as $user => $tot) {
-    if (!isset($userAgg[$user])) {
-      $userAgg[$user] = [
-        'sumA'      => 0,
-        'sumP'      => 0,
-        'bestStage' => $st,
-        'bestIdx'   => array_search($st, $orderStages, true)
-      ];
+    if (! isset($userPointAgg[$user])) {
+        $userPointAgg[$user] = ['jobs' => 0, 'sumA' => 0, 'sumP' => 0];
     }
 
-    // akumulasi poin semua job yang lolos aturan chain
-    $userAgg[$user]['sumA'] += $tot['sumA'];
-    $userAgg[$user]['sumP'] += $tot['sumP'];
+    $userPointAgg[$user]['jobs'] += 1;
+    $userPointAgg[$user]['sumA'] += (int)($row['score'] ?? 0);
+    $userPointAgg[$user]['sumP'] += 10;
+}
+sqlsrv_free_stmt($stmtPoints);
 
-    // stage tampil: pilih yang paling kecil
-    $idxNow = array_search($st, $orderStages, true);
-    if ($idxNow < $userAgg[$user]['bestIdx']) {
-      $userAgg[$user]['bestStage'] = $st;
-      $userAgg[$user]['bestIdx']   = $idxNow;
+$pointRows = [];
+foreach ($userPointAgg as $user => $tot) {
+    $ratio = ($tot['sumP'] > 0) ? ($tot['sumA'] / $tot['sumP']) : 0;
+    $pointRows[] = [
+        'user' => $user,
+        'jobs' => (int)$tot['jobs'],
+        'ratio' => (float)$ratio
+    ];
+}
+
+usort($pointRows, function ($a, $b) {
+    if ($a['ratio'] === $b['ratio']) {
+        return strnatcasecmp($a['user'], $b['user']);
     }
-  }
-}
-
-/* ===== Susun kembali per STAGE untuk tampilan ===== */
-$stageDisplay = [];
-foreach ($orderStages as $st) {
-  $stageDisplay[$st] = [];
-}
-
-foreach ($userAgg as $user => $info) {
-  $st    = $info['bestStage']; // stage prioritas untuk tampilan
-  $ratio = ($info['sumP'] > 0) ? $info['sumA'] / $info['sumP'] : 0;
-
-  $stageDisplay[$st][] = [
-    'user'  => $user,
-    'ratio' => $ratio
-  ];
-}
-
-/* Sort user A–Z di dalam masing-masing stage */
-foreach ($stageDisplay as $st => $rows) {
-  usort($rows, function($a, $b) {
-    return strnatcasecmp($a['user'], $b['user']);
-  });
-  $stageDisplay[$st] = $rows;
-}
+    return ($a['ratio'] < $b['ratio']) ? 1 : -1;
+});
 ?>
 
 <div class="col-md-6">
   <div class="box">
     <h4 class="text-center" style="font-weight:bold;">
-      REKAP POINTS AWARDED H-1 (<?= htmlspecialchars($kemarin); ?>)
+      REKAP POINTS AWARDED H-1
+      <span style="font-size:13px;">
+        (<?= htmlspecialchars($dtStartPoints); ?> s/d <?= htmlspecialchars($dtEndPoints); ?>)
+      </span>
     </h4>
 
     <table class="table table-chart" style="width:100%;">
       <thead class="table-secondary">
         <tr class="text-center" style="background:#eee;">
-          <th style="text-align:center; width:28%;">STAGE</th>
-          <th style="text-align:center; width:44%;">NAMA</th>
-          <th style="text-align:center; width:28%;">POINT</th>
+          <th style="text-align:center; width:45%;">NAMA</th>
+          <th style="text-align:center; width:20%;">TOTAL JOB</th>
+          <th style="text-align:center; width:35%;">POINT</th>
         </tr>
       </thead>
       <tbody>
-        <?php
-        $printedAny = false;
-
-        foreach ($orderStages as $st) {
-          $rows = $stageDisplay[$st];
-          if (empty($rows)) continue;
-
-          $printedAny = true;
-          $rowspan = count($rows);
-
-          foreach ($rows as $i => $row) {
-            echo '<tr>';
-
-            // Kolom STAGE hanya dicetak sekali (rowspan)
-            if ($i === 0) {
-              echo '<td rowspan="'.$rowspan.'" style="vertical-align:middle;font-weight:bold;">'
-                    . htmlspecialchars($st) .
-                  '</td>';
-            }
-
-            echo '<td>'.htmlspecialchars($row['user']).'</td>';
-            echo '<td class="text-center" style="background:#cfe8ff;font-weight:bold;">'
-                    . number_format($row['ratio'], 4, '.', '') .
-                 '</td>';
-            echo '</tr>';
-          }
-        }
-
-        if (!$printedAny) {
-          echo '<tr><td colspan="3" class="text-center text-muted">Tidak ada data.</td></tr>';
-        }
-        ?>
+        <?php if (! empty($pointRows)): ?>
+          <?php foreach ($pointRows as $r): ?>
+            <tr>
+              <td><?= htmlspecialchars($r['user']); ?></td>
+              <td class="text-center"><?= (int)$r['jobs']; ?></td>
+              <td class="text-center" style="background:#cfe8ff;font-weight:bold;">
+                <?= number_format((float)$r['ratio'], 4, '.', ''); ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <tr><td colspan="3" class="text-center text-muted">Tidak ada data.</td></tr>
+        <?php endif; ?>
       </tbody>
     </table>
   </div>

@@ -311,6 +311,11 @@ $page = strtolower($page);
                                         <a href="?p=Points-Awarded"><i class="fa fa-star-o text-yellow" aria-hidden="true"></i>
                                             <span>Points Awarded</span></a>
                                     </li>
+                                    
+                                    <li class="<?php if ($_GET['p'] == "Points-Awarded-New") echo "active"; ?>">
+                                        <a href="?p=Points-Awarded-New"><i class="fa fa-star-o text-yellow" aria-hidden="true"></i>
+                                            <span>Points Awarded (*)</span></a>
+                                    </li>
                                 </ul>
                             <?php endif; ?>
 
