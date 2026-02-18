@@ -202,6 +202,8 @@
                         OR p.SUBCODE01 = 'D'
                         OR p.SUBCODE01 = 'R'
                         OR p.SUBCODE01 = 'E'
+                        OR p.SUBCODE01 = 'N'
+                        OR p.SUBCODE01 = 'P'
                     )";
             $result_now = db2_exec($conn1, $query_get_data_now);
             while($rowdb = db2_fetch_assoc($result_now)){

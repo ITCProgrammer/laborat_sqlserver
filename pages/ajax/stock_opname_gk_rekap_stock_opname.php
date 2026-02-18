@@ -322,9 +322,9 @@ LEFT JOIN (SELECT
                 LEFT JOIN LOGICALWAREHOUSE l2 ON l2.CODE = s3.LOGICALWAREHOUSECODE 
                 WHERE 
                     s.ITEMTYPECODE = 'DYC' 
-                    AND s.TRANSACTIONDATE BETWEEN '$kemarin_stk_transaksi ' AND '$tgl_stk_op' 
+                    AND s.TRANSACTIONDATE BETWEEN '$tgl_tutup ' AND '$tgl_stk_op' 
                     AND (
-                        (s.TRANSACTIONDATE > '$kemarin_stk_transaksi ' OR (s.TRANSACTIONDATE = '$kemarin_stk_transaksi ' AND s.TRANSACTIONTIME >= '23:01:00'))
+                        (s.TRANSACTIONDATE > '$tgl_tutup ' OR (s.TRANSACTIONDATE = '$tgl_tutup ' AND s.TRANSACTIONTIME >= '23:01:00'))
                         AND (s.TRANSACTIONDATE < '$tgl_stk_op' OR (s.TRANSACTIONDATE = '$tgl_stk_op' AND s.TRANSACTIONTIME <= '$jam_stk_op:00'))
                     )
                     AND s.TEMPLATECODE IN ('QCT','304','OPN','204','125') 
