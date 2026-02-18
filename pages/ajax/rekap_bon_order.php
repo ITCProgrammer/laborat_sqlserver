@@ -231,7 +231,8 @@ $sqlPoints = "SELECT
                       WHEN (t.hari * 24 + t.jam) BETWEEN 217 AND 240 THEN 1
                       ELSE 0
                   END AS score,
-                  CONCAT(LOWER(LTRIM(RTRIM(psu.username))), ' (', u.jabatan, ')') AS people_involved
+                  LOWER(LTRIM(RTRIM(psu.username))) AS people_involved,
+                  COALESCE(NULLIF(LTRIM(RTRIM(u.jabatan)), ''), '-') AS jabatan
               FROM db_laborat.tbl_status_matching sm
               CROSS APPLY (
                   SELECT
@@ -279,37 +280,48 @@ if (! $stmtPoints) {
     die("Query points gagal: " . print_r(sqlsrv_errors(), true));
 }
 
-$userPointAgg = [];
+$jabatanPointAgg = [];
 while ($row = sqlsrv_fetch_array($stmtPoints, SQLSRV_FETCH_ASSOC)) {
     $user = strtoupper(trim((string)($row['people_involved'] ?? '')));
+    $jabatan = strtoupper(trim((string)($row['jabatan'] ?? '-')));
     if ($user === '') continue;
+    if ($jabatan === '') $jabatan = '-';
 
-    if (! isset($userPointAgg[$user])) {
-        $userPointAgg[$user] = ['jobs' => 0, 'sumA' => 0, 'sumP' => 0];
+    if (! isset($jabatanPointAgg[$jabatan])) {
+        $jabatanPointAgg[$jabatan] = [];
+    }
+    if (! isset($jabatanPointAgg[$jabatan][$user])) {
+        $jabatanPointAgg[$jabatan][$user] = ['jobs' => 0, 'sumA' => 0, 'sumP' => 0];
     }
 
-    $userPointAgg[$user]['jobs'] += 1;
-    $userPointAgg[$user]['sumA'] += (int)($row['score'] ?? 0);
-    $userPointAgg[$user]['sumP'] += 10;
+    $jabatanPointAgg[$jabatan][$user]['jobs'] += 1;
+    $jabatanPointAgg[$jabatan][$user]['sumA'] += (int)($row['score'] ?? 0);
+    $jabatanPointAgg[$jabatan][$user]['sumP'] += 10;
 }
 sqlsrv_free_stmt($stmtPoints);
 
-$pointRows = [];
-foreach ($userPointAgg as $user => $tot) {
-    $ratio = ($tot['sumP'] > 0) ? ($tot['sumA'] / $tot['sumP']) : 0;
-    $pointRows[] = [
-        'user' => $user,
-        'jobs' => (int)$tot['jobs'],
-        'ratio' => (float)$ratio
-    ];
-}
-
-usort($pointRows, function ($a, $b) {
-    if ($a['ratio'] === $b['ratio']) {
-        return strnatcasecmp($a['user'], $b['user']);
+$pointGroups = [];
+ksort($jabatanPointAgg, SORT_NATURAL | SORT_FLAG_CASE);
+foreach ($jabatanPointAgg as $jabatan => $usersAgg) {
+    $rows = [];
+    foreach ($usersAgg as $user => $tot) {
+        $ratio = ($tot['sumP'] > 0) ? ($tot['sumA'] / $tot['sumP']) : 0;
+        $rows[] = [
+            'user' => $user,
+            'jobs' => (int)$tot['jobs'],
+            'ratio' => (float)$ratio
+        ];
     }
-    return ($a['ratio'] < $b['ratio']) ? 1 : -1;
-});
+
+    usort($rows, function ($a, $b) {
+        if ($a['ratio'] === $b['ratio']) {
+            return strnatcasecmp($a['user'], $b['user']);
+        }
+        return ($a['ratio'] < $b['ratio']) ? 1 : -1;
+    });
+
+    $pointGroups[$jabatan] = $rows;
+}
 ?>
 
 <div class="col-md-6">
@@ -324,24 +336,33 @@ usort($pointRows, function ($a, $b) {
     <table class="table table-chart" style="width:100%;">
       <thead class="table-secondary">
         <tr class="text-center" style="background:#eee;">
-          <th style="text-align:center; width:45%;">NAMA</th>
-          <th style="text-align:center; width:20%;">TOTAL JOB</th>
-          <th style="text-align:center; width:35%;">POINT</th>
+          <th style="text-align:center; width:24%;">JABATAN</th>
+          <th style="text-align:center; width:36%;">NAMA</th>
+          <th style="text-align:center; width:15%;">TOTAL JOB</th>
+          <th style="text-align:center; width:25%;">POINT</th>
         </tr>
       </thead>
       <tbody>
-        <?php if (! empty($pointRows)): ?>
-          <?php foreach ($pointRows as $r): ?>
-            <tr>
-              <td><?= htmlspecialchars($r['user']); ?></td>
-              <td class="text-center"><?= (int)$r['jobs']; ?></td>
-              <td class="text-center" style="background:#cfe8ff;font-weight:bold;">
-                <?= number_format((float)$r['ratio'], 4, '.', ''); ?>
-              </td>
-            </tr>
+        <?php if (! empty($pointGroups)): ?>
+          <?php foreach ($pointGroups as $jabatan => $rows): ?>
+            <?php $rowspan = count($rows); ?>
+            <?php foreach ($rows as $idx => $r): ?>
+              <tr>
+                <?php if ($idx === 0): ?>
+                  <td rowspan="<?= (int)$rowspan; ?>" style="vertical-align: middle; font-weight: 700;">
+                    <?= htmlspecialchars($jabatan); ?>
+                  </td>
+                <?php endif; ?>
+                <td><?= htmlspecialchars($r['user']); ?></td>
+                <td class="text-center"><?= (int)$r['jobs']; ?></td>
+                <td class="text-center" style="background:#cfe8ff;font-weight:bold;">
+                  <?= number_format((float)$r['ratio'], 4, '.', ''); ?>
+                </td>
+              </tr>
+            <?php endforeach; ?>
           <?php endforeach; ?>
         <?php else: ?>
-          <tr><td colspan="3" class="text-center text-muted">Tidak ada data.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted">Tidak ada data.</td></tr>
         <?php endif; ?>
       </tbody>
     </table>

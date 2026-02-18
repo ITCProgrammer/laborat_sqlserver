@@ -87,7 +87,7 @@ function render_date_detail_table(array $rows, string $dateKey)
   echo '</table>';
 }
 
-function render_user_daily_summary_modal(array $rowsByDate, string $user)
+function render_user_daily_summary_modal(array $rowsByDate, string $user, string $scopeKey = '')
 {
   if (empty($rowsByDate)) {
     echo '<div class="alert alert-info" style="margin-bottom:0;">Tidak ada data.</div>';
@@ -95,7 +95,7 @@ function render_user_daily_summary_modal(array $rowsByDate, string $user)
   }
 
   ksort($rowsByDate);
-  $uSlug = slug_id($user);
+  $uSlug = slug_id(($scopeKey !== '' ? $scopeKey . '-' : '') . $user);
   $tableId = 'dt-summary-' . $uSlug;
   $modalsHtml = '';
 
@@ -203,7 +203,8 @@ $sql = "SELECT
               WHEN (t.hari * 24 + t.jam) BETWEEN 217 AND 240 THEN 1
               ELSE 0
           END AS score,
-          CONCAT(LOWER(LTRIM(RTRIM(psu.username))), ' (', u.jabatan, ')') AS people_involved
+          LOWER(LTRIM(RTRIM(psu.username))) AS people_involved,
+          COALESCE(NULLIF(LTRIM(RTRIM(u.jabatan)), ''), '-') AS jabatan
       FROM db_laborat.tbl_status_matching sm
       CROSS APPLY (
           SELECT
@@ -256,18 +257,23 @@ $totalRows = 0;
 
 while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
   $user = strtoupper(trim((string)($row['people_involved'] ?? '')));
+  $jabatan = strtoupper(trim((string)($row['jabatan'] ?? '-')));
   if ($user === '') continue;
+  if ($jabatan === '') $jabatan = '-';
   $approveDate = normalize_ymd($row['approve_at'] ?? null);
   if ($approveDate === '') continue;
 
-  if (!isset($rowsByUser[$user])) {
-    $rowsByUser[$user] = [];
+  if (!isset($rowsByUser[$jabatan])) {
+    $rowsByUser[$jabatan] = [];
   }
-  if (!isset($rowsByUser[$user][$approveDate])) {
-    $rowsByUser[$user][$approveDate] = [];
+  if (!isset($rowsByUser[$jabatan][$user])) {
+    $rowsByUser[$jabatan][$user] = [];
+  }
+  if (!isset($rowsByUser[$jabatan][$user][$approveDate])) {
+    $rowsByUser[$jabatan][$user][$approveDate] = [];
   }
 
-  $rowsByUser[$user][$approveDate][] = [
+  $rowsByUser[$jabatan][$user][$approveDate][] = [
     'job' => (string)($row['idm'] ?? ''),
     'points_awarded' => (int)($row['score'] ?? 0),
     'possible_points' => 10,
@@ -276,17 +282,41 @@ while ($row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC)) {
 }
 sqlsrv_free_stmt($stmt);
 
-$allUsers = array_keys($rowsByUser);
-sort($allUsers);
+$allJabatan = array_keys($rowsByUser);
+sort($allJabatan);
 
-foreach ($allUsers as $u) {
-  if (isset($rowsByUser[$u]) && is_array($rowsByUser[$u])) {
-    ksort($rowsByUser[$u]);
+$allUsers = [];
+foreach ($allJabatan as $j) {
+  if (!isset($rowsByUser[$j]) || !is_array($rowsByUser[$j])) continue;
+  ksort($rowsByUser[$j], SORT_NATURAL | SORT_FLAG_CASE);
+  foreach ($rowsByUser[$j] as $u => $byDate) {
+    $allUsers[$u] = true;
+    if (is_array($byDate)) {
+      ksort($rowsByUser[$j][$u]);
+    }
+  }
+}
+$totalUsers = count($allUsers);
+
+$activeJabatan = isset($_POST['active_jabatan']) ? strtoupper(trim((string)$_POST['active_jabatan'])) : '';
+if ($activeJabatan === '' || !in_array($activeJabatan, $allJabatan, true)) {
+  $activeJabatan = $allJabatan[0] ?? '';
+}
+
+$activeUserByJabatan = [];
+foreach ($allJabatan as $j) {
+  $users = array_keys($rowsByUser[$j]);
+  if (empty($users)) continue;
+
+  if ($j === $activeJabatan && $activeUser !== '' && in_array($activeUser, $users, true)) {
+    $activeUserByJabatan[$j] = $activeUser;
+  } else {
+    $activeUserByJabatan[$j] = $users[0];
   }
 }
 
-if ($activeUser === '' || !in_array($activeUser, $allUsers, true)) {
-  $activeUser = $allUsers[0] ?? '';
+if ($activeUser === '' && $activeJabatan !== '' && isset($activeUserByJabatan[$activeJabatan])) {
+  $activeUser = $activeUserByJabatan[$activeJabatan];
 }
 ?>
 
@@ -348,6 +378,7 @@ if ($activeUser === '' || !in_array($activeUser, $allUsers, true)) {
       <div class="container-fluid">
         <form class="form-inline" method="POST" action="">
           <input type="hidden" name="p" value="Points-Awarded-New">
+          <input type="hidden" name="active_jabatan" id="active_jabatan" value="<?php echo htmlspecialchars($activeJabatan); ?>">
           <input type="hidden" name="active_user" id="active_user" value="<?php echo htmlspecialchars($activeUser); ?>">
 
           <div class="form-group mb-2">
@@ -382,40 +413,69 @@ if ($activeUser === '' || !in_array($activeUser, $allUsers, true)) {
       <?php else: ?>
         <div class="alert alert-info">
           Menampilkan <strong><?php echo (int)$totalRows; ?></strong> job dari
-          <strong><?php echo count($allUsers); ?></strong> people involved.
+          <strong><?php echo (int)$totalUsers; ?></strong> people involved
+          dalam <strong><?php echo count($allJabatan); ?></strong> kategori jabatan.
           Range: <strong><?php echo htmlspecialchars($dtStart); ?></strong> s/d
           <strong><?php echo htmlspecialchars($dtEnd); ?></strong>.
         </div>
 
-        <ul class="nav nav-tabs" role="tablist" id="peopleTabs">
-          <?php foreach ($allUsers as $u):
-            $uid = slug_id($u);
-            $act = ($u === $activeUser) ? 'active' : '';
+        <ul class="nav nav-tabs" role="tablist" id="jabatanTabs">
+          <?php foreach ($allJabatan as $j):
+            $jid = slug_id($j);
+            $act = ($j === $activeJabatan) ? 'active' : '';
           ?>
             <li role="presentation" class="<?php echo $act; ?>">
-              <a href="#tab-<?php echo $uid; ?>"
-                 aria-controls="tab-<?php echo $uid; ?>"
+              <a href="#tab-jabatan-<?php echo $jid; ?>"
+                 aria-controls="tab-jabatan-<?php echo $jid; ?>"
                  role="tab"
                  data-toggle="tab"
-                 data-userkey="<?php echo htmlspecialchars($u); ?>">
-                <?php echo htmlspecialchars($u); ?>
+                 data-jabatankey="<?php echo htmlspecialchars($j); ?>">
+                <?php echo htmlspecialchars($j); ?>
               </a>
             </li>
           <?php endforeach; ?>
         </ul>
 
         <div class="tab-content" style="margin-top: 14px;">
-          <?php foreach ($allUsers as $u):
-            $uid = slug_id($u);
-            $act = ($u === $activeUser) ? 'active' : '';
-            $rowsByDate = $rowsByUser[$u];
+          <?php foreach ($allJabatan as $j):
+            $jid = slug_id($j);
+            $act = ($j === $activeJabatan) ? 'active' : '';
+            $usersInJabatan = $rowsByUser[$j];
+            $activeUserThisJabatan = $activeUserByJabatan[$j] ?? '';
           ?>
-            <div role="tabpanel" class="tab-pane <?php echo $act; ?>" id="tab-<?php echo $uid; ?>">
-              <div class="alert alert-info" style="margin-bottom:10px;">
-                Menampilkan <strong>ratio per hari</strong> untuk user <strong><?php echo htmlspecialchars($u); ?></strong>
-                pada range <strong><?php echo htmlspecialchars($dtStart); ?></strong> s/d <strong><?php echo htmlspecialchars($dtEnd); ?></strong>.
+            <div role="tabpanel" class="tab-pane <?php echo $act; ?>" id="tab-jabatan-<?php echo $jid; ?>">
+              <ul class="nav nav-pills people-tabs" role="tablist" style="margin-bottom:10px;">
+                <?php foreach ($usersInJabatan as $u => $rowsByDateUser):
+                  $uid = slug_id($jid . '-' . $u);
+                  $uAct = ($u === $activeUserThisJabatan) ? 'active' : '';
+                ?>
+                  <li role="presentation" class="<?php echo $uAct; ?>">
+                    <a href="#tab-user-<?php echo $uid; ?>"
+                       aria-controls="tab-user-<?php echo $uid; ?>"
+                       role="tab"
+                       data-toggle="tab"
+                       data-jabatankey="<?php echo htmlspecialchars($j); ?>"
+                       data-userkey="<?php echo htmlspecialchars($u); ?>">
+                      <?php echo htmlspecialchars($u); ?>
+                    </a>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+
+              <div class="tab-content">
+                <?php foreach ($usersInJabatan as $u => $rowsByDate):
+                  $uid = slug_id($jid . '-' . $u);
+                  $uAct = ($u === $activeUserThisJabatan) ? 'active' : '';
+                ?>
+                  <div role="tabpanel" class="tab-pane <?php echo $uAct; ?>" id="tab-user-<?php echo $uid; ?>">
+                    <div class="alert alert-info" style="margin-bottom:10px;">
+                      Menampilkan <strong>ratio per hari</strong> untuk user <strong><?php echo htmlspecialchars($u); ?></strong>
+                      pada range <strong><?php echo htmlspecialchars($dtStart); ?></strong> s/d <strong><?php echo htmlspecialchars($dtEnd); ?></strong>.
+                    </div>
+                    <?php render_user_daily_summary_modal($rowsByDate, $u, $j); ?>
+                  </div>
+                <?php endforeach; ?>
               </div>
-              <?php render_user_daily_summary_modal($rowsByDate, $u); ?>
             </div>
           <?php endforeach; ?>
         </div>
@@ -426,29 +486,42 @@ if ($activeUser === '' || !in_array($activeUser, $allUsers, true)) {
 
 <script>
 (function () {
-  $(document).on('shown.bs.tab', '#peopleTabs a[data-toggle="tab"]', function (e) {
-    var key = $(e.target).data('userkey');
-    if (!key) return;
+  $(document).on('shown.bs.tab', '#jabatanTabs a[data-toggle="tab"]', function (e) {
+    var jabatan = $(e.target).data('jabatankey');
+    if (jabatan) $('#active_jabatan').val(jabatan);
 
-    $('#active_user').val(key);
-
-    if (history.replaceState) {
-      var url = location.pathname + location.search;
-      history.replaceState(null, '', url + '#' + encodeURIComponent(key));
+    var paneSelector = $(e.target).attr('href');
+    var $activeUserTab = $(paneSelector).find('.people-tabs li.active a[data-userkey]').first();
+    if ($activeUserTab.length) {
+      $('#active_user').val($activeUserTab.data('userkey') || '');
     } else {
-      location.hash = encodeURIComponent(key);
+      var $firstUserTab = $(paneSelector).find('.people-tabs a[data-userkey]').first();
+      if ($firstUserTab.length) {
+        $firstUserTab.tab('show');
+      } else {
+        $('#active_user').val('');
+      }
     }
   });
 
+  $(document).on('shown.bs.tab', '.people-tabs a[data-toggle="tab"]', function (e) {
+    var user = $(e.target).data('userkey');
+    var jabatan = $(e.target).data('jabatankey');
+    if (user) $('#active_user').val(user);
+    if (jabatan) $('#active_jabatan').val(jabatan);
+  });
+
   $(function () {
-    var h = decodeURIComponent((location.hash || '').replace('#', ''));
-    if (!h) return;
-    $('#peopleTabs a').each(function () {
-      if ($(this).data('userkey') === h) {
-        $(this).tab('show');
-        $('#active_user').val(h);
-      }
-    });
+    var $activeUserTab = $('.people-tabs li.active a[data-userkey]').first();
+    if ($activeUserTab.length) {
+      $('#active_user').val($activeUserTab.data('userkey') || '');
+      $('#active_jabatan').val($activeUserTab.data('jabatankey') || '');
+      return;
+    }
+    var $activeJabatanTab = $('#jabatanTabs li.active a[data-jabatankey]').first();
+    if ($activeJabatanTab.length) {
+      $('#active_jabatan').val($activeJabatanTab.data('jabatankey') || '');
+    }
   });
 
   $(document).on('shown.bs.modal', '.modal', function () {
@@ -490,7 +563,7 @@ if ($activeUser === '' || !in_array($activeUser, $allUsers, true)) {
     initSummaryTables();
   });
 
-  $(document).on('shown.bs.tab', '#peopleTabs a[data-toggle="tab"]', function () {
+  $(document).on('shown.bs.tab', '#jabatanTabs a[data-toggle="tab"], .people-tabs a[data-toggle="tab"]', function () {
     initSummaryTables();
     $.fn.dataTable.tables({ visible: true, api: true }).columns.adjust();
   });
