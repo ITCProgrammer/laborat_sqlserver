@@ -175,6 +175,8 @@ LEFT JOIN (SELECT
                         LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'C'
                         OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'D'
                         OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'R'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'P'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'N'
                     )
     	    ) d
     GROUP BY tgl_tutup, KODE_OBAT ";
@@ -194,6 +196,8 @@ LEFT JOIN (SELECT
             LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'C'
             OR LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'D'
             OR LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'R'
+            OR LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'P'
+            OR LEFT(o.KODE_OBAT, CHARINDEX('-', o.KODE_OBAT + '-') - 1)  = 'N'
         )
     GROUP BY tgl_tutup, KODE_OBAT ";
     $stmt_opn = sqlsrv_query($con, $query_get_total_stk_opn, [$tgl_tutup]);
@@ -223,6 +227,8 @@ LEFT JOIN (SELECT
                         LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'C'
                         OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'D'
                         OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'R'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'p'
+                        OR LEFT(KODE_OBAT, CHARINDEX('-', KODE_OBAT + '-') - 1)  = 'N'
                     )
     	    ) d
     GROUP BY tgl_tutup, KODE_OBAT ";
