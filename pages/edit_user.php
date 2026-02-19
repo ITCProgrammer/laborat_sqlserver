@@ -7,10 +7,11 @@ if ($_POST) {
 	$id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
 	$user = isset($_POST['username']) ? $_POST['username'] : '';
 	$level = isset($_POST['level']) ? $_POST['level'] : '';
-	$status = isset($_POST['status']) ? $_POST['status'] : '';
-	$thn = isset($_POST['thn']) ? $_POST['thn'] : '';
-	$jabatan = isset($_POST['jabatan']) ? $_POST['jabatan'] : '';
-	$roles = isset($_POST['roles']) ? implode(';', $_POST['roles']) : '';
+		$status = isset($_POST['status']) ? $_POST['status'] : '';
+		$thn = isset($_POST['thn']) ? $_POST['thn'] : '';
+		$jabatan = isset($_POST['jabatan']) ? $_POST['jabatan'] : '';
+		$level_jabatan = isset($_POST['level_jabatan']) ? $_POST['level_jabatan'] : '';
+		$roles = isset($_POST['roles']) ? implode(';', $_POST['roles']) : '';
 	$userLAB = isset($_SESSION['userLAB']) ? $_SESSION['userLAB'] : '';
 	$ip = isset($_SESSION['ip']) ? $_SESSION['ip'] : '';
 	$os = isset($_SESSION['os']) ? $_SESSION['os'] : '';
@@ -35,16 +36,17 @@ if ($_POST) {
 		$updatePasswordParams = [];
 	}
 
-	$updateSql = "UPDATE db_laborat.tbl_user SET 
-			username = ?
-			$updatePassword,
-			level = ?,
-			status = ?,
-			mamber = ?,
-			jabatan = ?,
-			pic_cycletime = ?
-			WHERE id = ?";
-	$updateParams = array_merge([$user], $updatePasswordParams, [$level, $status, $thn, $jabatan, $roles, $id]);
+		$updateSql = "UPDATE db_laborat.tbl_user SET 
+				username = ?
+				$updatePassword,
+				level = ?,
+				status = ?,
+				mamber = ?,
+				jabatan = ?,
+				level_jabatan = ?,
+				pic_cycletime = ?
+				WHERE id = ?";
+		$updateParams = array_merge([$user], $updatePasswordParams, [$level, $status, $thn, $jabatan, $level_jabatan, $roles, $id]);
 	sqlsrv_query($con, $updateSql, $updateParams);
 
 	$time = date('Y-m-d H:i:s');

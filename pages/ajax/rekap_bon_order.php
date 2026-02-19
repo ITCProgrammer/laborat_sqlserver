@@ -232,7 +232,7 @@ $sqlPoints = "SELECT
                       ELSE 0
                   END AS score,
                   LOWER(LTRIM(RTRIM(psu.username))) AS people_involved,
-                  COALESCE(NULLIF(LTRIM(RTRIM(u.jabatan)), ''), '-') AS jabatan
+                  COALESCE(NULLIF(LTRIM(RTRIM(u.level_jabatan)), ''), '-') AS jabatan
               FROM db_laborat.tbl_status_matching sm
               CROSS APPLY (
                   SELECT
@@ -333,38 +333,57 @@ foreach ($jabatanPointAgg as $jabatan => $usersAgg) {
       </span>
     </h4>
 
-    <table class="table table-chart" style="width:100%;">
-      <thead class="table-secondary">
-        <tr class="text-center" style="background:#eee;">
-          <th style="text-align:center; width:24%;">JABATAN</th>
-          <th style="text-align:center; width:36%;">NAMA</th>
-          <th style="text-align:center; width:15%;">TOTAL JOB</th>
-          <th style="text-align:center; width:25%;">POINT</th>
-        </tr>
-      </thead>
-      <tbody>
-        <?php if (! empty($pointGroups)): ?>
-          <?php foreach ($pointGroups as $jabatan => $rows): ?>
-            <?php $rowspan = count($rows); ?>
-            <?php foreach ($rows as $idx => $r): ?>
-              <tr>
-                <?php if ($idx === 0): ?>
-                  <td rowspan="<?= (int)$rowspan; ?>" style="vertical-align: middle; font-weight: 700;">
-                    <?= htmlspecialchars($jabatan); ?>
-                  </td>
-                <?php endif; ?>
-                <td><?= htmlspecialchars($r['user']); ?></td>
-                <td class="text-center"><?= (int)$r['jobs']; ?></td>
-                <td class="text-center" style="background:#cfe8ff;font-weight:bold;">
-                  <?= number_format((float)$r['ratio'], 4, '.', ''); ?>
-                </td>
-              </tr>
-            <?php endforeach; ?>
-          <?php endforeach; ?>
-        <?php else: ?>
-          <tr><td colspan="4" class="text-center text-muted">Tidak ada data.</td></tr>
-        <?php endif; ?>
-      </tbody>
-    </table>
+	    <table class="table table-chart" style="width:100%;">
+	      <thead class="table-secondary">
+	        <tr class="text-center" style="background:#eee;">
+	          <th style="text-align:center; width:24%;">JABATAN</th>
+	          <th style="text-align:center; width:10%;">RANK</th>
+	          <th style="text-align:center; width:30%;">NAMA</th>
+	          <th style="text-align:center; width:15%;">TOTAL JOB</th>
+	          <th style="text-align:center; width:21%;">POINT</th>
+	        </tr>
+	      </thead>
+	      <tbody>
+	        <?php if (! empty($pointGroups)): ?>
+	          <?php foreach ($pointGroups as $jabatan => $rows): ?>
+	            <?php $rowspan = count($rows); ?>
+	            <?php foreach ($rows as $idx => $r): ?>
+	              <?php
+	                $rank = $idx + 1;
+	                $rankBg = '#bdbdbd';
+	                $rankColor = '#1f1f1f';
+	                if ($rank === 1) {
+	                  $rankBg = '#34a853';
+	                  $rankColor = '#ffffff';
+	                } elseif ($rank === 2) {
+	                  $rankBg = '#fbbc04';
+	                  $rankColor = '#1f1f1f';
+	                } elseif ($rank === 3) {
+	                  $rankBg = '#1a73e8';
+	                  $rankColor = '#ffffff';
+	                }
+	              ?>
+	              <tr>
+	                <?php if ($idx === 0): ?>
+	                  <td rowspan="<?= (int)$rowspan; ?>" style="vertical-align: middle; font-weight: 700;">
+	                    <?= htmlspecialchars($jabatan); ?>
+	                  </td>
+	                <?php endif; ?>
+	                <td class="text-center" style="background:<?= $rankBg; ?>; color:<?= $rankColor; ?>; font-weight:700;">
+	                  <?= $rank; ?>
+	                </td>
+	                <td><?= htmlspecialchars($r['user']); ?></td>
+	                <td class="text-center"><?= (int)$r['jobs']; ?></td>
+	                <td class="text-center" style="background:#cfe8ff;font-weight:bold;">
+	                  <?= number_format((float)$r['ratio'], 4, '.', ''); ?>
+	                </td>
+	              </tr>
+	            <?php endforeach; ?>
+	          <?php endforeach; ?>
+	        <?php else: ?>
+	          <tr><td colspan="5" class="text-center text-muted">Tidak ada data.</td></tr>
+	        <?php endif; ?>
+	      </tbody>
+	    </table>
   </div>
 </div>

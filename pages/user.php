@@ -42,10 +42,11 @@ include "koneksi.php";
             <thead class="btn-primary">
               <tr>
                 <th width="5%">No</th>
-                <th width="57%">UserName</th>
+                <th width="35%">UserName</th>
                 <th width="15%">Jabatan</th>
-                <th width="13%">Status</th>
-                <th width="13%">Role CycleTime</th>
+                <th width="12%">Level Jabatan</th>
+                <th width="10%">Status</th>
+                <th width="18%">Role CycleTime</th>
                 <th width="10%">Action</th>
               </tr>
             </thead>
@@ -59,6 +60,7 @@ include "koneksi.php";
                   <th><?php echo $no; ?></th>
                   <th><?php echo $rowd['username']; ?></th>
                   <th><?php echo $rowd['jabatan'] ?></th>
+                  <th><?php echo $rowd['level_jabatan'] ?></th>
                   <th><?php echo $rowd['status']; ?></th>
                   <th><?php echo $rowd['roles']; ?></th>
                   <th><a href="#" id='<?php echo $rowd['id'] ?>' class="btn btn-info user_edit"><i class="fa fa-edit"></i> </a></th>
@@ -110,6 +112,18 @@ include "koneksi.php";
                             <option value="<?php echo $role['role'] ?>"><?php echo $role['role'] ?></option>
                           <?php } ?>
                           <option selected disabled>-Pilih-</option>
+                        </select>
+                        <span class="help-block with-errors"></span>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label for="level_jabatan" class="col-md-3 control-label">Level Jabatan</label>
+                      <div class="col-md-6">
+                        <select name="level_jabatan" class="form-control" id="level_jabatan" required>
+                          <option value="" selected disabled>-Pilih-</option>
+                          <option value="Colorist">Colorist</option>
+                          <option value="Adm">Adm</option>
+                          <option value="Matcher">Matcher</option>
                         </select>
                         <span class="help-block with-errors"></span>
                       </div>

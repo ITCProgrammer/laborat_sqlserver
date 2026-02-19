@@ -63,6 +63,17 @@ while ($modal && ($r = sqlsrv_fetch_array($modal, SQLSRV_FETCH_ASSOC))) {
             </div>
           </div>
           <div class="form-group">
+            <label for="level_jabatan" class="col-md-3 control-label">Level Jabatan</label>
+            <div class="col-md-6">
+              <select name="level_jabatan" class="form-control" id="level_jabatan" required>
+                <option value="Colorist" <?php if (($r['level_jabatan'] ?? '') === 'Colorist') echo 'selected'; ?>>Colorist</option>
+                <option value="Adm" <?php if (($r['level_jabatan'] ?? '') === 'Adm') echo 'selected'; ?>>Adm</option>
+                <option value="Matcher" <?php if (($r['level_jabatan'] ?? '') === 'Matcher') echo 'selected'; ?>>Matcher</option>
+              </select>
+              <span class="help-block with-errors"></span>
+            </div>
+          </div>
+          <div class="form-group">
             <label for="thn" class="col-md-3 control-label">Tahun Mamber</label>
             <div class="col-md-6">
               <select name="thn" class="form-control" id="thn" required>

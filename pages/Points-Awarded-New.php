@@ -204,7 +204,7 @@ $sql = "SELECT
               ELSE 0
           END AS score,
           LOWER(LTRIM(RTRIM(psu.username))) AS people_involved,
-          COALESCE(NULLIF(LTRIM(RTRIM(u.jabatan)), ''), '-') AS jabatan
+          COALESCE(NULLIF(LTRIM(RTRIM(u.level_jabatan)), ''), '-') AS jabatan
       FROM db_laborat.tbl_status_matching sm
       CROSS APPLY (
           SELECT
