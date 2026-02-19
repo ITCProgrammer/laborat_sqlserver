@@ -210,8 +210,10 @@ $sisaReview = $totalH1 - ($totalApproved + $totalReject);
 
 <?php
 /* ===== Rekap Points Awarded (sinkron dengan Points-Awarded-New) ===== */
-$dtStartPoints = $kemarin . ' 23:00';
-$dtEndPoints   = date('Y-m-d', strtotime($kemarin . ' +1 day')) . ' 23:00';
+$pointsEndDate = $kemarin;
+$pointsStartDate = date('Y-m-d', strtotime($pointsEndDate . ' -1 day'));
+$dtStartPoints = $pointsStartDate . ' 23:00';
+$dtEndPoints   = $pointsEndDate . ' 23:00';
 
 $sqlPoints = "SELECT
                   sm.idm,
