@@ -76,6 +76,51 @@
 	$cek1 = $cek1 ?? 0;
 	$r1 = $r1 ?? [];
 
+	function jsAlertAndRedirect($message, $redirectUrl = '?p=Form-Testing')
+	{
+		$msg = json_encode($message, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+		$url = json_encode($redirectUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+		echo "<script>alert($msg);window.location.href=$url;</script>";
+	}
+
+	function safeLen($value)
+	{
+		$val = (string)$value;
+		return function_exists('mb_strlen') ? mb_strlen($val, 'UTF-8') : strlen($val);
+	}
+
+	function addLengthViolation(&$issues, $label, $value, $max)
+	{
+		$len = safeLen($value);
+		if ($len > $max) {
+			$issues[] = "$label terlalu panjang ($len/$max).";
+		}
+	}
+
+	function formatSqlsrvErrorForAlert($errors)
+	{
+		if (!is_array($errors) || empty($errors)) {
+			return 'Gagal menyimpan data. Silakan coba lagi.';
+		}
+
+		$primary = $errors[0];
+		$code = isset($primary['code']) ? (int)$primary['code'] : 0;
+		$message = isset($primary['message']) ? trim((string)$primary['message']) : '';
+
+		if ($code === 2628) {
+			if (preg_match("/column '([^']+)'/i", $message, $matches)) {
+				return "Data terlalu panjang pada kolom {$matches[1]}. Mohon dipendekkan lalu simpan ulang.";
+			}
+			return 'Ada data yang melebihi batas panjang kolom database.';
+		}
+
+		if ($code === 2627) {
+			return 'No Counter sudah terpakai (duplikat). Silakan refresh halaman lalu simpan ulang.';
+		}
+
+		return "SQL Error [$code]: $message";
+	}
+
 	?>
 	<?php
 	if (isset($_POST['simpan'])) {
@@ -102,31 +147,101 @@
 
 		$ip_num = get_client_ip();
 
-		$warna = $_POST['warna'];
-		$nowarna = $_POST['nowarna'];
-		$buyer = $_POST['buyer'];
-		$kain = $_POST['jenis_kain'];
-		$item = $_POST['noitem'];
-		$nama = $_POST['nama'];
-		$cck_warna = $_POST['cck_warna'];
-		$note_lab = $_POST['note_lab'];
+		if (!$con) {
+			jsAlertAndRedirect('Koneksi ke database laborat gagal. Cek server SQL lalu coba lagi.');
+			exit;
+		}
+
+		$warna = trim((string)($_POST['warna'] ?? ''));
+		$nowarna = trim((string)($_POST['nowarna'] ?? ''));
+		$buyer = trim((string)($_POST['buyer'] ?? ''));
+		$kain = trim((string)($_POST['jenis_kain'] ?? ''));
+		$item = trim((string)($_POST['noitem'] ?? ''));
+		$nama = trim((string)($_POST['nama'] ?? ''));
+		$cck_warna = trim((string)($_POST['cck_warna'] ?? ''));
+		$note_lab = trim((string)($_POST['note_lab'] ?? ''));
 		$userLAB = $_SESSION['userLAB'] ?? '';
+		$dyestuff = trim((string)($_POST['Dyestuff'] ?? ''));
+		$suffix = trim((string)($_POST['suffix'] ?? ''));
+		$status = trim((string)($_POST['sts'] ?? ''));
+		$noResep = trim((string)($_POST['no_resep'] ?? ''));
+		$jenMatching = (isset($_POST['jen_matching']) && is_array($_POST['jen_matching'])) ? $_POST['jen_matching'] : [];
 
 		$chkc = '';
 		if (!empty($_POST['colorfastness']) && is_array($_POST['colorfastness'])) {
 			$chkc = implode(',', $_POST['colorfastness']);
 		}
 
+		$validationErrors = [];
+		if ($dyestuff === '') {
+			$validationErrors[] = 'Jenis Testing wajib dipilih.';
+		}
+		if (empty($jenMatching)) {
+			$validationErrors[] = 'Treatment wajib dipilih minimal 1.';
+		}
+		if ($status === '') {
+			$validationErrors[] = 'Status wajib dipilih.';
+		}
+		if ($nama === '') {
+			$validationErrors[] = 'Nama Personil Testing wajib diisi.';
+		}
+
+		addLengthViolation($validationErrors, 'Jenis Testing', $dyestuff, 2);
+		addLengthViolation($validationErrors, 'Suffix', $suffix, 20);
+		addLengthViolation($validationErrors, 'Buyer', $buyer, 100);
+		addLengthViolation($validationErrors, 'No Warna', $nowarna, 100);
+		addLengthViolation($validationErrors, 'Nama Warna', $warna, 100);
+		addLengthViolation($validationErrors, 'Jenis Kain', $kain, 500);
+		addLengthViolation($validationErrors, 'Cocok Warna', $cck_warna, 100);
+		addLengthViolation($validationErrors, 'No Item', $item, 20);
+		addLengthViolation($validationErrors, 'Permintaan Testing', $chkc, 250);
+		addLengthViolation($validationErrors, 'Nama Personil Testing', $nama, 100);
+		addLengthViolation($validationErrors, 'Status', $status, 7);
+		addLengthViolation($validationErrors, 'Note Lab', $note_lab, 200);
+		addLengthViolation($validationErrors, 'User LAB', $userLAB, 100);
+
+		if (!empty($validationErrors)) {
+			jsAlertAndRedirect("Data belum bisa disimpan:\n- " . implode("\n- ", $validationErrors));
+			exit;
+		}
+
 		sqlsrv_begin_transaction($con);
 
 		$success = true;
+		$errorMessage = '';
 
-		if (isset($_POST["jen_matching"])) {
+		if (!empty($jenMatching)) {
 			$notrt = 1;
 
-			foreach ($_POST['jen_matching'] as $index => $subject1) {
-				$ktjen = $subject1;
-				$nocount = $_POST['no_resep'] . "-" . $notrt;
+			foreach ($jenMatching as $index => $subject1) {
+				$ktjen = trim((string)$subject1);
+				$nocount = $noResep . "-" . $notrt;
+
+				$rowValidation = [];
+				addLengthViolation($rowValidation, 'No Counter', $nocount, 15);
+				addLengthViolation($rowValidation, 'Treatment', $ktjen, 200);
+				if (!empty($rowValidation)) {
+					$success = false;
+					$errorMessage = "Data belum bisa disimpan:\n- " . implode("\n- ", $rowValidation);
+					break;
+				}
+
+				$checkDup = sqlsrv_query(
+					$con,
+					"SELECT COUNT(1) AS jml FROM db_laborat.tbl_test_qc WHERE RTRIM(no_counter) = RTRIM(?)",
+					[$nocount]
+				);
+				if (!$checkDup) {
+					$success = false;
+					$errorMessage = formatSqlsrvErrorForAlert(sqlsrv_errors(SQLSRV_ERR_ERRORS));
+					break;
+				}
+				$dupRow = sqlsrv_fetch_array($checkDup, SQLSRV_FETCH_ASSOC);
+				if ($dupRow && (int)$dupRow['jml'] > 0) {
+					$success = false;
+					$errorMessage = "No Counter \"$nocount\" sudah ada. Refresh halaman lalu simpan ulang.";
+					break;
+				}
 
 				// $qry = mysqli_query($con, "INSERT INTO tbl_test_qc (no_counter, treatment, jenis_testing, suffix, buyer, no_warna, warna, jenis_kain, no_item, permintaan_testing, nama_personil_test, tgl_buat, tgl_update, sts_laborat, sts_qc, sts, created_by)
 	            //     VALUES ('$nocount', '$ktjen', '$_POST[Dyestuff]', '$_POST[suffix]', '$buyer', '$nowarna', '$warna', '$kain', '$item', '$chkc', '$nama', NOW(), NOW(), 'Open', 'Belum Terima Kain', '$_POST[sts]', '$_SESSION[userLAB]')");
@@ -138,8 +253,8 @@
 					[
 						$nocount,
 						$ktjen,
-						$_POST['Dyestuff'],
-						$_POST['suffix'],
+						$dyestuff,
+						$suffix,
 						$buyer,
 						$nowarna,
 						$warna,
@@ -148,7 +263,7 @@
 						$item,
 						$chkc,
 						$nama,
-						$_POST['sts'],
+						$status,
 						$note_lab,
 						$userLAB
 					]
@@ -157,6 +272,7 @@
 
 				if (!$qry) {
 					$success = false;
+					$errorMessage = formatSqlsrvErrorForAlert(sqlsrv_errors(SQLSRV_ERR_ERRORS));
 					break; // Keluar dari loop jika salah satu query gagal
 				}
 
@@ -170,6 +286,7 @@
 
 				if (!$qry2) {
 					$success = false;
+					$errorMessage = formatSqlsrvErrorForAlert(sqlsrv_errors(SQLSRV_ERR_ERRORS));
 					break; // Keluar dari loop jika salah satu query gagal
 				}
 
@@ -183,7 +300,10 @@
 			echo "<script>alert('Data Tersimpan');window.location.href='?p=TestQCFinal';</script>";
 		} else {
 			sqlsrv_rollback($con);
-			echo "<script>alert('Gagal menyimpan data. Silakan coba lagi.');window.location.href='?p=Form-Testing';</script>";
+			if ($errorMessage === '') {
+				$errorMessage = 'Gagal menyimpan data. Silakan coba lagi.';
+			}
+			jsAlertAndRedirect($errorMessage);
 		}
 	}
 	// if (isset($_POST['simpan'])) {
@@ -516,9 +636,9 @@
 																													} ?>> Chlorin &amp; Non-Chlorin
 				</label>
 				<br>
-				<label><input type="checkbox" class="minimal" name="colorfastness[]" value="BLEEDING <?php if (in_array("BLEEDING", $detail2)) {
-																											echo "checked";
-																										} ?>"> Bleeding
+				<label><input type="checkbox" class="minimal" name="colorfastness[]" value="BLEEDING" <?php if (in_array("BLEEDING", $detail2)) {
+																												echo "checked";
+																											} ?>> Bleeding
 				</label>
 				<br>
 				<label><input type="checkbox" class="minimal" name="colorfastness[]" value="PHENOLIC YELLOWING" <?php if (in_array("PHENOLIC YELLOWING", $detail2)) {
