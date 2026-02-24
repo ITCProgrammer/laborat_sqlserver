@@ -25,10 +25,14 @@ $warehouse = $_POST['warehouse'];
 //     $detailtype = '1';
 // }
 
-$query = "SELECT *,  CASE 
-    	WHEN PROGRESSSTATUS = 2 THEN 0
-    	ELSE QTY
-    END AS QTY2 FROM(SELECT 
+$query = "SELECT *,  
+                CASE 
+                WHEN PROGRESSSTATUS = 2 THEN 0
+                ELSE QTY
+            END AS QTY2,
+            CREATIONDATE_PR 
+            FROM 
+            (SELECT 
             v.ISTANCECODE,
             v.COUNTERCODE,
             r.HEADERCODE AS PR_CODE,                                           
@@ -88,6 +92,8 @@ $query = "SELECT *,  CASE
             r.LONGDESCRIPTION,
             r.CREATIONDATETIME,
             p2.PROGRESSSTATUS)
+            WHERE
+            PROGRESSSTATUS != 2 
             ORDER BY KODE_OBAT ASC";
 // echo "<pre>$query</pre>";
 
