@@ -872,7 +872,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                             DECOSUBCODE03,
                                             DECOSUBCODE04,
                                             DECOSUBCODE05,
-                                            sum(QTY) AS QTY,
+                                            CASE 
+                                            	WHEN PROGRESSSTATUS = 2 THEN 0
+                                            	ELSE sum(QTY)
+                                            END AS QTY,
                                             BASEPRIMARYUNITCODE
                                             from
                                             (SELECT 
@@ -896,13 +899,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                 else v.BASEPRIMARYUNITCODE
                                             END AS BASEPRIMARYUNITCODE,
                                             date(p.CREATIONDATETIME) AS PO_DATE,
-                                            p.CREATIONDATETIME 
+                                            p.CREATIONDATETIME,
+                                            p2.PROGRESSSTATUS
                                             FROM 
                                             VIEWAVANALYSISPART1 v 
                                             LEFT JOIN PURCHASEORDERLINE p ON p.PURCHASEORDERCODE = v.ISTANCECODE AND p.ORDERLINE = v.ISTANCELINE 
                                             AND p.SUBCODE01 = v.DECOSUBCODE01 
                                             AND p.SUBCODE02 = v.DECOSUBCODE02 
                                             AND p.SUBCODE03 = v.DECOSUBCODE03 
+                                            LEFT JOIN PURCHASEORDER p2 ON p2.CODE = p.PURCHASEORDERCODE 
                                             WHERE 
                                             v.ISTANCETYPE = '6'
                                              AND v.LOGICALWAREHOUSECODE $where_warehouse
@@ -921,7 +926,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                             v.DECOSUBCODE06,
                                             v.DECOSUBCODE07,
                                             v.BASEPRIMARYUNITCODE,
-                                            p.CREATIONDATETIME)
+                                            p.CREATIONDATETIME,
+                                            p2.PROGRESSSTATUS)
                                             GROUP BY 
                                             COUNTERCODE,
                                             DECOSUBCODE01,
@@ -929,7 +935,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                             DECOSUBCODE03,
                                             DECOSUBCODE04,
                                             DECOSUBCODE05,
-                                            BASEPRIMARYUNITCODE");
+                                            BASEPRIMARYUNITCODE,
+                                            PROGRESSSTATUS");
                                     $row_buka_po = db2_fetch_assoc($buka_po);
 
                                     $pakai_belum_timbang = db2_exec($conn1, "SELECT 
