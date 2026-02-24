@@ -55,7 +55,7 @@ $conn_string = "DRIVER={IBM ODBC DB2 DRIVER}; HOSTNAME=$hostname; PORT=$port; PR
 $conn1 = db2_pconnect($conn_string,'', '');
 
 $hostLabSqlsrv = "10.0.0.221";
-$dbLabSqlsrv   = "db_laborat_test";
+$dbLabSqlsrv   = "db_laborat";
 $con = sqlsrv_connect($hostLabSqlsrv, [
     "Database" => $dbLabSqlsrv,
     "UID"      => $usernameSVR19,
