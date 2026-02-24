@@ -215,33 +215,32 @@ $sql = "SELECT
                   CHARINDEX(' Jam', sm.timer) - (CHARINDEX('Hari,', sm.timer) + LEN('Hari,'))
               )))) AS jam
       ) t
-      LEFT JOIN (
+      OUTER APPLY (
           SELECT DISTINCT
-              x.idm_key,
-              x.username
-          FROM (
-              SELECT
+              LOWER(LTRIM(RTRIM(v.username))) AS username
+          FROM db_laborat.tbl_preliminary_schedule ps
+          CROSS APPLY (VALUES
+              (NULLIF(LTRIM(RTRIM(ps.user_scheduled)), ''), CAST(ps.creationdatetime AS datetime2)),
+              (NULLIF(LTRIM(RTRIM(ps.user_dispensing)), ''), COALESCE(CAST(ps.dispensing_start AS datetime2), CAST(ps.creationdatetime AS datetime2))),
+              (NULLIF(LTRIM(RTRIM(ps.user_dyeing)), ''), COALESCE(CAST(ps.dyeing_start AS datetime2), CAST(ps.creationdatetime AS datetime2))),
+              (NULLIF(LTRIM(RTRIM(ps.user_darkroom_start)), ''), COALESCE(CAST(ps.darkroom_start AS datetime2), CAST(ps.creationdatetime AS datetime2))),
+              (NULLIF(LTRIM(RTRIM(ps.user_darkroom_end)), ''), COALESCE(CAST(ps.darkroom_end AS datetime2), CAST(ps.creationdatetime AS datetime2))),
+              (NULLIF(LTRIM(RTRIM(ps.hold_to_repeat)), ''), COALESCE(CAST(ps.time_hold_to_repeat AS datetime2), CAST(ps.creationdatetime AS datetime2))),
+              (NULLIF(LTRIM(RTRIM(ps.hold_to_end)), ''), COALESCE(CAST(ps.time_hold_to_end AS datetime2), CAST(ps.creationdatetime AS datetime2)))
+          ) v(username, event_time)
+          WHERE
+              (
                   CASE
                       WHEN LEFT(ps.no_resep, 2) = 'DR' AND CHARINDEX('-', ps.no_resep) > 0
                           THEN LEFT(ps.no_resep, CHARINDEX('-', ps.no_resep) - 1)
                       ELSE ps.no_resep
-                  END AS idm_key,
-                  v.username
-              FROM db_laborat.tbl_preliminary_schedule ps
-              CROSS APPLY (VALUES
-                  (NULLIF(LTRIM(RTRIM(ps.user_scheduled)), '')),
-                  (NULLIF(LTRIM(RTRIM(ps.user_dispensing)), '')),
-                  (NULLIF(LTRIM(RTRIM(ps.user_dyeing)), '')),
-                  (NULLIF(LTRIM(RTRIM(ps.user_darkroom_start)), '')),
-                  (NULLIF(LTRIM(RTRIM(ps.user_darkroom_end)), '')),
-                  (NULLIF(LTRIM(RTRIM(ps.hold_to_repeat)), '')),
-                  (NULLIF(LTRIM(RTRIM(ps.hold_to_end)), ''))
-              ) v(username)
-              WHERE v.username IS NOT NULL
-          ) x
+                  END
+              ) = sm.idm
+              AND v.username IS NOT NULL
+              AND v.event_time IS NOT NULL
+              AND CONVERT(date, v.event_time) <= CONVERT(date, sm.approve_at)
       ) psu
-          ON psu.idm_key = sm.idm
-      LEFT JOIN db_laborat.tbl_user u ON u.username = LOWER(LTRIM(RTRIM(psu.username)))
+      LEFT JOIN db_laborat.tbl_user u ON u.username = psu.username
       WHERE
           sm.approve_at BETWEEN ? AND ?
           AND psu.username IS NOT NULL
