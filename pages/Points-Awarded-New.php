@@ -233,7 +233,9 @@ $sql = "SELECT
                   (NULLIF(LTRIM(RTRIM(ps.user_dispensing)), '')),
                   (NULLIF(LTRIM(RTRIM(ps.user_dyeing)), '')),
                   (NULLIF(LTRIM(RTRIM(ps.user_darkroom_start)), '')),
-                  (NULLIF(LTRIM(RTRIM(ps.user_darkroom_end)), ''))
+                  (NULLIF(LTRIM(RTRIM(ps.user_darkroom_end)), '')),
+                  (NULLIF(LTRIM(RTRIM(ps.hold_to_repeat)), '')),
+                  (NULLIF(LTRIM(RTRIM(ps.hold_to_end)), ''))
               ) v(username)
               WHERE v.username IS NOT NULL
           ) x

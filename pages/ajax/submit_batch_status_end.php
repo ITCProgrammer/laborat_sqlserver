@@ -58,15 +58,25 @@ function processUpdate($con, $no_resep, $expected_status, $new_status, $update_e
         throw new Exception("Status No. Resep $no_resep tidak sesuai ($row[status]).");
     }
 
-    $query = $update_end_time
-        ? "UPDATE db_laborat.tbl_preliminary_schedule 
-           SET status = ?, darkroom_end = GETDATE(), user_darkroom_end = ?
-           WHERE no_resep = ? AND is_old_cycle = 0"
-        : "UPDATE db_laborat.tbl_preliminary_schedule 
-           SET status = ?, user_darkroom_end = ?
-           WHERE no_resep = ? AND is_old_cycle = 0";
+    $isEndToRepeat = ($row['status'] === 'end' && $new_status === 'repeat');
 
-    $update = sqlsrv_query($con, $query, [$new_status, $userDarkroomEnd, $no_resep]);
+    if ($isEndToRepeat) {
+        $query = "UPDATE db_laborat.tbl_preliminary_schedule 
+                  SET status = ?, end_to_repeat = ?, time_end_to_repeat = GETDATE()
+                  WHERE no_resep = ? AND is_old_cycle = 0";
+        $params = [$new_status, $userDarkroomEnd, $no_resep];
+    } else {
+        $query = $update_end_time
+            ? "UPDATE db_laborat.tbl_preliminary_schedule 
+               SET status = ?, darkroom_end = GETDATE(), user_darkroom_end = ?
+               WHERE no_resep = ? AND is_old_cycle = 0"
+            : "UPDATE db_laborat.tbl_preliminary_schedule 
+               SET status = ?, user_darkroom_end = ?
+               WHERE no_resep = ? AND is_old_cycle = 0";
+        $params = [$new_status, $userDarkroomEnd, $no_resep];
+    }
+
+    $update = sqlsrv_query($con, $query, $params);
     if (!$update) {
         throw new Exception("Update gagal untuk $no_resep: " . json_encode(sqlsrv_errors()));
     }
