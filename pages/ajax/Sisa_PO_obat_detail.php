@@ -25,7 +25,10 @@ $warehouse = $_POST['warehouse'];
 //     $detailtype = '1';
 // }
 
-$query = "SELECT * FROM(SELECT 
+$query = "SELECT *,  CASE 
+    	WHEN PROGRESSSTATUS = 2 THEN 0
+    	ELSE QTY
+    END AS QTY2 FROM(SELECT 
             v.ISTANCECODE,
             v.COUNTERCODE,
             r.HEADERCODE AS PR_CODE,                                           
@@ -49,13 +52,15 @@ $query = "SELECT * FROM(SELECT
             VARCHAR_FORMAT(p.CREATIONDATETIME, 'YYYY-MM-DD HH24:MI:SS') AS TGL_WAKTU,
             date(p.CREATIONDATETIME) AS PO_DATE,
             p.CREATIONDATETIME AS CREATIONDATE_PO,
-                date(r.CREATIONDATETIME) AS CREATIONDATE_PR
+                date(r.CREATIONDATETIME) AS CREATIONDATE_PR,
+            p2.PROGRESSSTATUS
             FROM 
             VIEWAVANALYSISPART1 v 
             LEFT JOIN PURCHASEORDERLINE p ON p.PURCHASEORDERCODE = v.ISTANCECODE AND p.ORDERLINE = v.ISTANCELINE 
             AND p.SUBCODE01 = v.DECOSUBCODE01 
             AND p.SUBCODE02 = v.DECOSUBCODE02 
             AND p.SUBCODE03 = v.DECOSUBCODE03 
+            LEFT JOIN PURCHASEORDER p2 ON p2.CODE = p.PURCHASEORDERCODE 
             LEFT JOIN REPLENISHMENTREQUISITION r ON v.ISTANCECODE = r.LINEPURCHASEORDERCODE AND r.LINEORDERLINE = v.ISTANCELINE 
             AND r.SUBCODE01 = v.DECOSUBCODE01 
             AND r.SUBCODE02 = v.DECOSUBCODE02 
@@ -81,7 +86,8 @@ $query = "SELECT * FROM(SELECT
             p.CREATIONDATETIME,
             r.HEADERCODE,
             r.LONGDESCRIPTION,
-            r.CREATIONDATETIME)
+            r.CREATIONDATETIME,
+            p2.PROGRESSSTATUS)
             ORDER BY KODE_OBAT ASC";
 // echo "<pre>$query</pre>";
 
