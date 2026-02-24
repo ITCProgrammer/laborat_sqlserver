@@ -125,7 +125,7 @@ echo "<h4><strong>" . htmlspecialchars($kode_obat_label) . " - " . htmlspecialch
             echo "<td>" . $no++ . "</td>";
             echo "<td>" . htmlspecialchars($row['TGL_WAKTU'] ?? '') . "</td>";
             echo "<td>" . htmlspecialchars($row['ISTANCECODE'] ?? '') . "</td>";
-            echo "<td>" . number_format((float) ($row['QTY'] ?? 0), 2) . "</td>";
+            echo "<td>" . number_format((float) ($row['QTY2'] ?? 0), 2) . "</td>";
             echo "<td>" . htmlspecialchars($row['PR_CODE'] ?? '') . "</td>";
             echo "<td>" . htmlspecialchars($row['CREATIONDATE_PR'] ?? '') . "</td>";
             echo "</tr>";
