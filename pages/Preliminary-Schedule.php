@@ -1058,6 +1058,30 @@ $is_scheduling = ($row['is_scheduling'] == 1);
                         $('#temp').prop('disabled', false).prop('required', true).val('');
                         setTempValidity(false);
                     } else {
+                        if (response.code === 'APPROVED_LOCKED') {
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'Suffix Sudah Approved',
+                                html: `
+                                    <div style="text-align:left;">
+                                        <p>No. resep ini sudah <b>approved</b> pada <b>${response.approve_at || '-'}</b>.</p>
+                                        <p>Input normal tidak diizinkan. Jika perlu input, gunakan mode <b>Test Report</b>:</p>
+                                        <ol style="padding-left:18px; margin:0;">
+                                            <li>Centang <b>Test Report</b></li>
+                                            <li>Isi <b>Bottle Quantity</b> normal = <b>0</b></li>
+                                            <li>Isi <b>Bottle Quantity (Test Report)</b></li>
+                                        </ol>
+                                    </div>
+                                `
+                            });
+
+                            $('#has_bottle_test').prop('checked', true).trigger('change');
+                            $('#bottle_qty').val(0);
+                            $('#bottle_qty_1').val(0);
+                            $('#bottle_qty_test').focus();
+                            return;
+                        }
+
                         toastr.error(response.message);
                         if (response.errors) {
                             console.error("Detail error:", response.errors);

@@ -116,7 +116,7 @@ $stmt = sqlsrv_query($con, $sql, [$no_resep]);
 
 <?php if (!empty($idm)): ?>
 <div class="alert alert-info" style="margin-bottom:8px;">
-    <strong>IDM:</strong> <?= htmlspecialchars($idm) ?>
+    <strong>No Resep:</strong> <?= htmlspecialchars($idm) ?>
     <span style="margin:0 8px;">|</span>
     <strong>Approved At:</strong> <?= !empty($approveAt) ? fmtDt($approveAt) : '-' ?>
     <br><small class="">Kolom berwarna = tanggal proses melewati approve at, tidak masuk point awarded.</small>

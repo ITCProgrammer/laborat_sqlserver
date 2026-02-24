@@ -28,6 +28,39 @@ if ($bottle_qty_1 > 10 || $bottle_qty_2 > 10 || $bottle_qty_test > 10) {
     exit;
 }
 
+// Normalize no_resep -> idm (untuk kasus DRxxxx-A/B)
+$idm = $no_resep;
+if (strtoupper(substr($no_resep, 0, 2)) === 'DR') {
+    $dashPos = strpos($no_resep, '-');
+    if ($dashPos !== false) {
+        $idm = substr($no_resep, 0, $dashPos);
+    }
+}
+
+// Jika sudah approved, blokir input normal.
+// Pengecualian: input test report (is_test = 1) tetap boleh.
+$stmtApproved = sqlsrv_query(
+    $con,
+    "SELECT TOP 1 approve_at
+     FROM db_laborat.tbl_status_matching
+     WHERE idm = ? AND approve_at IS NOT NULL
+     ORDER BY approve_at DESC, id DESC",
+    [$idm]
+);
+$rowApproved = $stmtApproved ? sqlsrv_fetch_array($stmtApproved, SQLSRV_FETCH_ASSOC) : null;
+$approveAt   = $rowApproved['approve_at'] ?? null;
+
+if (!empty($approveAt) && $bottle_qty_1 > 0) {
+    $approveAtText = ($approveAt instanceof DateTimeInterface) ? $approveAt->format('Y-m-d H:i:s') : (string)$approveAt;
+    echo json_encode([
+        'success' => false,
+        'code' => 'APPROVED_LOCKED',
+        'approve_at' => $approveAtText,
+        'message' => "No. resep sudah di-approve pada {$approveAtText}. Input normal tidak diizinkan. Gunakan Test Report saja (Bottle Quantity normal = 0)."
+    ]);
+    exit;
+}
+
 // Helper hitung cepat
 $countByStatus = function(string $statusList) use ($con, $no_resep) {
     $sql = "SELECT COUNT(*) AS total FROM db_laborat.tbl_preliminary_schedule WHERE no_resep = ? AND status IN ($statusList)";

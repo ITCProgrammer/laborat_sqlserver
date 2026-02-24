@@ -307,10 +307,10 @@ $page = strtolower($page);
                                     </li>
                                     <li class="divider"></li>
 
-                                    <li class="<?php if ($_GET['p'] == "Points-Awarded") echo "active"; ?>">
+                                    <!-- <li class="<?php if ($_GET['p'] == "Points-Awarded") echo "active"; ?>">
                                         <a href="?p=Points-Awarded"><i class="fa fa-star-o text-yellow" aria-hidden="true"></i>
                                             <span>Points Awarded</span></a>
-                                    </li>
+                                    </li> -->
                                     
                                     <li class="<?php if ($_GET['p'] == "Points-Awarded-New") echo "active"; ?>">
                                         <a href="?p=Points-Awarded-New"><i class="fa fa-star-o text-yellow" aria-hidden="true"></i>
