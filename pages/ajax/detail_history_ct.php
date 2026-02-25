@@ -98,7 +98,9 @@ $sql = "SELECT
             MAX(t.hold_to_repeat) AS hold_to_repeat,
             MAX(t.time_hold_to_repeat) AS time_hold_to_repeat,
             MAX(t.hold_to_end) AS hold_to_end,
-            MAX(t.time_hold_to_end) AS time_hold_to_end
+            MAX(t.time_hold_to_end) AS time_hold_to_end,
+            MAX(t.repeat_to_end) AS repeat_to_end,
+            MAX(t.time_repeat_to_end) AS time_repeat_to_end
         FROM db_laborat.tbl_preliminary_schedule t
         CROSS APPLY (SELECT CAST(t.creationdatetime AS datetime2(0)) AS creation_sec) dt
         WHERE t.no_resep = ?
@@ -136,6 +138,7 @@ $stmt = sqlsrv_query($con, $sql, [$no_resep]);
         <th title="Tidak mendapatkan point awarded">End to Repeat</th>
         <th>Hold to Repeat</th>
         <th>Hold to End</th>
+        <th>Repeat To End</th>
         <th>Status Terakhir</th>
         </tr>
     </thead>
@@ -151,6 +154,7 @@ $stmt = sqlsrv_query($con, $sql, [$no_resep]);
         $colEndRepeat   = isAfterApproveDate($row['time_end_to_repeat'] ?? null, $approveAt);
         $colHoldRepeat  = isAfterApproveDate($row['time_hold_to_repeat'] ?? null, $approveAt);
         $colHoldEnd     = isAfterApproveDate($row['time_hold_to_end'] ?? null, $approveAt);
+        $colRepeatEnd   = isAfterApproveDate($row['time_repeat_to_end'] ?? null, $approveAt);
     ?>
         <tr>
         <td><?= $no ?></td>
@@ -223,6 +227,13 @@ $stmt = sqlsrv_query($con, $sql, [$no_resep]);
             <?= fmtDt($row['time_hold_to_end']) ?>
             <?php if (!empty($row['hold_to_end'])): ?>
             <br><small class="text-muted">User: <?= htmlspecialchars($row['hold_to_end']) ?></small>
+            <?php endif; ?>
+        </td>
+        
+        <td class="<?= $colRepeatEnd ? 'award-excluded-cell' : '' ?>">
+            <?= fmtDt($row['time_repeat_to_end']) ?>
+            <?php if (!empty($row['repeat_to_end'])): ?>
+            <br><small class="text-muted">User: <?= htmlspecialchars($row['repeat_to_end']) ?></small>
             <?php endif; ?>
         </td>
 

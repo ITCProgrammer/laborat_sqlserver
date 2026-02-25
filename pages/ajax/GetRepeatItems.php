@@ -6,38 +6,32 @@ ini_set("display_errors", 1);
 include "../../koneksi.php";
 
 try {
-    $statuses = ['repeat'];
-    $statusList = "'" . implode("','", $statuses) . "'";
-
     $sql = "
-        SELECT 
-            tps.id,
-            tps.no_resep,
-            tps.code,
-            tps.no_machine,
-            tps.status,
-            tps.is_old_data,
-            tps.is_old_cycle,
-            tps.is_test,
-            tps.is_bonresep,
-            tps.order_index,
-            tps.user_scheduled,
-            ms.product_name,
-            ms.suhu,
-            ms.waktu,
-            ms.dispensing
-        FROM db_laborat.tbl_preliminary_schedule tps
-        INNER JOIN (
-            SELECT MIN(id) AS id
-            FROM db_laborat.tbl_preliminary_schedule
-            WHERE status IN ($statusList) AND is_old_cycle = 0
-            GROUP BY no_resep
-        ) AS sub ON tps.id = sub.id
-        LEFT JOIN db_laborat.master_suhu ms 
-            ON CONVERT(VARCHAR(50), tps.code) = CONVERT(VARCHAR(50), ms.code)
-        ORDER BY 
-            CASE WHEN tps.status = 'repeat' THEN 1 ELSE 0 END DESC,
-            tps.id ASC
+        SET NOCOUNT ON;
+
+        WITH repeat_rows AS (
+            SELECT
+                tps.no_resep,
+                tps.code,
+                tps.status,
+                ROW_NUMBER() OVER (
+                    PARTITION BY tps.no_resep
+                    ORDER BY tps.id DESC
+                ) AS rn
+            FROM db_laborat.tbl_preliminary_schedule tps
+            WHERE
+                tps.status = 'repeat'
+                AND tps.is_old_cycle = 0
+        )
+        SELECT
+            rr.no_resep,
+            rr.status,
+            ms.product_name
+        FROM repeat_rows rr
+        LEFT JOIN db_laborat.master_suhu ms
+            ON CONVERT(VARCHAR(50), rr.code) = CONVERT(VARCHAR(50), ms.code)
+        WHERE rr.rn = 1
+        ORDER BY rr.no_resep ASC
     ";
 
     $result = sqlsrv_query($con, $sql);
