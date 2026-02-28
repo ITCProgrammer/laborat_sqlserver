@@ -2,6 +2,137 @@
 ini_set("error_reporting", 1);
 session_start();
 include "koneksi.php";
+
+if (!function_exists('qcf_print_api_send')) {
+	function qcf_print_api_send($docNumber)
+	{
+		$url = "http://10.0.0.121:8080/api/v1/document/create";
+		$payload = json_encode([
+			"doc_number" => $docNumber,
+			"ip_address" => '10.0.6.225'
+		]);
+
+		$ch = curl_init($url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+		curl_setopt($ch, CURLOPT_POST, true);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+		$response = curl_exec($ch);
+		$error = curl_error($ch);
+		curl_close($ch);
+
+		if ($error) {
+			return [
+				'success' => 0,
+				'message' => "CURL Error: " . $error,
+				'response' => $response
+			];
+		}
+
+		$result = json_decode($response, true);
+		$ok = isset($result['success']) && $result['success'] ? 1 : 0;
+		$msg = isset($result['message']) ? (string)$result['message'] : 'Unknown response';
+
+		return [
+			'success' => $ok,
+			'message' => $msg,
+			'response' => $response
+		];
+	}
+}
+
+if (!function_exists('qcf_has_recent_print_log')) {
+	function qcf_has_recent_print_log($conn, $docNumber, $seconds = 8)
+	{
+		$stmt = sqlsrv_query(
+			$conn,
+			"SELECT TOP 1 1 AS found
+			 FROM db_laborat.log_printing
+			 WHERE no_resep = ?
+			   AND created_at >= DATEADD(SECOND, ?, GETDATE())",
+			[$docNumber, -abs((int)$seconds)]
+		);
+		if (! $stmt) {
+			return false;
+		}
+		$row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+		sqlsrv_free_stmt($stmt);
+		return $row ? true : false;
+	}
+}
+
+if (isset($_POST['print_matching'])) {
+	header('Content-Type: application/json; charset=utf-8');
+	$no_resep = strtoupper(trim((string)($_POST['noresep'] ?? '')));
+	$time = date('Y-m-d H:i:s');
+	$ip_num = $_SERVER['REMOTE_ADDR'];
+	$createdBy = $_SESSION['userLAB'] ?? '';
+	$isDr = (substr($no_resep, 0, 2) === 'DR');
+	$targetDocs = $isDr ? [$no_resep . '-A', $no_resep . '-B'] : [$no_resep];
+
+	if ($no_resep === '') {
+		echo json_encode([
+			'ok' => false,
+			'message' => 'No resep kosong'
+		]);
+		exit;
+	}
+
+	$printed = 0;
+	$skipped = 0;
+	$failed = 0;
+
+	foreach ($targetDocs as $docNo) {
+		// Anti duplicate request: request yang sama dalam 8 detik akan diabaikan.
+		if (qcf_has_recent_print_log($con, $docNo, 8)) {
+			$skipped++;
+			continue;
+		}
+
+		$info = ($docNo === ($no_resep . '-A')) ? 'generate no resep DR-A' : (($docNo === ($no_resep . '-B')) ? 'generate no resep DR-B' : 'generate no resep');
+		sqlsrv_query(
+			$con,
+			"INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
+			 VALUES (?, 'Create No.resep', ?, ?, ?, ?)",
+			[$docNo, $info, $createdBy, $time, $ip_num]
+		);
+
+		$api = qcf_print_api_send($docNo);
+		$logSuccess = (int)$api['success'];
+		$logMessage = addslashes((string)$api['message']);
+		$responseRaw = isset($api['response']) ? $api['response'] : null;
+
+		sqlsrv_query(
+			$con,
+			"INSERT INTO db_laborat.log_printing (no_resep, ip_address, success, message, response_raw, created_at, created_by)
+			 VALUES (?, ?, ?, ?, ?, GETDATE(), ?)",
+			[$docNo, $ip_num, $logSuccess, $logMessage, $responseRaw, $createdBy]
+		);
+
+		if ($logSuccess) {
+			$printed++;
+		} else {
+			$failed++;
+		}
+	}
+
+	$ok = ($failed === 0) && (($printed + $skipped) > 0);
+	$message = 'Perintah print berhasil dikirim';
+	if ($failed > 0) {
+		$message = 'Sebagian print gagal dikirim';
+	} elseif ($printed === 0 && $skipped > 0) {
+		$message = 'Permintaan duplikat terdeteksi, proses print kedua diabaikan';
+	}
+
+	echo json_encode([
+		'ok' => $ok,
+		'printed' => $printed,
+		'skipped' => $skipped,
+		'failed' => $failed,
+		'message' => $message
+	]);
+	exit;
+}
 // Ambil id matching
 $noResep = isset($_GET['noresep']) ? $_GET['noresep'] : '';
 $r1 = sqlsrv_fetch_array(
@@ -134,117 +265,53 @@ if (isset($_POST['save'])) {
 			</div> -->
 			<a href="pages/cetak/matching.php?idkk=<?php echo $_GET['noresep']; ?>" class="btn btn-danger pull-right" target="_blank" id="btnCetak"><span class="fa fa-print"></span> Cetak</a>
 			<script>
-				document.getElementById('btnCetak').addEventListener('click', function(e) {
-					e.preventDefault();
-					var noresep = "<?php echo $_GET['noresep']; ?>";
-					var xhr = new XMLHttpRequest();
-					xhr.open("POST", "", true);
-					xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-					xhr.onreadystatechange = function() {
-						if (xhr.readyState === 4 && xhr.status === 200) {
-							// Optionally handle response
-							window.open("pages/cetak/matching.php?idkk=" + noresep, "_blank");
-						}
-					};
-					xhr.send("print_matching=1&noresep=" + encodeURIComponent(noresep));
-				});
+				(function () {
+					var btn = document.getElementById('btnCetak');
+					if (!btn) return;
+
+					var inFlight = false;
+					btn.addEventListener('click', function(e) {
+						e.preventDefault();
+						if (inFlight) return;
+
+						inFlight = true;
+						btn.classList.add('disabled');
+						btn.style.pointerEvents = 'none';
+						btn.style.opacity = '0.7';
+						btn.innerHTML = '<span class="fa fa-spinner fa-spin"></span> Proses...';
+
+						var noresep = "<?php echo $_GET['noresep']; ?>";
+						fetch("", {
+							method: "POST",
+							headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+							body: "print_matching=1&noresep=" + encodeURIComponent(noresep)
+						})
+						.then(function(res) { return res.text(); })
+						.then(function(text) {
+							var resp = {};
+							try { resp = JSON.parse(text); } catch (e) {}
+
+							if (resp && resp.ok) {
+								window.open("pages/cetak/matching.php?idkk=" + noresep, "_blank");
+								return;
+							}
+
+							var msg = (resp && resp.message) ? resp.message : 'Gagal kirim perintah print RFID';
+							alert(msg);
+						})
+						.catch(function() {
+							alert('Gagal kirim perintah print RFID');
+						})
+						.finally(function() {
+							inFlight = false;
+							btn.classList.remove('disabled');
+							btn.style.pointerEvents = '';
+							btn.style.opacity = '';
+							btn.innerHTML = '<span class="fa fa-print"></span> Cetak';
+						});
+					});
+				})();
 			</script>
-			<?php
-			if (isset($_POST['print_matching'])) {
-				$no_resep = $_POST['noresep'];
-				$time = date('Y-m-d H:i:s');
-				$ip_num = $_SERVER['REMOTE_ADDR'];
-				// Cek jika dua huruf depan $no_resep adalah DR
-				if (substr($no_resep, 0, 2) === 'DR') {
-					$no_resep_a = $no_resep . '-A';
-					$no_resep_b = $no_resep . '-B';
-
-					sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
-						VALUES (?, 'Create No.resep', 'generate no resep DR-A', ?, ?, ?)", [$no_resep_a, $_SESSION['userLAB'], $time, $ip_num]);
-					sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
-						VALUES (?, 'Create No.resep', 'generate no resep DR-B', ?, ?, ?)", [$no_resep_b, $_SESSION['userLAB'], $time, $ip_num]);
-
-					$url = "http://10.0.0.121:8080/api/v1/document/create";
-					$payload_a = json_encode([
-						"doc_number" => $no_resep_a,
-						"ip_address" => '10.0.6.225'
-					]);
-					$ch_a = curl_init($url);
-					curl_setopt($ch_a, CURLOPT_RETURNTRANSFER, true);
-					curl_setopt($ch_a, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-					curl_setopt($ch_a, CURLOPT_POST, true);
-					curl_setopt($ch_a, CURLOPT_POSTFIELDS, $payload_a);
-					$response_a = curl_exec($ch_a);
-					$error_a = curl_error($ch_a);
-					curl_close($ch_a);
-
-					$payload_b = json_encode([
-						"doc_number" => $no_resep_b,
-						"ip_address" => '10.0.6.225'
-					]);
-					$ch_b = curl_init($url);
-					curl_setopt($ch_b, CURLOPT_RETURNTRANSFER, true);
-					curl_setopt($ch_b, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-					curl_setopt($ch_b, CURLOPT_POST, true);
-					curl_setopt($ch_b, CURLOPT_POSTFIELDS, $payload_b);
-					$response_b = curl_exec($ch_b);
-					$error_b = curl_error($ch_b);
-					curl_close($ch_b);
-
-					if ($error_a) {
-						$logMessageA = "CURL Error: " . addslashes($error_a);
-						$logSuccessA = 0;
-					} else {
-						$resultA = json_decode($response_a, true);
-						$logMessageA = addslashes($resultA['message'] ?? 'Unknown response');
-						$logSuccessA = isset($resultA['success']) && $resultA['success'] ? 1 : 0;
-					}
-					sqlsrv_query($con, "INSERT INTO db_laborat.log_printing (no_resep, ip_address, success, message, response_raw, created_at, created_by)
-						VALUES (?, ?, ?, ?, ?, GETDATE(), ?)", [$no_resep_a, $ip_num, $logSuccessA, $logMessageA, $response_a, $_SESSION['userLAB']]);
-
-					if ($error_b) {
-						$logMessageB = "CURL Error: " . addslashes($error_b);
-						$logSuccessB = 0;
-					} else {
-						$resultB = json_decode($response_b, true);
-						$logMessageB = addslashes($resultB['message'] ?? 'Unknown response');
-						$logSuccessB = isset($resultB['success']) && $resultB['success'] ? 1 : 0;
-					}
-					sqlsrv_query($con, "INSERT INTO db_laborat.log_printing (no_resep, ip_address, success, message, response_raw, created_at, created_by)
-						VALUES (?, ?, ?, ?, ?, GETDATE(), ?)", [$no_resep_b, $ip_num, $logSuccessB, $logMessageB, $response_b, $_SESSION['userLAB']]);
-					// Tidak perlu alert di sini, karena sudah di-handle di JS
-				} else {
-					sqlsrv_query($con, "INSERT INTO db_laborat.log_status_matching (ids, status, info, do_by, do_at, ip_address)
-						VALUES (?, 'Create No.resep', 'generate no resep', ?, ?, ?)", [$no_resep, $_SESSION['userLAB'], $time, $ip_num]);
-
-					$url = "http://10.0.0.121:8080/api/v1/document/create";
-					$payload = json_encode([
-						"doc_number" => $no_resep,
-						"ip_address" => '10.0.6.225'
-					]);
-					$ch = curl_init($url);
-					curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-					curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-					curl_setopt($ch, CURLOPT_POST, true);
-					curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-					$response = curl_exec($ch);
-					$error = curl_error($ch);
-					curl_close($ch);
-
-					if ($error) {
-						$logMessage = "CURL Error: " . addslashes($error);
-						$logSuccess = 0;
-					} else {
-						$result = json_decode($response, true);
-						$logMessage = addslashes($result['message'] ?? 'Unknown response');
-						$logSuccess = isset($result['success']) && $result['success'] ? 1 : 0;
-					}
-					sqlsrv_query($con, "INSERT INTO db_laborat.log_printing (no_resep, ip_address, success, message, response_raw, created_at, created_by)
-						VALUES (?, ?, ?, ?, ?, GETDATE(), ?)", [$no_resep, $ip_num, $logSuccess, $logMessage, $response, $_SESSION['userLAB']]);
-				}
-				exit;
-			}
-			?>
 		</div>
 		<!-- /.box-footer -->
 

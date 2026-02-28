@@ -4,38 +4,82 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 include "koneksi.php";
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['no_resep'])) {
-    $no_resep = $_POST['no_resep'];
-    $ip_num = $_SERVER['REMOTE_ADDR'];
+if (!function_exists('qcf_printrfid_send_api')) {
+    function qcf_printrfid_send_api($docNumber)
+    {
+        $url = "http://10.0.0.121:8080/api/v1/document/create";
+        $payload = json_encode([
+            "doc_number" => $docNumber,
+            "ip_address" => '10.0.6.225'
+        ]);
 
-    // === PANGGIL API PRINT ===
-    $url = "http://10.0.0.121:8080/api/v1/document/create";
-    $payload = json_encode([
-        "doc_number" => $no_resep,
-        "ip_address" => '10.0.6.225'
-    ]);
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 
-    $ch = curl_init($url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
 
-    $response = curl_exec($ch);
-    $error = curl_error($ch);
-    curl_close($ch);
+        if ($error) {
+            return [
+                'success' => 0,
+                'message' => "CURL Error: " . $error,
+                'response' => $response
+            ];
+        }
 
-    // === LOG HASIL PRINTING ===
-    if ($error) {
-        $logMessage = "CURL Error: " . addslashes($error);
-        $logSuccess = 0;
-    } else {
         $result = json_decode($response, true);
-        $logMessage = addslashes($result['message'] ?? 'Unknown response');
-        $logSuccess = isset($result['success']) && $result['success'] ? 1 : 0;
+        return [
+            'success' => (isset($result['success']) && $result['success']) ? 1 : 0,
+            'message' => isset($result['message']) ? (string)$result['message'] : 'Unknown response',
+            'response' => $response
+        ];
+    }
+}
+
+if (!function_exists('qcf_printrfid_has_recent_log')) {
+    function qcf_printrfid_has_recent_log($conn, $docNumber, $seconds = 8)
+    {
+        $stmt = sqlsrv_query(
+            $conn,
+            "SELECT TOP 1 1 AS found
+             FROM db_laborat.log_printing
+             WHERE no_resep = ?
+               AND created_at >= DATEADD(SECOND, ?, GETDATE())",
+            [$docNumber, -abs((int)$seconds)]
+        );
+        if (! $stmt) {
+            return false;
+        }
+        $row = sqlsrv_fetch_array($stmt, SQLSRV_FETCH_ASSOC);
+        sqlsrv_free_stmt($stmt);
+        return $row ? true : false;
+    }
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['no_resep'])) {
+    $no_resep = strtoupper(trim((string)$_POST['no_resep']));
+    $ip_num = $_SERVER['REMOTE_ADDR'];
+    $createdBy = $_SESSION['userLAB'] ?? '';
+
+    if ($no_resep === '') {
+        echo "<script>alert('No resep kosong');window.location.href='?p=PrintRFID';</script>";
+        exit;
     }
 
-    $createdBy = $_SESSION['userLAB'] ?? '';
+    if (qcf_printrfid_has_recent_log($con, $no_resep, 8)) {
+        echo "<script>alert('Permintaan print duplikat terdeteksi, abaikan klik berulang.');window.location.href='?p=form-matching-detail&noresep=$no_resep';</script>";
+        exit;
+    }
+
+    $api = qcf_printrfid_send_api($no_resep);
+    $logMessage = addslashes((string)$api['message']);
+    $logSuccess = (int)$api['success'];
+    $response = isset($api['response']) ? $api['response'] : null;
+
     $insertSql = "INSERT INTO db_laborat.log_printing
         (no_resep, ip_address, success, message, response_raw, created_at, created_by)
         VALUES (?, ?, ?, ?, ?, GETDATE(), ?)";
@@ -59,10 +103,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['no_resep'])) {
 </head>
 <body>
     <h2>Print RFID</h2>
-    <form method="post">
+    <form method="post" id="printRfidForm">
         <label>No Resep:</label>
         <input type="text" name="no_resep" required autofocus>
-        <button type="submit">Print</button>
+        <button type="submit" id="btnSubmitPrint">Print</button>
     </form>
 
     <h3>Log Printing</h3>
@@ -107,6 +151,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['no_resep'])) {
     <script>
         $(document).ready(function() {
             $('#logPrintingTable').DataTable();
+            $('#printRfidForm').on('submit', function () {
+                var $btn = $('#btnSubmitPrint');
+                if ($btn.prop('disabled')) {
+                    return false;
+                }
+                $btn.prop('disabled', true).text('Proses...');
+                return true;
+            });
         });
     </script>
 </body>
