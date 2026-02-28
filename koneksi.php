@@ -67,6 +67,42 @@ if (! $con) {
     noteConnectionFailure($dbLabSqlsrv, print_r(sqlsrv_errors(), true));
 }
 
+$con_db_laborat_sqlsrv = $con;
+
+if (!function_exists('qcf_get_db_laborat_conn')) {
+    function qcf_get_db_laborat_conn()
+    {
+        global $con, $con_db_laborat_sqlsrv, $hostLabSqlsrv, $dbLabSqlsrv, $usernameSVR19, $passwordSVR19;
+
+        if (is_resource($con) || is_object($con)) {
+            $con_db_laborat_sqlsrv = $con;
+            return $con;
+        }
+
+        if (is_resource($con_db_laborat_sqlsrv) || is_object($con_db_laborat_sqlsrv)) {
+            return $con_db_laborat_sqlsrv;
+        }
+
+        $con_db_laborat_sqlsrv = @sqlsrv_connect($hostLabSqlsrv, [
+            "Database" => $dbLabSqlsrv,
+            "UID" => $usernameSVR19,
+            "PWD" => $passwordSVR19,
+            "CharacterSet" => "UTF-8",
+        ]);
+
+        if (is_resource($con_db_laborat_sqlsrv) || is_object($con_db_laborat_sqlsrv)) {
+            $con = $con_db_laborat_sqlsrv;
+        }
+
+        return $con_db_laborat_sqlsrv;
+    }
+}
+
+$qcfDebugBootstrap = __DIR__ . DIRECTORY_SEPARATOR . 'observability' . DIRECTORY_SEPARATOR . 'debug_bootstrap.php';
+if (is_file($qcfDebugBootstrap)) {
+    include_once $qcfDebugBootstrap;
+}
+
 // Tutup koneksi saat eksekusi selesai (tidak wajib, tapi eksplisit).
 register_shutdown_function(function () use (&$con, &$con_db_dyeing, &$cona, &$con_nowprd) {
     if (is_resource($con_db_dyeing) && get_resource_type($con_db_dyeing) === 'SQL Server Connection') {

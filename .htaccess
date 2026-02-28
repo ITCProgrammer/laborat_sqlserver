@@ -1,5 +1,22 @@
 RewriteEngine On
 
+<IfModule mod_php.c>
+    php_value session.name LABORATSESSID
+    php_value session.cookie_path /
+    php_value session.cookie_httponly 1
+</IfModule>
+
+<IfModule php_module>
+    php_value session.name LABORATSESSID
+    php_value session.cookie_path /
+    php_value session.cookie_httponly 1
+</IfModule>
+
+RewriteRule ^telescope$ ./debug-monitor.php [L,QSA]
+RewriteRule ^telescope/requests$ ./debug-monitor.php?type=request [L,QSA]
+RewriteRule ^telescope/exceptions$ ./debug-monitor.php?type=error [L,QSA]
+RewriteRule ^telescope/errors$ ./debug-monitor.php?type=error [L,QSA]
+
 RewriteRule ^login$ login.php [L]
 RewriteRule ^login$ index.php [L]
 RewriteRule ^lockscreen$ lockscreen.php [L]
