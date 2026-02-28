@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 return array(
     // Set false to disable all monitoring.
     'enabled' => true,

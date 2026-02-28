@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 ini_set("error_reporting", 1);
 
 if (function_exists('session_status')) {

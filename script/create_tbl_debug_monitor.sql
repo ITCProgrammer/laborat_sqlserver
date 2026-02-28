@@ -1,4 +1,4 @@
-﻿IF OBJECT_ID('db_laborat.dbo.tbl_debug_monitor', 'U') IS NULL
+IF OBJECT_ID('db_laborat.dbo.tbl_debug_monitor', 'U') IS NULL
 BEGIN
     CREATE TABLE db_laborat.dbo.tbl_debug_monitor (
         id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,

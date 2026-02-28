@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 if (defined('QCF_DEBUG_BOOTSTRAPPED')) {
     return;
 }

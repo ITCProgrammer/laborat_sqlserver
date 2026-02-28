@@ -823,50 +823,81 @@
       if (to)   qs.push('to='+encodeURIComponent(to));
       var url = 'pages/ajax/get_summary_preliminary.php' + (qs.length ? ('?'+qs.join('&')) : '');
 
-      var res = await fetch(url);
-      var json = await res.json();
-      if (json && json.ok){
-        var rows = json.data || [];
-        for (var i=0;i<rows.length;i++){ rows[i].jml = computeJml(rows[i]); }
-        table.setData(rows);
-
-        table.clearFilter(true);
-
-        // === FILTER KLIEN: tanggal & jam ===
-        var r = normRangeDT();
-        if (r.fd || r.td || r.ft || r.tt){
-          table.setFilter(function(data){
-            var d = (data.tgl || '').trim();   // "YYYY-MM-DD"
-            var t = (data.jam || '').trim();   // "HH:MM"
-
-            if (t && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) return false;
-
-            // filter tanggal kasar
-            if (r.fd && d && d < r.fd) return false;
-            if (r.td && d && d > r.td) return false;
-
-            // jam saja (tanpa tanggal)
-            if (!r.fd && !r.td && (r.ft || r.tt)){
-              if (r.ft && t && t < r.ft) return false;
-              if (r.tt && t && t > r.tt) return false;
-              return true;
-            }
-
-            // gabungan tanggal+jam
-            var curDT = (d ? (d + 'T' + (t || '00:00')) : '');
-            if (r.fromDT && curDT && curDT < r.fromDT) return false;
-            if (r.toDT   && curDT && curDT > r.toDT)   return false;
-
-            return true;
-          });
-        }
-
-        if (!rows.length) { table.addRow({}, true); table.setPage(1); }
-      }else{
-        table.clearData(); table.addRow({}); alert(json && json.message ? json.message : 'Gagal ambil data');
+      var res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status);
       }
+
+      var raw = await res.text();
+      var json = null;
+      try {
+        json = JSON.parse(raw);
+      } catch (parseErr) {
+        console.error('Invalid JSON response:', raw.slice(0, 400));
+        throw new Error('Response JSON tidak valid');
+      }
+
+      if (!(json && json.ok)) {
+        var msg = (json && json.message) ? json.message : 'Gagal ambil data';
+        throw new Error(typeof msg === 'string' ? msg : 'Gagal ambil data');
+      }
+
+      var rows = Array.isArray(json.data) ? json.data : [];
+      for (var i=0;i<rows.length;i++){
+        if (rows[i] && typeof rows[i] === 'object') {
+          if (rows[i].tgl && typeof rows[i].tgl === 'object' && rows[i].tgl.date) {
+            rows[i].tgl = String(rows[i].tgl.date).slice(0, 10);
+          } else if (rows[i].tgl && typeof rows[i].tgl !== 'string') {
+            rows[i].tgl = String(rows[i].tgl).slice(0, 10);
+          }
+
+          if (rows[i].jam && typeof rows[i].jam === 'object' && rows[i].jam.date) {
+            rows[i].jam = String(rows[i].jam.date).substring(11, 16);
+          } else if (rows[i].jam && typeof rows[i].jam !== 'string') {
+            rows[i].jam = String(rows[i].jam);
+          }
+        }
+        rows[i].jml = computeJml(rows[i]);
+      }
+
+      table.setData(rows);
+      table.clearFilter(true);
+
+      // === FILTER KLIEN: tanggal & jam ===
+      var r = normRangeDT();
+      if (r.fd || r.td || r.ft || r.tt){
+        table.setFilter(function(data){
+          var d = String(data.tgl || '').trim();   // "YYYY-MM-DD"
+          var t = String(data.jam || '').trim();   // "HH:MM"
+
+          if (t && !/^([01]\d|2[0-3]):[0-5]\d$/.test(t)) return false;
+
+          // filter tanggal kasar
+          if (r.fd && d && d < r.fd) return false;
+          if (r.td && d && d > r.td) return false;
+
+          // jam saja (tanpa tanggal)
+          if (!r.fd && !r.td && (r.ft || r.tt)){
+            if (r.ft && t && t < r.ft) return false;
+            if (r.tt && t && t > r.tt) return false;
+            return true;
+          }
+
+          // gabungan tanggal+jam
+          var curDT = (d ? (d + 'T' + (t || '00:00')) : '');
+          if (r.fromDT && curDT && curDT < r.fromDT) return false;
+          if (r.toDT   && curDT && curDT > r.toDT)   return false;
+
+          return true;
+        });
+      }
+
+      if (!rows.length) { table.addRow({}, true); table.setPage(1); }
     }catch(e){
-      table.clearData(); table.addRow({}); alert('Gagal ambil data');
+      console.error('loadData failed:', e);
+      table.clearData();
+      table.addRow({});
+      alert('Gagal ambil data: ' + (e && e.message ? e.message : 'Unknown error'));
     }
   }
 
