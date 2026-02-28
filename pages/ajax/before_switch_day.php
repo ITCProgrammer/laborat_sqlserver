@@ -250,6 +250,7 @@ include '../../koneksi.php';
                 </tr>
             </tfoot>
         </table>
+        <?php if (false): ?>
         <!-- <h4 class="text-center" style="font-weight: bold;">RECAP PENANGGUNG JAWAB <span class="text-center" style="font-weight: bold;">H-1</span></h4> -->
         <!-- <table class="table table-chart">
             <thead>
@@ -348,5 +349,6 @@ include '../../koneksi.php';
                 </tr>
             </tfoot>
         </table> -->
+        <?php endif; ?>
     </div>
 </div>
