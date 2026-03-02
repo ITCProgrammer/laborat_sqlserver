@@ -1,6 +1,8 @@
 <?php
 ini_set("error_reporting", 1);
-session_start();
+if (session_status() !== PHP_SESSION_ACTIVE) {
+	session_start();
+}
 include "koneksi.php";
 
 if (!function_exists('qcf_print_api_send')) {
@@ -63,6 +65,15 @@ if (!function_exists('qcf_has_recent_print_log')) {
 
 if (isset($_POST['print_matching'])) {
 	header('Content-Type: application/json; charset=utf-8');
+	if (!isset($_SESSION['userLAB']) || !isset($_SESSION['passLAB'])) {
+		http_response_code(401);
+		echo json_encode([
+			'ok' => false,
+			'message' => 'Session login habis, silakan login ulang'
+		]);
+		exit;
+	}
+
 	$no_resep = strtoupper(trim((string)($_POST['noresep'] ?? '')));
 	$time = date('Y-m-d H:i:s');
 	$ip_num = $_SERVER['REMOTE_ADDR'];
@@ -281,7 +292,7 @@ if (isset($_POST['save'])) {
 						btn.innerHTML = '<span class="fa fa-spinner fa-spin"></span> Proses...';
 
 						var noresep = "<?php echo $_GET['noresep']; ?>";
-						fetch("", {
+						fetch("pages/form-matching-detail.php", {
 							method: "POST",
 							headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
 							body: "print_matching=1&noresep=" + encodeURIComponent(noresep)
@@ -296,7 +307,7 @@ if (isset($_POST['save'])) {
 								return;
 							}
 
-							var msg = (resp && resp.message) ? resp.message : 'Gagal kirim perintah print RFID';
+							var msg = (resp && resp.message) ? resp.message : ((text || '').trim() || 'Gagal kirim perintah print RFID');
 							alert(msg);
 						})
 						.catch(function() {
