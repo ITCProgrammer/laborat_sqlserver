@@ -1,6 +1,8 @@
 <?php
 ini_set("error_reporting", 1);
-session_start();
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 include "koneksi.php";
 $fmtDT = function($v){ return ($v instanceof DateTime)? $v->format('Y-m-d H:i:s') : $v; };
 $fmtNum = function($v){
@@ -1262,6 +1264,47 @@ if (substr(strtoupper($data['idm']), 0, 2) == "DR") {
                         <?php else : ?>
                             <p class="text-center" style="color: red; font-weight: bold;"></p>
                         <?php endif; ?>
+
+                        <?php
+                            $notInsertedExport = isset($_SESSION['export_recipe_not_inserted']) && is_array($_SESSION['export_recipe_not_inserted'])
+                                ? $_SESSION['export_recipe_not_inserted']
+                                : [];
+                            $db2ErrorExport = isset($_SESSION['export_recipe_db2_errors']) && is_array($_SESSION['export_recipe_db2_errors'])
+                                ? $_SESSION['export_recipe_db2_errors']
+                                : [];
+                            if (!empty($notInsertedExport)) {
+                                $maxShow = min(15, count($notInsertedExport));
+                                echo '<div class="alert alert-warning" style="margin-top:10px;">';
+                                echo '<strong>Catatan Export DB2:</strong><br>';
+                                echo 'Ada ' . count($notInsertedExport) . ' data RECIPECOMPONENTBEAN yang tidak ter-insert (duplicate key).';
+                                echo '<pre style="margin-top:8px; max-height:180px; overflow:auto; white-space:pre-wrap;">';
+                                for ($ni = 0; $ni < $maxShow; $ni++) {
+                                    echo htmlspecialchars(($ni + 1) . '. ' . $notInsertedExport[$ni]) . "\n";
+                                }
+                                if (count($notInsertedExport) > $maxShow) {
+                                    echo htmlspecialchars('... dan ' . (count($notInsertedExport) - $maxShow) . ' baris lainnya');
+                                }
+                                echo '</pre>';
+                                echo '</div>';
+                                unset($_SESSION['export_recipe_not_inserted']);
+                            }
+                            if (!empty($db2ErrorExport)) {
+                                $maxErrShow = min(15, count($db2ErrorExport));
+                                echo '<div class="alert alert-danger" style="margin-top:10px;">';
+                                echo '<strong>Error Export DB2:</strong><br>';
+                                echo 'Ada ' . count($db2ErrorExport) . ' statement gagal dieksekusi.';
+                                echo '<pre style="margin-top:8px; max-height:220px; overflow:auto; white-space:pre-wrap;">';
+                                for ($ei = 0; $ei < $maxErrShow; $ei++) {
+                                    echo htmlspecialchars(($ei + 1) . '. ' . $db2ErrorExport[$ei]) . "\n";
+                                }
+                                if (count($db2ErrorExport) > $maxErrShow) {
+                                    echo htmlspecialchars('... dan ' . (count($db2ErrorExport) - $maxErrShow) . ' baris lainnya');
+                                }
+                                echo '</pre>';
+                                echo '</div>';
+                                unset($_SESSION['export_recipe_db2_errors']);
+                            }
+                        ?>
                     </h4>
                 </div>
                 <?php

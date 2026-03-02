@@ -1,7 +1,241 @@
 <?php
 include "koneksi.php";
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
+}
 $db2_errors = [];
-$safeDb2 = function(string $sql) use (&$conn1, &$db2_errors) {
+$db2_not_inserted = [];
+$db2ColumnLengthCache = [];
+
+if (!function_exists('qcf_db2_is_duplicate_key_error')) {
+    function qcf_db2_is_duplicate_key_error($err)
+    {
+        $err = (string)$err;
+        return stripos($err, 'SQL0803N') !== false
+            || stripos($err, 'SQLCODE=-803') !== false
+            || stripos($err, 'SQLSTATE=23505') !== false;
+    }
+}
+
+if (!function_exists('qcf_db2_cleanup_value_string')) {
+    function qcf_db2_cleanup_value_string($value)
+    {
+        $value = (string)$value;
+        $value = str_replace(["\r\n", "\r", "\n", "\t"], ' ', $value);
+        $value = preg_replace('/\s+/', ' ', $value);
+        return trim((string)$value);
+    }
+}
+
+if (!function_exists('qcf_db2_split_sql_list')) {
+    function qcf_db2_split_sql_list($input)
+    {
+        $input = (string)$input;
+        $items = [];
+        $buf = '';
+        $len = strlen($input);
+        $inQuote = false;
+
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $input[$i];
+
+            if ($ch === "'") {
+                if ($inQuote && $i + 1 < $len && $input[$i + 1] === "'") {
+                    $buf .= "''";
+                    $i++;
+                    continue;
+                }
+                $inQuote = !$inQuote;
+                $buf .= $ch;
+                continue;
+            }
+
+            if ($ch === ',' && !$inQuote) {
+                $items[] = trim($buf);
+                $buf = '';
+                continue;
+            }
+
+            $buf .= $ch;
+        }
+
+        if (trim($buf) !== '') {
+            $items[] = trim($buf);
+        }
+
+        return $items;
+    }
+}
+
+if (!function_exists('qcf_db2_parse_insert_values')) {
+    function qcf_db2_parse_insert_values($sql, $tableName)
+    {
+        $sql = (string)$sql;
+        $tableName = preg_quote((string)$tableName, '/');
+        $pattern = '/INSERT\s+INTO\s+' . $tableName . '\s*\((.*?)\)\s*VALUES\s*\((.*)\)\s*$/is';
+        if (!preg_match($pattern, $sql, $m)) {
+            return [];
+        }
+
+        $columns = qcf_db2_split_sql_list($m[1]);
+        $values = qcf_db2_split_sql_list($m[2]);
+        if (empty($columns) || empty($values) || count($columns) !== count($values)) {
+            return [];
+        }
+
+        $map = [];
+        foreach ($columns as $idx => $col) {
+            $key = strtoupper(trim((string)$col));
+            $val = trim((string)$values[$idx]);
+            if (strlen($val) >= 2 && $val[0] === "'" && substr($val, -1) === "'") {
+                $val = substr($val, 1, -1);
+                $val = str_replace("''", "'", $val);
+            }
+            $map[$key] = qcf_db2_cleanup_value_string($val);
+        }
+
+        return $map;
+    }
+}
+
+if (!function_exists('qcf_db2_get_index_columns')) {
+    function qcf_db2_get_index_columns($conn, $schema, $table, $iid = 1)
+    {
+        static $cache = [];
+
+        $schema = strtoupper(trim((string)$schema));
+        $table = strtoupper(trim((string)$table));
+        $iid = (int)$iid;
+        $cacheKey = $schema . '.' . $table . '#' . $iid;
+        if (isset($cache[$cacheKey])) {
+            return $cache[$cacheKey];
+        }
+
+        if (! $conn || $schema === '' || $table === '' || $iid < 0) {
+            $cache[$cacheKey] = [];
+            return [];
+        }
+
+        $sql = "SELECT c.COLNAME
+                FROM SYSCAT.INDEXES i
+                JOIN SYSCAT.INDEXCOLUSE c
+                  ON c.INDSCHEMA = i.INDSCHEMA
+                 AND c.INDNAME = i.INDNAME
+                WHERE i.TABSCHEMA = '$schema'
+                  AND i.TABNAME = '$table'
+                  AND i.IID = $iid
+                ORDER BY c.COLSEQ";
+        $stmt = @db2_exec($conn, $sql);
+        if (! $stmt) {
+            $cache[$cacheKey] = [];
+            return [];
+        }
+
+        $cols = [];
+        while ($row = @db2_fetch_assoc($stmt)) {
+            $colName = isset($row['COLNAME']) ? strtoupper(trim((string)$row['COLNAME'])) : '';
+            if ($colName !== '') {
+                $cols[] = $colName;
+            }
+        }
+
+        $cache[$cacheKey] = $cols;
+        return $cols;
+    }
+}
+
+if (!function_exists('qcf_db2_recipecomponent_duplicate_warning')) {
+    function qcf_db2_recipecomponent_duplicate_warning($conn, $sql, $err)
+    {
+        $map = qcf_db2_parse_insert_values($sql, 'RECIPECOMPONENTBEAN');
+        $fields = qcf_db2_get_index_columns($conn, 'DB2ADMIN', 'RECIPECOMPONENTBEAN', 1);
+        if (empty($fields)) {
+            $fields = [
+                'FATHERID',
+                'IMPORTAUTOCOUNTER',
+                'IMPORTID',
+                'RELATEDDEPENDENTID',
+                'RECIPESUBCODE01',
+                'RECIPESUFFIXCODE',
+                'GROUPNUMBER',
+                'SEQUENCE',
+                'SUBSEQUENCE',
+                'ITEMTYPEAFICODE',
+                'SUBCODE01',
+                'SUBCODE02',
+                'SUBCODE03',
+                'SUFFIXCODE',
+            ];
+        }
+
+        $pairs = [];
+        foreach ($fields as $field) {
+            if (!array_key_exists($field, $map)) {
+                continue;
+            }
+            $v = trim((string)$map[$field]);
+            if ($v === '') {
+                $v = 'NULL';
+            }
+            $pairs[] = $field . '=' . $v;
+        }
+
+        $codes = [];
+        if (preg_match('/SQLSTATE=\w+/i', (string)$err, $mState)) {
+            $codes[] = strtoupper($mState[0]);
+        }
+        if (preg_match('/SQLCODE=-?\d+/i', (string)$err, $mCode)) {
+            $codes[] = strtoupper($mCode[0]);
+        }
+        $codes[] = 'IID=1';
+        $codeText = !empty($codes) ? ' [' . implode(', ', $codes) . ']' : '';
+
+        if (!empty($pairs)) {
+            return 'RECIPECOMPONENTBEAN duplicate skipped' . $codeText . ': ' . implode(', ', $pairs);
+        }
+
+        return 'RECIPECOMPONENTBEAN duplicate skipped' . $codeText;
+    }
+}
+
+$db2GetColumnLength = function(string $schema, string $table, string $column, int $default = 250) use (&$conn1, &$db2ColumnLengthCache) {
+    $schema = strtoupper(trim($schema));
+    $table = strtoupper(trim($table));
+    $column = strtoupper(trim($column));
+    $cacheKey = $schema . '.' . $table . '.' . $column;
+
+    if (isset($db2ColumnLengthCache[$cacheKey])) {
+        return $db2ColumnLengthCache[$cacheKey];
+    }
+
+    if (! $conn1) {
+        $db2ColumnLengthCache[$cacheKey] = $default;
+        return $default;
+    }
+
+    $sqlLen = "SELECT LENGTH
+               FROM SYSCAT.COLUMNS
+               WHERE TABSCHEMA = '$schema'
+                 AND TABNAME = '$table'
+                 AND COLNAME = '$column'
+               FETCH FIRST 1 ROW ONLY";
+    $stmtLen = @db2_exec($conn1, $sqlLen);
+    if (! $stmtLen) {
+        $db2ColumnLengthCache[$cacheKey] = $default;
+        return $default;
+    }
+
+    $rowLen = @db2_fetch_assoc($stmtLen);
+    $len = isset($rowLen['LENGTH']) ? (int)$rowLen['LENGTH'] : $default;
+    if ($len <= 0) {
+        $len = $default;
+    }
+
+    $db2ColumnLengthCache[$cacheKey] = $len;
+    return $len;
+};
+
+$safeDb2 = function(string $sql) use (&$conn1, &$db2_errors, &$db2_not_inserted) {
     if (!$conn1) {
         $msg = "DB2 connection not available for SQL: ".$sql;
         $db2_errors[] = $msg;
@@ -11,6 +245,15 @@ $safeDb2 = function(string $sql) use (&$conn1, &$db2_errors) {
     $stmt = @db2_exec($conn1, $sql);
     if (!$stmt) {
         $err = function_exists('db2_stmt_errormsg') ? db2_stmt_errormsg() : 'unknown db2 error';
+
+        // Idempotent export: duplicate row in RECIPECOMPONENTBEAN dianggap sudah pernah ter-insert.
+        if (stripos($sql, 'INSERT INTO RECIPECOMPONENTBEAN') !== false && qcf_db2_is_duplicate_key_error($err)) {
+            $warn = qcf_db2_recipecomponent_duplicate_warning($conn1, $sql, $err);
+            $db2_not_inserted[] = $warn;
+            error_log($warn . " | DB2: " . $err);
+            return true;
+        }
+
         $msg = "DB2 exec failed: ".$err." SQL: ".$sql;
         $db2_errors[] = $msg;
         error_log($msg);
@@ -1587,8 +1830,16 @@ $insert_adstoragebean8 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                             0,
                                                                             0)");
 
-$benang = addslashes($d_add['benang_substring']);
-$benang2 = db2_escape_string($benang);
+$benangRaw = qcf_db2_cleanup_value_string($d_add['benang_substring'] ?? '');
+$maxValueStringLen = $db2GetColumnLength('DB2ADMIN', 'ADSTORAGEBEAN', 'VALUESTRING', 250);
+if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+    if (mb_strlen($benangRaw, 'UTF-8') > $maxValueStringLen) {
+        $benangRaw = mb_substr($benangRaw, 0, $maxValueStringLen, 'UTF-8');
+    }
+} elseif (strlen($benangRaw) > $maxValueStringLen) {
+    $benangRaw = substr($benangRaw, 0, $maxValueStringLen);
+}
+$benang2 = db2_escape_string($benangRaw);
 $insert_adstoragebean9 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                                 IMPORTAUTOCOUNTER,
                                                                                 NAMEENTITYNAME,
@@ -1687,23 +1938,34 @@ $insert_adstoragebean10 = $safeDb2("INSERT INTO ADSTORAGEBEAN(FATHERID,
                                                                             0)");
 // PROSES EXPORT RECIPE ADDITIONAL DATA
 
-// STATUS EXPORT SAMPAI TAHAP APA
-if ($insert_recipeBean && $insert_recipeComponentBean && $insert_adstoragebean1 && $insert_adstoragebean2 && $insert_adstoragebean3 && $insert_adstoragebean4 && $insert_adstoragebean5 && $insert_adstoragebean6 && $insert_adstoragebean7 && $insert_adstoragebean8 && $insert_adstoragebean9) {
-    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=1&available=$warning"); // RECIPE & RECIPE COMPONENT & ADSTORAGE
-} elseif ($insert_recipeBean) {
-    // jika RECIPE ok tapi komponen gagal, tampilkan errornya
-    if (!$insert_recipeComponentBean && !empty($db2_errors)) {
-        echo "Insert RECIPECOMPONENTBEAN gagal.<br>Detail:<pre>".htmlentities(print_r($db2_errors,true))."</pre>";
-    } else {
-        header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=2&available=$warning"); // RECIPE
-    }
-} elseif ($insert_recipeComponentBean) {
-    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=3&available=$warning"); // RECIPE COMPONENT
+$warning = isset($warning) ? (string)$warning : '';
+if (!empty($db2_not_inserted)) {
+    $_SESSION['export_recipe_not_inserted'] = $db2_not_inserted;
+    $dupCount = count($db2_not_inserted);
+    $dupMsg = "Warning: {$dupCount} row RECIPECOMPONENTBEAN tidak diinsert (duplicate key).";
+    $warning = trim($warning) !== '' ? (trim($warning) . " | " . $dupMsg) : $dupMsg;
 } else {
-    // tampilkan alasan gagalnya komponen agar tidak silent failure
-    if (!empty($db2_errors)) {
-        echo "Insert RECIPECOMPONENTBEAN gagal.<br>Detail:<pre>".htmlentities(print_r($db2_errors,true))."</pre>";
-    } else {
-        header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=0&available=$warning");
-    }
+    unset($_SESSION['export_recipe_not_inserted']);
+}
+
+if (!empty($db2_errors)) {
+    $_SESSION['export_recipe_db2_errors'] = $db2_errors;
+    $errCount = count($db2_errors);
+    $errMsg = "Error: {$errCount} statement gagal insert ke DB2.";
+    $warning = trim($warning) !== '' ? (trim($warning) . " | " . $errMsg) : $errMsg;
+} else {
+    unset($_SESSION['export_recipe_db2_errors']);
+}
+
+$availableParam = urlencode($warning);
+
+// STATUS EXPORT SAMPAI TAHAP APA
+if ($insert_recipeBean && $insert_recipeComponentBean && $insert_adstoragebean1 && $insert_adstoragebean2 && $insert_adstoragebean3 && $insert_adstoragebean4 && $insert_adstoragebean5 && $insert_adstoragebean6 && $insert_adstoragebean7 && $insert_adstoragebean8 && $insert_adstoragebean9 && $insert_adstoragebean10) {
+    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=1&available=$availableParam"); // RECIPE & RECIPE COMPONENT & ADSTORAGE
+} elseif ($insert_recipeBean) {
+    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=2&available=$availableParam"); // RECIPE
+} elseif ($insert_recipeComponentBean) {
+    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=3&available=$availableParam"); // RECIPE COMPONENT
+} else {
+    header("location: index1.php?p=Detail-status-approved&idm=$idstatus&upload=0&available=$availableParam");
 }
