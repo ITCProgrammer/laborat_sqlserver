@@ -29,6 +29,8 @@
     if (! $data) {
         die('Data tidak ditemukan.');
     }
+    // Compat: field hidden `shadow_no_resep` masih dipakai di form lama.
+    $nourut = $data['no_resep'] ?? $rcode;
 ?>
 
 <?php
