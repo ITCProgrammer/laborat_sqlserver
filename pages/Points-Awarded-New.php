@@ -400,6 +400,12 @@ if ($activeUser === '' && $activeJabatan !== '' && isset($activeUserByJabatan[$a
           <button type="submit" name="submit" value="search" class="btn btn-primary btn-sm mb-2">
             <i class="fa fa-search" aria-hidden="true"></i>
           </button>
+          <button type="submit"
+                  class="btn btn-success btn-sm mb-2"
+                  formaction="pages/Points-Awarded-New-export.php"
+                  formtarget="_blank">
+            <i class="fa fa-download" aria-hidden="true"></i> Download Excel (raw)
+          </button>
         </form>
         <hr />
       </div>
