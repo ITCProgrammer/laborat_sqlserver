@@ -1,20 +1,30 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 date_default_timezone_set('Asia/Jakarta');
-// tanggal 1 di bulan berjalan jam 23:00:00
-$awaltanggal = date('Y-m-01 23:01:00');
-// $awaltanggal = date('2026-01-01 23:01:00');
+// ===============================
+// SET MANUAL PERIODE DI SINI
+// ===============================
+$tahun  = $_GET['thn'];
+$bulan  = $_GET['bln'];
 
-// Tanggal awal = 1 hari sebelum tanggal 1 bulan berjalan
-$awal = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
-$awal_ = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
+// tanggal 1 bulan tersebut jam 23:01:00
+$awaltanggal = $tahun . '-' . $bulan . '-01 23:01:00';
 
-// Tanggal akhir = tanggal terakhir bulan berjalan jam 23:00:00
-$akhir = date('Y-m-d 23:00:00');
-$akhir_ = date('Y-m-d');
+// Tanggal awal = 1 hari sebelum tanggal 1 bulan tersebut
+$awal   = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
+$awal_  = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
 
-$awalParam = $_GET['awal'] ?? '';
-$Bln2 = (new DateTime($awalParam))->format('m');
-$Thn2 = (new DateTime($awalParam))->format('Y');
+// Tanggal akhir = tanggal terakhir bulan tersebut jam 23:00:00
+$akhir  = date('Y-m-t 23:00:00', strtotime($tahun . '-' . $bulan . '-01'));
+$akhir_ = date('Y-m-t', strtotime($tahun . '-' . $bulan . '-01'));
+
+// Ambil bulan & tahun dari manual tadi
+$Bln2 = $bulan;
+$Thn2 = $tahun;
+
 $Bulan = $Thn2 . "-" . $Bln2;
 
 $namaFile = "lap_Bulanan_kategori_pemakaian_Obat_gd_kimia_bulanan_$Bulan.xls";
@@ -31,11 +41,11 @@ $ip_num = $_SERVER['REMOTE_ADDR'];
 $os = $_SERVER['HTTP_USER_AGENT'];
 
 
-$awalParam = $_GET['awal'] ?? '';
-$Bln2 = (new DateTime($awalParam))->format('m');
-$Thn2 = (new DateTime($awalParam))->format('Y');
-
-$Bulan = $Thn2 . "-" . $Bln2;
+//$awalParam = $_GET['awal'] ?? '';
+//$Bln2 = (new DateTime($awalParam))->format('m');
+//$Thn2 = (new DateTime($awalParam))->format('Y');
+//
+//$Bulan = $Thn2 . "-" . $Bln2;
 $namaFile = "Laporan Bulanan gudang-{$Bulan}.xls";
 
 $d = cal_days_in_month(CAL_GREGORIAN, $Bln2, $Thn2);
@@ -143,7 +153,7 @@ if (file_exists($logoPath)) {
 																u.LONGDESCRIPTION,
 																p.SUBCODE01
 															ORDER BY
-																p.SUBCODE01");
+																p.SUBCODE01 ");
 
                 ?>
             <!-- No Form -->
@@ -235,7 +245,7 @@ if (file_exists($logoPath)) {
                                             AND s.TEMPLATECODE IN ('201','203','303')
                                             AND s.LOGICALWAREHOUSECODE IN ('M510', 'M101')
                                             and s.DECOSUBCODE01 = '$row[DECOSUBCODE01]'
-                                            AND NOT TRIM(s.DECOSUBCODE01) || '-' || TRIM(s.DECOSUBCODE02) || '-' || TRIM(s.DECOSUBCODE03) ='E-1-000'
+                                            AND NOT TRIM(s.DECOSUBCODE01) || '-' || TRIM(s.DECOSUBCODE02) || '-' || TRIM(s.DECOSUBCODE03) ='E-1-000' 
 											AND TRIM(s.DECOSUBCODE01) || '-' || TRIM(s.DECOSUBCODE02) || '-' || TRIM(s.DECOSUBCODE03) IN ($kode_obat_list)
                                         )
                                             WHERE TEMPLATE <> '303'
@@ -299,7 +309,7 @@ if (file_exists($logoPath)) {
                                         and s.CREATIONUSER != 'MT_STI'
                                         AND s.LOGICALWAREHOUSECODE IN ('M510', 'M101')
                                         and s.DECOSUBCODE01 = '$row[DECOSUBCODE01]'
-                                        AND NOT TRIM(s.DECOSUBCODE01) || '-' || TRIM(s.DECOSUBCODE02) || '-' || TRIM(s.DECOSUBCODE03) ='E-1-000'
+                                        AND NOT TRIM(s.DECOSUBCODE01) || '-' || TRIM(s.DECOSUBCODE02) || '-' || TRIM(s.DECOSUBCODE03) ='E-1-000' 
 										AND TRIM(s.DECOSUBCODE01) || '-' || TRIM(s.DECOSUBCODE02) || '-' || TRIM(s.DECOSUBCODE03) IN ($kode_obat_list)
                                     )
                                     WHERE TEMPLATE <> '304'
@@ -441,7 +451,7 @@ if (file_exists($logoPath)) {
                                             AND i.LOGICALWAREHOUSECODE IN ('M510', 'M101')
                                             AND i.SUBCODE01 = '$row[DECOSUBCODE01]'
                                             AND NOT TRIM(i.SUBCODE01) || '-' || TRIM(i.SUBCODE02) || '-' || TRIM(i.SUBCODE03) ='E-1-000'
-											AND TRIM(i.SUBCODE01) || '-' || TRIM(i.SUBCODE02) || '-' || TRIM(i.SUBCODE03) IN ($kode_obat_list) ");
+											AND TRIM(i.SUBCODE01) || '-' || TRIM(i.SUBCODE02) || '-' || TRIM(i.SUBCODE03) IN ($kode_obat_list)");
                                     $row_stock_minimum = db2_fetch_assoc($stock_minimum) ?: [];
 
                                     $buka_po = db2_exec($conn1, "SELECT 
@@ -502,44 +512,44 @@ if (file_exists($logoPath)) {
             } else {
 
                 $sql_qty_awal = "SELECT
-                                                            FORMAT(DATEADD(MONTH, -1, sub.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
-                                                            sub.DECOSUBCODE01,
-                                                            SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS qty_awal
-                                                        FROM
-                                                        (
-                                                            SELECT DISTINCT
-                                                                t.tgl_tutup,
-                                                                t.KODE_OBAT,
-                                                                t.LONGDESCRIPTION,
-                                                                t.DECOSUBCODE01,
-                                                                t.DECOSUBCODE02,
-                                                                t.DECOSUBCODE03,
-                                                                t.LOGICALWAREHOUSECODE,
-                                                                t.WAREHOUSELOCATIONCODE,
-                                                                t.WHSLOCATIONWAREHOUSEZONECODE,
-                                                                t.LOTCODE,
-                                                                t.BASEPRIMARYQUANTITYUNIT
-                                                            FROM db_laborat.tblopname_11 t
-                                                            WHERE
-                                                                t.DECOSUBCODE01 = ?
-																AND t.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
-                                                                AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
-                                                                and not t.kode_obat = 'E-1-000'
-                                                                AND t.tgl_tutup =
-                                                                (
-                                                                    SELECT MAX(t2.tgl_tutup)
-                                                                    FROM db_laborat.tblopname_11 t2
-                                                                    WHERE
-                                                                        t2.DECOSUBCODE01 = ?
-                                                                        AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101')
-                                                                         and not t2.kode_obat = 'E-1-000' 
-                                                                        AND t2.tgl_tutup = ?
-																		AND t2.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
-                                                                )
-                                                        ) AS sub
-                                                        GROUP BY
-                                                            sub.tgl_tutup,
-                                                            sub.DECOSUBCODE01
+										FORMAT(DATEADD(MONTH, -1, sub.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
+										sub.DECOSUBCODE01,
+										SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS qty_awal
+									FROM
+									(
+										SELECT DISTINCT
+											t.tgl_tutup,
+											t.KODE_OBAT,
+											t.LONGDESCRIPTION,
+											t.DECOSUBCODE01,
+											t.DECOSUBCODE02,
+											t.DECOSUBCODE03,
+											t.LOGICALWAREHOUSECODE,
+											t.WAREHOUSELOCATIONCODE,
+											t.WHSLOCATIONWAREHOUSEZONECODE,
+											t.LOTCODE,
+											t.BASEPRIMARYQUANTITYUNIT
+										FROM db_laborat.tblopname_11 t
+										WHERE
+											t.DECOSUBCODE01 = ?
+											AND t.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
+											AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101')
+											AND t.kode_obat <> 'E-1-000'
+											AND t.tgl_tutup =
+											(
+												SELECT MAX(t2.tgl_tutup)
+												FROM db_laborat.tblopname_11 t2
+												WHERE
+													t2.DECOSUBCODE01 = ?
+													AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101')
+													AND t2.kode_obat <> 'E-1-000'
+													AND t2.tgl_tutup = ?
+													AND t2.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
+											)
+									) AS sub
+									GROUP BY
+										sub.tgl_tutup,
+										sub.DECOSUBCODE01
                                                     ";
 
                 $params = [$code1, $kdobat, $code1, $awal_, $kdobat];
@@ -553,44 +563,44 @@ if (file_exists($logoPath)) {
             // var_dump($row_qty_awal);
 
             $sql = "SELECT
-                                                FORMAT(DATEADD(MONTH, -1, sub.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
-                                                sub.DECOSUBCODE01,
-                                                SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS STOCK_BALANCE
-                                            FROM
-                                            (
-                                                SELECT DISTINCT
-                                                    t.tgl_tutup,
-                                                    t.KODE_OBAT,
-                                                    t.LONGDESCRIPTION,
-                                                    t.DECOSUBCODE01,
-                                                    t.DECOSUBCODE02,
-                                                    t.DECOSUBCODE03,
-                                                    t.LOGICALWAREHOUSECODE,
-                                                    t.WAREHOUSELOCATIONCODE,
-                                                    t.WHSLOCATIONWAREHOUSEZONECODE,
-                                                    t.LOTCODE,
-                                                    t.BASEPRIMARYQUANTITYUNIT
-                                                FROM db_laborat.tblopname_11 t
-                                                WHERE
-                                                    t.DECOSUBCODE01 = ?
-													AND t.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
-                                                    AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
-                                                    and not t.kode_obat = 'E-1-000'
-                                                    AND t.tgl_tutup =
-                                                    (
-                                                        SELECT MAX(t2.tgl_tutup)
-                                                        FROM db_laborat.tblopname_11 t2
-                                                        WHERE
-                                                            t2.DECOSUBCODE01 = ?
-                                                             and not t2.kode_obat = 'E-1-000'
-                                                            AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101') 
-                                                            AND t2.tgl_tutup = ?
-															AND t2.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
-                                                    )
-                                            ) AS sub
-                                            GROUP BY
-                                                sub.tgl_tutup,
-                                                sub.DECOSUBCODE01
+							FORMAT(DATEADD(MONTH, -1, sub.tgl_tutup), 'yyyy-MM') AS tahun_bulan,
+							sub.DECOSUBCODE01,
+							SUM(sub.BASEPRIMARYQUANTITYUNIT * 1000) AS STOCK_BALANCE
+						FROM
+						(
+							SELECT DISTINCT
+								t.tgl_tutup,
+								t.KODE_OBAT,
+								t.LONGDESCRIPTION,
+								t.DECOSUBCODE01,
+								t.DECOSUBCODE02,
+								t.DECOSUBCODE03,
+								t.LOGICALWAREHOUSECODE,
+								t.WAREHOUSELOCATIONCODE,
+								t.WHSLOCATIONWAREHOUSEZONECODE,
+								t.LOTCODE,
+								t.BASEPRIMARYQUANTITYUNIT
+							FROM db_laborat.tblopname_11 t
+							WHERE
+								t.DECOSUBCODE01 = ?
+								AND t.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
+								AND t.LOGICALWAREHOUSECODE IN ('M510', 'M101')
+								AND t.kode_obat <> 'E-1-000'
+								AND t.tgl_tutup =
+								(
+									SELECT MAX(t2.tgl_tutup)
+									FROM db_laborat.tblopname_11 t2
+									WHERE
+										t2.DECOSUBCODE01 = ?
+										AND t2.LOGICALWAREHOUSECODE IN ('M510', 'M101')
+										AND t2.kode_obat <> 'E-1-000'
+										AND t2.tgl_tutup = ?
+										AND t2.kode_obat IN (SELECT value FROM STRING_SPLIT(?, ','))
+								)
+						) AS sub
+						GROUP BY
+							sub.tgl_tutup,
+							sub.DECOSUBCODE01
                                             ";
 
             $params = [$code1, $kdobat, $code1, $akhir_, $kdobat];

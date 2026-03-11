@@ -98,6 +98,7 @@ $tahun = $date->format('Y');
             LOTCODE,
             LOGICALWAREHOUSECODE,
             WAREHOUSELOCATIONCODE,
+			WHSLOCATIONWAREHOUSEZONECODE,
             tgl_tutup,
             BASEPRIMARYQUANTITYUNIT,
             BASEPRIMARYUNITCODE
@@ -112,6 +113,7 @@ $tahun = $date->format('Y');
             LONGDESCRIPTION,
             LOTCODE,
             LOGICALWAREHOUSECODE,
+			WHSLOCATIONWAREHOUSEZONECODE,
             tgl_tutup,
             BASEPRIMARYUNITCODE
         ORDER BY KODE_OBAT ASC";
