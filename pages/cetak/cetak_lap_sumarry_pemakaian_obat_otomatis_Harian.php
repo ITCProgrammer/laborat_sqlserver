@@ -491,7 +491,7 @@ if (file_exists($logoPath)) {
             $row_stock_masuk = db2_fetch_assoc($stock_masuk) ?: [];
 
 
-            $tgl_input = $akhir; // Misal: 2025-08-15
+            $tgl_input = $awal; // Misal: 2025-08-15
             $tgl_sebelumnya = date('Y-m-01', strtotime('-6 months', strtotime($tgl_input)));
 
             $buka_po = db2_exec($conn1, "SELECT 
@@ -501,10 +501,12 @@ if (file_exists($logoPath)) {
                                             DECOSUBCODE03,
                                             DECOSUBCODE04,
                                             DECOSUBCODE05,
-                                             CASE 
-                                            	WHEN PROGRESSSTATUS = 2 THEN 0
-                                            	ELSE round(sum(QTY))
-                                            END AS QTY,
+                                            SUM(
+												CASE 
+													WHEN PROGRESSSTATUS = 2 THEN 0
+													ELSE QTY
+												END
+											) AS QTY,
                                             BASEPRIMARYUNITCODE
                                             from
                                             (SELECT 
@@ -564,8 +566,7 @@ if (file_exists($logoPath)) {
                                             DECOSUBCODE03,
                                             DECOSUBCODE04,
                                             DECOSUBCODE05,
-                                            BASEPRIMARYUNITCODE,
-                                            PROGRESSSTATUS");
+                                            BASEPRIMARYUNITCODE");
             $row_buka_po = db2_fetch_assoc($buka_po) ?: [];
 
             $pakai_belum_timbang = db2_exec($conn1, "SELECT 
