@@ -483,7 +483,7 @@ if (file_exists($logoPath)) {
                                                             AND s.DECOSUBCODE02 = '$row[DECOSUBCODE02]' 
                                                             AND s.DECOSUBCODE03 = '$row[DECOSUBCODE03]'
                                                             )  AS sub
-                                                            WHERE TEMPLATE <> '304'
+                                                            WHERE sub.TEMPLATECODE <> '304'
                                                             GROUP BY 
                                                             ITEMTYPECODE,
                                                             TEMPLATE,
