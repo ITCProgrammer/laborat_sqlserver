@@ -20,22 +20,41 @@ $columns = array(
 );
 // set_order_type("desc");
 $searchVal = $requestData['search']['value'] ?? '';
-
+$defaultFilter = "a.status_bagi = 'siap bagi' AND ISNULL(b.status, 'siap bagi') = 'siap bagi'";
 $baseSql = "FROM db_laborat.tbl_matching a
-            LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm
-            WHERE a.status_bagi = 'siap bagi' AND ISNULL(b.status, 'siap bagi') = 'siap bagi'";
+            LEFT JOIN db_laborat.tbl_status_matching b ON a.no_resep = b.idm";
 $params = [];
-if (!empty($searchVal)) {
-    $baseSql .= " AND (a.no_resep LIKE ? OR a.no_order LIKE ? OR a.warna LIKE ? OR a.no_warna LIKE ? OR a.no_item LIKE ? OR a.no_po LIKE ? OR ISNULL(b.status, 'belum bagi') LIKE ?)";
-    $like = '%' . $searchVal . '%';
-    $params = [$like, $like, $like, $like, $like, $like, $like];
-}
 
-$countSql = "SELECT COUNT(*) AS cnt " . $baseSql;
-$stmtCount = sqlsrv_query($con, $countSql, $params);
-$rowCount = sqlsrv_fetch_array($stmtCount, SQLSRV_FETCH_ASSOC);
-sqlsrv_free_stmt($stmtCount);
-$totalData = $totalFiltered = $rowCount ? (int)$rowCount['cnt'] : 0;
+if (!empty($searchVal)) {
+    $like = '%' . $searchVal . '%';
+    $baseSql .= " WHERE (
+                    ($defaultFilter AND (
+                        a.no_resep LIKE ? OR
+                        a.no_order LIKE ? OR
+                        a.warna LIKE ? OR
+                        a.no_warna LIKE ? OR
+                        a.no_item LIKE ? OR
+                        a.no_po LIKE ? OR
+                        ISNULL(b.status, 'belum bagi') LIKE ?
+                    ))
+                    OR a.no_resep LIKE ?
+                 )";
+    $params = [$like, $like, $like, $like, $like, $like, $like, $like];
+
+    $countSql = "SELECT COUNT(*) AS cnt " . $baseSql;
+    $stmtCount = sqlsrv_query($con, $countSql, $params);
+    $rowCount = sqlsrv_fetch_array($stmtCount, SQLSRV_FETCH_ASSOC);
+    sqlsrv_free_stmt($stmtCount);
+    $totalFiltered = $rowCount ? (int)$rowCount['cnt'] : 0;
+    $totalData = $totalFiltered;
+} else {
+    $baseSql .= " WHERE $defaultFilter";
+    $countSql = "SELECT COUNT(*) AS cnt " . $baseSql;
+    $stmtCount = sqlsrv_query($con, $countSql);
+    $rowCount = sqlsrv_fetch_array($stmtCount, SQLSRV_FETCH_ASSOC);
+    sqlsrv_free_stmt($stmtCount);
+    $totalData = $totalFiltered = $rowCount ? (int)$rowCount['cnt'] : 0;
+}
 
 $orderColIdx = (int)($requestData['order'][0]['column'] ?? 0);
 $orderDir = strtolower($requestData['order'][0]['dir'] ?? 'desc');
@@ -70,7 +89,14 @@ while ($row = sqlsrv_fetch_array($query, SQLSRV_FETCH_ASSOC)) {
     $status =  '<a href="#" class="btn btn-xs btn-success"><strong>' . $row['status'] . '</strong></a href="#">';
     $nestedData = array();
 
-    $nestedData[] = '<div class="btn-group-vertical" role="group" aria-label="..."><a href="javascript:void(0)" class="_hapus btn btn-xs btn-danger"><i class="fa fa-trash"></i></a><a href="index1.php?p=edit_matching&rcode=' . $row['no_resep'] . '" class="_edit btn btn-xs btn-primary"><i class="fa fa-pencil"></i></a><a style="color: black;" target="_blank" href="pages/cetak/matching.php?idkk=' . $row['no_resep'] . '" class="btn btn-xs btn-warning"><i class="fa fa-print"></i></a></div>';
+    $actions = '';
+    if ($row['status'] === 'siap bagi') {
+        $actions .= '<a href="javascript:void(0)" class="_hapus btn btn-xs btn-danger"><i class="fa fa-trash"></i></a>';
+    }
+    $actions .= '<a href="index1.php?p=edit_matching&rcode=' . $row['no_resep'] . '" class="_edit btn btn-xs btn-primary"><i class="fa fa-pencil"></i></a>';
+    $actions .= '<a style="color: black;" target="_blank" href="pages/cetak/matching.php?idkk=' . $row['no_resep'] . '" class="btn btn-xs btn-warning"><i class="fa fa-print"></i></a>';
+
+    $nestedData[] = '<div class="btn-group-vertical" role="group" aria-label="...">' . $actions . '</div>';
     $nestedData[] = '<a href="javascript:void(0)" class="pilih">' . $row["no_resep"] . '</a>';
     $nestedData[] = $row["no_order"];
     $nestedData[] = $row["no_po"];
