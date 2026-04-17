@@ -437,7 +437,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     -- AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$_POST[tgl] $_POST[time]:00' AND '$_POST[tgl2] $_POST[time2]:00' 
                                     AND (
                                         (s.TRANSACTIONDATE > '$_POST[tgl]' OR (s.TRANSACTIONDATE = '$_POST[tgl]' AND s.TRANSACTIONTIME >= '$_POST[time]:00'))
-                                        AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:00'))
+                                        AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:59'))
                                     )
                                     )
                                     -- WHERE KODE_OBAT <>  'E-1-000'
@@ -632,7 +632,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                             AND s.TRANSACTIONDATE BETWEEN '$_POST[tgl]' AND '$_POST[tgl2]'
                                             AND (
                                                 (s.TRANSACTIONDATE > '$_POST[tgl]' OR (s.TRANSACTIONDATE = '$_POST[tgl]' AND s.TRANSACTIONTIME >= '$_POST[time]:00'))
-                                                AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:00'))
+                                                AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:59'))
                                             )
                                             AND s.TEMPLATECODE IN ('201','203','303')
                                             AND s.LOGICALWAREHOUSECODE $where_warehouse
@@ -689,7 +689,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                 AND s.TRANSACTIONDATE BETWEEN '$_POST[tgl]' AND '$_POST[tgl2]'
                                                 AND (
                                                     (s.TRANSACTIONDATE > '$_POST[tgl]' OR (s.TRANSACTIONDATE = '$_POST[tgl]' AND s.TRANSACTIONTIME >= '$_POST[time]:00'))
-                                                    AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:00'))
+                                                    AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:59'))
                                                 )
                                                 AND s.TEMPLATECODE IN ('120','098')
                                                 and not (s.CREATIONUSER = 'azwani.najwa'   AND s.TEMPLATECODE = '098' and (s.TRANSACTIONDATE ='2025-07-13' or s.TRANSACTIONDATE ='2025-10-05'))
@@ -782,7 +782,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                             AND s.TRANSACTIONDATE BETWEEN '$_POST[tgl]' AND '$_POST[tgl2]'
                                                             AND (
                                                                 (s.TRANSACTIONDATE > '$_POST[tgl]' OR (s.TRANSACTIONDATE = '$_POST[tgl]' AND s.TRANSACTIONTIME >= '$_POST[time]:00'))
-                                                                AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:00'))
+                                                                AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:59'))
                                                             )
                                                             AND s.TEMPLATECODE IN ('QCT','304','OPN','204','125')
                                                             AND NOT COALESCE(TRIM( CASE 
@@ -845,7 +845,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                 AND s.TRANSACTIONDATE BETWEEN '$_POST[tgl]' AND '$_POST[tgl2]'
                                                 AND (
                                                     (s.TRANSACTIONDATE > '$_POST[tgl]' OR (s.TRANSACTIONDATE = '$_POST[tgl]' AND s.TRANSACTIONTIME >= '$_POST[time]:00'))
-                                                    AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:00'))
+                                                    AND (s.TRANSACTIONDATE < '$_POST[tgl2]' OR (s.TRANSACTIONDATE = '$_POST[tgl2]' AND s.TRANSACTIONTIME <= '$_POST[time2]:59'))
                                                 )
                                                 AND s.TEMPLATECODE IN ('QCT','304','OPN','204','125')
                                                 -- and s.CREATIONUSER != 'MT_STI'
