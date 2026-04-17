@@ -56,7 +56,7 @@
 	$dt	= $sqlMatching ? sqlsrv_fetch_array($sqlMatching, SQLSRV_FETCH_ASSOC) : null;
 	$dt = $dt ?: [];
 	$buyerTest = trim($dt['buyer'] ?? '') . " " . trim($dt['no_item'] ?? '');
-	$hostSVR221 = "10.0.0.221";
+	$hostSVR221 = "sql-db-prd.indotaichen.com";
 	$usernameSVR221 = "sa";
 	$passwordSVR221 = "Ind@taichen2024";
 	$qc = "db_qc";

@@ -356,7 +356,7 @@ $page  = strtolower($page);
         text: 'Persentase Status Akhir Resep -12 Hari'
       },
       subtitle: {
-        text: 'Source: DB 10.0.0.10/laborat'
+        text: 'Source: DB wsu-db-prd.indotaichen.com/laborat'
       },
       xAxis: {
         categories: <?php echo $data_hari ?>,

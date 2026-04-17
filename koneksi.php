@@ -17,16 +17,16 @@ if (defined('LAB_KONEKSI_INITIALIZED')) {
 }
 define('LAB_KONEKSI_INITIALIZED', true);
 
-// $con_db_dyeing    = mysqli_connect("10.0.0.10","dit","4dm1n","db_dying");
+// $con_db_dyeing    = mysqli_connect("wsu-db-prd.indotaichen.com","dit","4dm1n","db_dying");
 
-$hostDbDyeing = "10.0.0.221";
+$hostDbDyeing = "sql-db-prd.indotaichen.com";
 $usernameDbDyeing = "sa";
 $passwordDbDyeing = "Ind@taichen2024";
 $dye = "db_dying";
 $db_dye = array("Database" => $dye, "UID" => $usernameDbDyeing, "PWD" => $passwordDbDyeing);
 $con_db_dyeing = sqlsrv_connect($hostDbDyeing, $db_dye);
 
-$hostSVR19     = "10.0.0.221";
+$hostSVR19     = "sql-db-prd.indotaichen.com";
 $usernameSVR19 = "sa";
 $passwordSVR19 = "Ind@taichen2024";
 $nowprd        = "nowprd";
@@ -38,7 +38,7 @@ $nowprdd       = [
 ];
 $con_nowprd = sqlsrv_connect($hostSVR19, $nowprdd);
 
-$hostDbADM = "10.0.0.221";
+$hostDbADM = "sql-db-prd.indotaichen.com";
 $usernameDbADM = "sa";
 $passwordDbADM = "Ind@taichen2024";
 $adm = "db_adm";
@@ -54,7 +54,7 @@ $port="25000";
 $conn_string = "DRIVER={IBM ODBC DB2 DRIVER}; HOSTNAME=$hostname; PORT=$port; PROTOCOL=TCPIP; UID=$user; PWD=$passworddb2; DATABASE=$database;";
 $conn1 = db2_pconnect($conn_string,'', '');
 
-$hostLabSqlsrv = "10.0.0.221";
+$hostLabSqlsrv = "sql-db-prd.indotaichen.com";
 $dbLabSqlsrv   = "db_laborat";
 $con = sqlsrv_connect($hostLabSqlsrv, [
     "Database" => $dbLabSqlsrv,

@@ -8,7 +8,7 @@ include "koneksi.php";
 if (!function_exists('qcf_print_api_send')) {
 	function qcf_print_api_send($docNumber)
 	{
-		$url = "http://10.0.0.121:8080/api/v1/document/create";
+		$url = "http://s-rfid.indotaichen.com:8080/api/v1/document/create";
 		$payload = json_encode([
 			"doc_number" => $docNumber,
 			"ip_address" => '10.0.6.225'

@@ -7,13 +7,13 @@ date_default_timezone_set('Asia/Jakarta');
 // $time       = date('Y-m-d H:i:s');
 // $connInfo   = array("Database" => $db_name, "UID" => $username, "PWD" => $password);
 // $conn       = sqlsrv_connect($host, $connInfo);
-$con        = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_laborat");
+$con        = mysqli_connect("wsu-db-prd.indotaichen.com", "dit", "4dm1n", "db_laborat");
 
 $time = date('Y-m-d H:i:s');
 
 function SiapBagi($jenis_matching)
 {
-    $con = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_laborat");
+    $con = mysqli_connect("wsu-db-prd.indotaichen.com", "dit", "4dm1n", "db_laborat");
     $sql = mysqli_fetch_array(
         /*mysqli_query($con,"SELECT count(a.id) as count 
                                         from tbl_matching a
@@ -42,7 +42,7 @@ if ($sql_siap_bagi) {
 
 function SedangJalan($jenis_matching)
 {
-    $con = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_laborat");
+    $con = mysqli_connect("wsu-db-prd.indotaichen.com", "dit", "4dm1n", "db_laborat");
     $sql = mysqli_fetch_array(
         /* mysqli_query($con,"SELECT count(b.id) as `count`
         FROM tbl_status_matching a
@@ -74,7 +74,7 @@ if ($sql_sedang_jalan) {
 
 function WaitingApprove($jenis_matching)
 {
-    $con = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_laborat");
+    $con = mysqli_connect("wsu-db-prd.indotaichen.com", "dit", "4dm1n", "db_laborat");
     $sql = mysqli_fetch_array(
         mysqli_query($con, "SELECT count(b.id) as `count`
         FROM tbl_status_matching a
@@ -100,7 +100,7 @@ if ($sql_WaitingApprove) {
 
 function Tunggu($jenis_matching)
 {
-    $con = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_laborat");
+    $con = mysqli_connect("wsu-db-prd.indotaichen.com", "dit", "4dm1n", "db_laborat");
     $sql = mysqli_fetch_array(
         //mysqli_query($con,"SELECT count(id) as `count` from tbl_matching where status_bagi = 'tunggu' and jenis_matching = '$jenis_matching'")
         mysqli_query($con, "select  count(a.id) as `count` FROM tbl_matching a 
@@ -129,7 +129,7 @@ if ($sql_Tunggu) {
 
 function belum_bagi($jenis_matching)
 {
-    $con = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_laborat");
+    $con = mysqli_connect("wsu-db-prd.indotaichen.com", "dit", "4dm1n", "db_laborat");
     $sql = mysqli_fetch_array(
         /*mysqli_query($con,"SELECT count(a.id) as `count` from tbl_matching a
         left join tbl_status_matching b on a.no_resep = b.idm

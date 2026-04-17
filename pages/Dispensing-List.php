@@ -124,7 +124,7 @@
 </style>
 
 <div class="row">
-    <div class="col-xs-12">
+    <div class="col-xs-12">10
         <div class="box">
             <div class="box-body">
                 <div class="row" style="margin-bottom: 10px;">

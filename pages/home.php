@@ -473,7 +473,7 @@ function sqlsrv_scalar_int($conn, $sql, array $params = [])
           text: 'Persentase Status Akhir Resep -12 Hari'
         },
         subtitle: {
-          text: 'Source: DB 10.0.0.221/laborat'
+          text: 'Source: DB sql-db-prd.indotaichen.com/laborat'
         },
         xAxis: {
           categories: d.xCategories,

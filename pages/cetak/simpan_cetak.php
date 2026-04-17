@@ -1,7 +1,7 @@
 <?php
 ini_set("error_reporting", 1);
 session_start();
-$con = mysqli_connect("10.0.0.10", "dit", "4dm1n", "db_laborat");
+$con = mysqli_connect("wsu-db-prd.indotaichen.com", "dit", "4dm1n", "db_laborat");
 $lReg_username = $_SESSION['labReg_username'];
 
 include "../../koneksiLAB.php";

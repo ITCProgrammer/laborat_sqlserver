@@ -25,6 +25,6 @@ RewriteRule ^([a-zA-Z0-9_-]+)$ index1.php?p=$1 [L]
 RewriteRule ^([a-zA-Z0-9_-]+)/$ index1.php?p=$1 [L]
 
 RewriteCond %{REQUEST_URI} ^/socket/ [NC]
-RewriteRule ^(.*)$ http://10.0.0.121:3000/$1 [P,L]
+RewriteRule ^(.*)$ http://s-rfid.indotaichen.com:3000/$1 [P,L]
 
 Options All -Indexes
