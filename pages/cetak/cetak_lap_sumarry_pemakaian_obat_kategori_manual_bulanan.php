@@ -18,7 +18,7 @@ $awal   = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
 $awal_  = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
 
 // Tanggal akhir = tanggal terakhir bulan tersebut jam 23:00:00
-$akhir  = date('Y-m-t 23:00:00', strtotime($tahun . '-' . $bulan . '-01'));
+$akhir  = date('Y-m-t 23:00:59', strtotime($tahun . '-' . $bulan . '-01'));
 $akhir_ = date('Y-m-t', strtotime($tahun . '-' . $bulan . '-01'));
 
 // Ambil bulan & tahun dari manual tadi
@@ -153,7 +153,7 @@ if (file_exists($logoPath)) {
 																u.LONGDESCRIPTION,
 																p.SUBCODE01
 															ORDER BY
-																p.SUBCODE01 ");
+																u.LONGDESCRIPTION ");
 
                 ?>
             <!-- No Form -->

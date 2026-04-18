@@ -322,7 +322,7 @@ if (file_exists($logoPath)) {
                                         AND i2.SUBCODE03 = s.DECOSUBCODE03
                                         WHERE
                                             s.ITEMTYPECODE = 'DYC'
-                                            AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:00'
+                                            AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:59'
                                             AND s.TEMPLATECODE IN ('201','203','303')
                                             AND s.LOGICALWAREHOUSECODE IN ('M510','M101')
                                             AND s.DECOSUBCODE01 = '$row[DECOSUBCODE01]' 
@@ -375,7 +375,7 @@ if (file_exists($logoPath)) {
                                                 STOCKTRANSACTION s
                                             WHERE
                                                 s.ITEMTYPECODE = 'DYC'
-                                                AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:00'
+                                                AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:59'
                                                 AND s.TEMPLATECODE IN ('120','098')
                                                 and not (s.CREATIONUSER = 'azwani.najwa'   AND s.TEMPLATECODE = '098' and (s.TRANSACTIONDATE ='2025-07-13' or s.TRANSACTIONDATE ='2025-10-05'))
                                                 AND s.LOGICALWAREHOUSECODE  IN ('M510','M101')
@@ -460,7 +460,7 @@ if (file_exists($logoPath)) {
                                                         WHERE
                                                             s.ITEMTYPECODE = 'DYC'
                                                             -- AND s.TRANSACTIONDATE BETWEEN '$awal' AND '$akhir'
-                                                            AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:00'
+                                                            AND TIMESTAMP(s.TRANSACTIONDATE, s.TRANSACTIONTIME) BETWEEN '$awal 23:01:00' AND '$akhir 23:00:59'
                                                             AND s.TEMPLATECODE IN ('QCT','304','OPN','204','125')
                                                            AND NOT COALESCE(TRIM( CASE 
                                                                 WHEN s3.TEMPLATECODE IS NOT NULL THEN s3.TEMPLATECODE
@@ -474,7 +474,9 @@ if (file_exists($logoPath)) {
                                                             AND s.DECOSUBCODE02 = '$row[DECOSUBCODE02]' 
                                                             AND s.DECOSUBCODE03 = '$row[DECOSUBCODE03]'
                                                             )  AS sub
-                                                            WHERE TEMPLATE <> '304'
+                                                            WHERE 
+															-- TEMPLATE <> '304'
+															sub.TEMPLATECODE <> '304'
                                                             GROUP BY 
                                                             ITEMTYPECODE,
                                                             TEMPLATE,

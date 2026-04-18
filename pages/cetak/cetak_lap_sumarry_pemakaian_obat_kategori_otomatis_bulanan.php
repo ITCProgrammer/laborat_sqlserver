@@ -9,7 +9,7 @@ $awal = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
 $awal_ = date('Y-m-d', strtotime('-1 day', strtotime($awaltanggal)));
 
 // Tanggal akhir = tanggal terakhir bulan berjalan jam 23:00:00
-$akhir = date('Y-m-d 23:00:00');
+$akhir = date('Y-m-d 23:00:59');
 $akhir_ = date('Y-m-d');
 
 $awalParam = $_GET['awal'] ?? '';
@@ -143,7 +143,7 @@ if (file_exists($logoPath)) {
 																u.LONGDESCRIPTION,
 																p.SUBCODE01
 															ORDER BY
-																p.SUBCODE01");
+																u.LONGDESCRIPTION");
 
                 ?>
             <!-- No Form -->
