@@ -798,7 +798,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                                             AND s.DECOSUBCODE02 = '$row[DECOSUBCODE02]' 
                                                             AND s.DECOSUBCODE03 = '$row[DECOSUBCODE03]'
                                                             )  AS sub
-                                                            WHERE TEMPLATE <> '304'
+                                                            WHERE 
+															-- TEMPLATE <> '304'
+															sub.TEMPLATECODE <> '304'
                                                             GROUP BY 
                                                             ITEMTYPECODE,
                                                             TEMPLATE,
