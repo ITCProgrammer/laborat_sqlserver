@@ -45,7 +45,7 @@ $adm = "db_adm";
 $db_adm = array("Database" => $adm, "UID" => $usernameDbADM, "PWD" => $passwordDbADM);
 $cona = sqlsrv_connect($hostDbADM, $db_adm);
 
-$hostname="10.0.0.21";
+$hostname="db2-db-prd.indotaichen.com";
 // $database = "NOWTEST"; // SERVER NOW 20
 $database = "NOWPRD"; // SERVER NOW 22
 $user = "db2admin";
