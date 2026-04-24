@@ -1,5 +1,5 @@
 <?php
-    $hostname = "10.0.0.21";
+    $hostname = "db2-db-prd.indotaichen.com";
                              // $database = "NOWTEST"; // SERVER NOW 20
     $database    = "NOWPRD"; // SERVER NOW 22
     $user        = "db2admin";
